@@ -1,0 +1,24 @@
+﻿datasets:
+  openaq_measurements:
+    required_columns:
+    - location_id
+    - location
+    - parameter
+    - value
+    - unit
+    - datetime
+    freshness_column: datetime
+  waqi_air_quality:
+    required_columns:
+    - station_uid
+    - station_name
+    - aqi
+    - observed_at
+    freshness_column: observed_at
+  ncei_cdo_climate:
+    required_columns:
+    - station
+    - date
+    - datatype
+    - value
+    freshness_column: date

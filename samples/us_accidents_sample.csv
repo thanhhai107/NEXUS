@@ -1,0 +1,4 @@
+ID,Severity,Start_Time,End_Time,Start_Lat,Start_Lng,Distance(mi),Description,Street,City,County,State,Zipcode,Weather_Timestamp,Temperature(F),Visibility(mi),Weather_Condition
+A-1,2,2026-04-28T07:30:00+00:00,2026-04-28T08:05:00+00:00,34.052235,-118.243683,0.12,Right lane blocked due to accident,I-5,Los Angeles,Los Angeles,CA,90012,2026-04-28T07:20:00+00:00,65.0,10.0,Clear
+A-2,3,2026-04-28T08:15:00+00:00,2026-04-28T09:05:00+00:00,40.712776,-74.005974,0.45,Multi-vehicle crash near ramp,FDR Dr,New York,New York,NY,10002,2026-04-28T08:00:00+00:00,58.0,6.0,Rain
+A-3,2,2026-04-28T09:10:00+00:00,2026-04-28T09:40:00+00:00,41.878113,-87.629799,0.20,Shoulder incident reported,I-90,Chicago,Cook,IL,60601,2026-04-28T09:00:00+00:00,51.0,8.0,Cloudy

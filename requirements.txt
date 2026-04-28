@@ -1,0 +1,10 @@
+requests==2.32.3
+kafka-python==2.0.2
+PyYAML==6.0.1
+jsonschema==4.23.0
+psycopg[binary]==3.2.3
+pytest==8.2.2
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pyspark==3.5.1
+dbt-trino==1.8.1

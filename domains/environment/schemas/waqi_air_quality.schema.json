@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WAQI Air Quality",
+  "type": "object",
+  "required": [
+    "station_uid",
+    "station_name",
+    "aqi",
+    "observed_at"
+  ],
+  "properties": {
+    "station_uid": {
+      "type": "integer"
+    },
+    "station_name": {
+      "type": "string"
+    },
+    "aqi": {
+      "type": "integer"
+    },
+    "observed_at": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "latitude": {
+      "type": "number"
+    },
+    "longitude": {
+      "type": "number"
+    },
+    "dominant_pollutant": {
+      "type": "string"
+    }
+  }
+}

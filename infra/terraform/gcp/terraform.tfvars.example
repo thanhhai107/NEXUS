@@ -1,0 +1,20 @@
+project_id = "your-gcp-project-id"
+enable_required_apis = true
+region = "asia-southeast1"
+zone   = "asia-southeast1-a"
+
+cluster_name = "nexus"
+
+network_name       = "default"
+machine_type       = "e2-custom-12-16384"
+worker_count       = 
+boot_disk_size_gb  = 
+boot_disk_type     = "pd-balanced"
+
+allowed_admin_cidrs = [
+  "YOUR_IP/32"
+]
+
+ssh_user       = "ubuntu"
+ssh_public_key = ""
+enable_oslogin = false

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TfL Transport Status",
+  "type": "object",
+  "required": [
+    "event_id",
+    "source",
+    "event_type",
+    "event_time"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string"
+    },
+    "event_time": {
+      "type": "string"
+    },
+    "line_id": {
+      "type": "string"
+    },
+    "line_name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "severity": {
+      "type": "integer"
+    },
+    "reason": {
+      "type": "string"
+    }
+  }
+}

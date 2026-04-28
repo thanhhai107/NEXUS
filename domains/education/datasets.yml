@@ -1,0 +1,84 @@
+﻿datasets:
+  world_bank_education:
+    domain: education
+    description: Education indicators from World Bank Open Data.
+    source_type: rest_api
+    source_uri: https://api.worldbank.org/v2/country/all/indicator/SE.XPD.TOTL.GD.ZS?format=json
+    docs_uri: https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-about-the-indicators-api-documentation
+    schema_path: domains/education/schemas/world_bank_education.schema.json
+    freshness_hours: 8760
+    primary_keys:
+    - country_id
+    - indicator_id
+    - year
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/world_bank_education/
+      bronze_table: nexus.bronze.world_bank_education
+      silver_table: nexus.silver.world_bank_education
+      gold_table: nexus.gold.world_bank_education_summary
+  unesco_uis_education:
+    domain: education
+    description: Education, science, and culture indicators from UNESCO UIS.
+    source_type: rest_api
+    source_uri: https://databrowser.uis.unesco.org/
+    docs_uri: https://databrowser.uis.unesco.org/resources
+    schema_path: domains/education/schemas/unesco_uis_education.schema.json
+    freshness_hours: 8760
+    primary_keys:
+    - country_id
+    - indicator_id
+    - year
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/unesco_uis_education/
+      bronze_table: nexus.bronze.unesco_uis_education
+      silver_table: nexus.silver.unesco_uis_education
+      gold_table: nexus.gold.unesco_uis_education_summary
+  college_scorecard:
+    domain: education
+    description: US higher education institution data from College Scorecard.
+    source_type: rest_api
+    source_uri: https://api.data.gov/ed/collegescorecard/v1/schools
+    docs_uri: https://collegescorecard.ed.gov/data/api/
+    api_key_env: COLLEGE_SCORECARD_API_KEY
+    schema_path: domains/education/schemas/college_scorecard.schema.json
+    freshness_hours: 8760
+    primary_keys:
+    - id
+    - latest_year
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/college_scorecard/
+      bronze_table: nexus.bronze.college_scorecard
+      silver_table: nexus.silver.college_scorecard
+      gold_table: nexus.gold.college_scorecard_summary
+  education_events:
+    domain: education
+    description: Optional simulated Education stream for attendance and enrollment
+      updates.
+    source_type: simulated_stream
+    topic: education-events
+    schema_path: domains/education/schemas/education_events.schema.json
+    freshness_hours: 1
+    primary_keys:
+    - event_id
+    governance:
+      owner: education-data-platform
+      steward: education-data-steward
+      sensitivity: internal
+      retention:
+        policy: internal-event-standard
+        days: 90
+      access_policy:
+        allowed_roles:
+        - admin
+        - steward
+        - analyst
+        denied_roles:
+        - public
+        api_access: true
+        trino_access: true
+        superset_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/education_events/
+      bronze_table: nexus.bronze.education_events
+      silver_table: nexus.silver.education_events
+      gold_table: nexus.gold.education_events_hourly

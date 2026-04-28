@@ -1,0 +1,251 @@
+﻿name: nexus
+
+services:
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: nexus-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: nexus-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: nexus-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "29092:29092"
+
+  spark:
+    image: bitnami/spark:3.5
+    container_name: nexus-spark
+    environment:
+      SPARK_MODE: master
+      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
+      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
+      SPARK_SSL_ENABLED: "no"
+    ports:
+      - "7077:7077"
+      - "8081:8080"
+    volumes:
+      - ../../:/opt/nexus
+
+  spark-worker:
+    image: bitnami/spark:3.5
+    container_name: nexus-spark-worker
+    depends_on:
+      - spark
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark:7077
+      SPARK_WORKER_MEMORY: 2G
+      SPARK_WORKER_CORES: 2
+    volumes:
+      - ../../:/opt/nexus
+
+  trino:
+    image: trinodb/trino:451
+    container_name: nexus-trino
+    depends_on:
+      - minio
+    ports:
+      - "8085:8080"
+    volumes:
+      - ../../serving/query/trino/catalog:/etc/trino/catalog
+      - ../../serving/query/trino/access-control.properties:/etc/trino/access-control.properties
+      - ../../serving/query/trino/rules.json:/etc/trino/rules.json
+
+  airflow-db:
+    image: postgres:16
+    container_name: nexus-airflow-db
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+
+  governance-db:
+    image: postgres:16
+    container_name: nexus-governance-db
+    environment:
+      POSTGRES_USER: nexus_governance
+      POSTGRES_PASSWORD: nexus_governance
+      POSTGRES_DB: nexus_governance
+    volumes:
+      - governance-db-data:/var/lib/postgresql/data
+
+  airflow:
+    image: apache/airflow:2.9.1-python3.11
+    container_name: nexus-airflow
+    depends_on:
+      - airflow-db
+      - governance-db
+      - kafka
+      - minio
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__SECRET_KEY: nexus-local-secret
+      _PIP_ADDITIONAL_REQUIREMENTS: requests kafka-python PyYAML jsonschema psycopg[binary]
+      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
+      NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db:5432/nexus_governance}
+      AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_ADMIN_USERNAME:-admin}
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      KAFKA_TOPIC_TRANSPORT_EVENTS: ${KAFKA_TOPIC_TRANSPORT_EVENTS:-transport-events}
+      NEXUS_STREAM_SOURCE: ${NEXUS_STREAM_SOURCE:-transport}
+      TRANSPORT_EVENTS_API_URL: ${TRANSPORT_EVENTS_API_URL:-}
+      TRANSPORT_EVENTS_API_KEY: ${TRANSPORT_EVENTS_API_KEY:-}
+      TFL_API_URL: ${TFL_API_URL:-https://api.tfl.gov.uk/Line/Mode/tube,dlr,overground,elizabeth-line/Status}
+      TFL_API_KEY: ${TFL_API_KEY:-}
+      GTFS_REALTIME_URL: ${GTFS_REALTIME_URL:-}
+      GTFS_REALTIME_TYPE: ${GTFS_REALTIME_TYPE:-vehicle_positions}
+      SG_TRAFFIC_API_URL: ${SG_TRAFFIC_API_URL:-https://api-open.data.gov.sg/v2/real-time/api/traffic-images}
+      OPENAQ_API_URL: ${OPENAQ_API_URL:-https://api.openaq.org/v3/measurements}
+      OPENAQ_API_KEY: ${OPENAQ_API_KEY:-}
+      WAQI_API_URL: ${WAQI_API_URL:-}
+      WAQI_API_TOKEN: ${WAQI_API_TOKEN:-}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      NEXUS_BUCKET: ${NEXUS_BUCKET:-nexus-lakehouse}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gpt-4o-mini}
+    command: >
+      bash -c "airflow db migrate &&
+      (airflow users create --username $${AIRFLOW_ADMIN_USERNAME} --password $${AIRFLOW_ADMIN_PASSWORD}
+      --firstname Nexus --lastname Admin --role Admin --email admin@example.com || true &&
+      true) &&
+      airflow webserver"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../../orchestration/airflow/dags:/opt/airflow/dags
+      - ../../common:/opt/airflow/common
+      - ../../config:/opt/airflow/config
+      - ../../domains:/opt/airflow/domains
+      - ../../ingestion:/opt/airflow/ingestion
+      - ../../processing:/opt/airflow/processing
+      - ../../governance:/opt/airflow/governance
+      - ../../cli:/opt/airflow/cli
+      - ../../samples:/opt/airflow/samples
+      - ../../runtime:/opt/airflow/runtime
+
+  airflow-scheduler:
+    image: apache/airflow:2.9.1-python3.11
+    container_name: nexus-airflow-scheduler
+    depends_on:
+      - airflow
+      - governance-db
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      _PIP_ADDITIONAL_REQUIREMENTS: requests kafka-python PyYAML jsonschema psycopg[binary]
+      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
+      NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db:5432/nexus_governance}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      KAFKA_TOPIC_TRANSPORT_EVENTS: ${KAFKA_TOPIC_TRANSPORT_EVENTS:-transport-events}
+      NEXUS_STREAM_SOURCE: ${NEXUS_STREAM_SOURCE:-transport}
+      TRANSPORT_EVENTS_API_URL: ${TRANSPORT_EVENTS_API_URL:-}
+      TRANSPORT_EVENTS_API_KEY: ${TRANSPORT_EVENTS_API_KEY:-}
+      TFL_API_URL: ${TFL_API_URL:-https://api.tfl.gov.uk/Line/Mode/tube,dlr,overground,elizabeth-line/Status}
+      TFL_API_KEY: ${TFL_API_KEY:-}
+      GTFS_REALTIME_URL: ${GTFS_REALTIME_URL:-}
+      GTFS_REALTIME_TYPE: ${GTFS_REALTIME_TYPE:-vehicle_positions}
+      SG_TRAFFIC_API_URL: ${SG_TRAFFIC_API_URL:-https://api-open.data.gov.sg/v2/real-time/api/traffic-images}
+      OPENAQ_API_URL: ${OPENAQ_API_URL:-https://api.openaq.org/v3/measurements}
+      OPENAQ_API_KEY: ${OPENAQ_API_KEY:-}
+      WAQI_API_URL: ${WAQI_API_URL:-}
+      WAQI_API_TOKEN: ${WAQI_API_TOKEN:-}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      NEXUS_BUCKET: ${NEXUS_BUCKET:-nexus-lakehouse}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gpt-4o-mini}
+    command: scheduler
+    volumes:
+      - ../../orchestration/airflow/dags:/opt/airflow/dags
+      - ../../common:/opt/airflow/common
+      - ../../config:/opt/airflow/config
+      - ../../domains:/opt/airflow/domains
+      - ../../ingestion:/opt/airflow/ingestion
+      - ../../processing:/opt/airflow/processing
+      - ../../governance:/opt/airflow/governance
+      - ../../cli:/opt/airflow/cli
+      - ../../samples:/opt/airflow/samples
+      - ../../runtime:/opt/airflow/runtime
+
+  superset:
+    image: apache/superset:4.0.2
+    container_name: nexus-superset
+    depends_on:
+      - trino
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-change-me-for-production}
+    ports:
+      - "8088:8088"
+    volumes:
+      - ../../serving/dashboards/superset:/app/pythonpath
+      - superset-home:/app/superset_home
+    command: >
+      bash -c "superset db upgrade &&
+      (superset fab create-admin --username ${SUPERSET_ADMIN_USERNAME:-admin}
+      --firstname Nexus --lastname Admin --email admin@example.com
+      --password ${SUPERSET_ADMIN_PASSWORD:-admin} || true) &&
+      superset init &&
+      superset run -h 0.0.0.0 -p 8088"
+
+  api:
+    build:
+      context: ../..
+      dockerfile: serving/api/Dockerfile
+    container_name: nexus-api
+    depends_on:
+      - trino
+      - governance-db
+    environment:
+      TRINO_HOST: ${TRINO_HOST:-trino}
+      TRINO_PORT: ${TRINO_PORT:-8080}
+      TRINO_USER: ${TRINO_USER:-nexus}
+      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
+      NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db:5432/nexus_governance}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../common:/app/common
+      - ../../config:/app/config
+      - ../../domains:/app/domains
+      - ../../runtime:/app/runtime
+      - ../../governance:/app/governance
+
+volumes:
+  minio-data:
+  airflow-db-data:
+  governance-db-data:
+  superset-home:

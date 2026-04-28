@@ -1,0 +1,55 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python cache and test artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Runtime outputs
+runtime/logs/*
+!runtime/logs/.gitkeep
+runtime/raw/*
+!runtime/raw/.gitkeep
+runtime/quarantine/*
+!runtime/quarantine/.gitkeep
+runtime/metrics/*
+!runtime/metrics/.gitkeep
+runtime/schemas/history/*
+!runtime/schemas/history/.gitkeep
+
+# dbt and analytics outputs
+target/
+transform/dbt/target/
+transform/dbt/logs/
+
+# Local service state
+superset_home/
+
+# Terraform
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

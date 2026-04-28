@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Transport Events",
+  "type": "object",
+  "required": [
+    "event_id",
+    "source",
+    "event_type",
+    "event_time"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "severity": {
+      "type": "integer"
+    },
+    "state": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "latitude": {
+      "type": "number"
+    },
+    "longitude": {
+      "type": "number"
+    }
+  }
+}

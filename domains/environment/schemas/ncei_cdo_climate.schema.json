@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NCEI CDO Climate",
+  "type": "object",
+  "required": [
+    "station",
+    "date",
+    "datatype",
+    "value"
+  ],
+  "properties": {
+    "station": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string"
+    },
+    "datatype": {
+      "type": "string"
+    },
+    "value": {
+      "type": "number"
+    },
+    "attributes": {
+      "type": "string"
+    }
+  }
+}

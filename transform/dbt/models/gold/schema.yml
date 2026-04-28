@@ -1,0 +1,15 @@
+﻿version: 2
+
+models:
+  - name: us_accidents_summary
+    description: Gold aggregate of US accident counts and distance by state and severity.
+    columns:
+      - name: state
+        tests:
+          - not_null
+      - name: severity
+        tests:
+          - not_null
+      - name: accident_count
+        tests:
+          - not_null

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenAQ Measurements",
+  "type": "object",
+  "required": [
+    "location_id",
+    "location",
+    "parameter",
+    "value",
+    "unit",
+    "datetime"
+  ],
+  "properties": {
+    "location_id": {
+      "type": "integer"
+    },
+    "location": {
+      "type": "string"
+    },
+    "parameter": {
+      "type": "string"
+    },
+    "value": {
+      "type": "number"
+    },
+    "unit": {
+      "type": "string"
+    },
+    "datetime": {
+      "type": "string"
+    },
+    "latitude": {
+      "type": "number"
+    },
+    "longitude": {
+      "type": "number"
+    },
+    "country": {
+      "type": "string"
+    }
+  }
+}

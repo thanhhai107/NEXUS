@@ -1,0 +1,28 @@
+﻿datasets:
+  world_bank_education:
+    required_columns:
+    - country_id
+    - country_name
+    - indicator_id
+    - indicator_name
+    - year
+    freshness_column: year
+  unesco_uis_education:
+    required_columns:
+    - country_id
+    - indicator_id
+    - year
+    freshness_column: year
+  college_scorecard:
+    required_columns:
+    - id
+    - school_name
+    - latest_year
+    freshness_column: latest_year
+  education_events:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    freshness_column: event_time

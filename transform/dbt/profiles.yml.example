@@ -1,0 +1,12 @@
+nexus:
+  target: local
+  outputs:
+    local:
+      type: trino
+      method: none
+      user: nexus
+      host: localhost
+      port: 8085
+      database: iceberg
+      schema: gold
+      threads: 4

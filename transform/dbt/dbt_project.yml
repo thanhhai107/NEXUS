@@ -1,0 +1,14 @@
+﻿name: nexus_dbt
+version: 0.1.0
+config-version: 2
+
+profile: nexus
+
+model-paths:
+  - models
+
+models:
+  nexus_dbt:
+    gold:
+      +materialized: table
+      +schema: gold

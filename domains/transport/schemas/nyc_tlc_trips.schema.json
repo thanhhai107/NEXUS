@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NYC TLC Trips",
+  "type": "object",
+  "required": [
+    "VendorID",
+    "tpep_pickup_datetime",
+    "tpep_dropoff_datetime",
+    "passenger_count",
+    "trip_distance"
+  ],
+  "properties": {
+    "VendorID": {
+      "type": "integer"
+    },
+    "tpep_pickup_datetime": {
+      "type": "string"
+    },
+    "tpep_dropoff_datetime": {
+      "type": "string"
+    },
+    "passenger_count": {
+      "type": "number"
+    },
+    "trip_distance": {
+      "type": "number"
+    },
+    "PULocationID": {
+      "type": "integer"
+    },
+    "DOLocationID": {
+      "type": "integer"
+    },
+    "fare_amount": {
+      "type": "number"
+    },
+    "total_amount": {
+      "type": "number"
+    }
+  }
+}

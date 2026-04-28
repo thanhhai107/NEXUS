@@ -1,0 +1,17 @@
+default_governance:
+  owner: data-platform
+  steward: data-steward
+  sensitivity: public
+  retention:
+    policy: open-data-standard
+    days: 365
+  access_policy:
+    allowed_roles:
+    - admin
+    - steward
+    - analyst
+    - public
+    denied_roles: []
+    api_access: true
+    trino_access: true
+    superset_access: true

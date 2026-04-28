@@ -1,0 +1,95 @@
+{
+  "catalogs": [
+    {
+      "role": "admin|steward",
+      "catalog": "iceberg|system",
+      "allow": "all"
+    },
+    {
+      "role": "analyst|public",
+      "catalog": "iceberg",
+      "allow": "read-only"
+    },
+    {
+      "user": "nexus",
+      "catalog": "iceberg",
+      "allow": "read-only"
+    },
+    {
+      "catalog": "system",
+      "allow": "none"
+    }
+  ],
+  "schemas": [
+    {
+      "role": "admin|steward",
+      "catalog": "iceberg",
+      "schema": ".*",
+      "owner": true
+    },
+    {
+      "role": "analyst",
+      "catalog": "iceberg",
+      "schema": "bronze|silver|gold",
+      "owner": false
+    },
+    {
+      "role": "public",
+      "catalog": "iceberg",
+      "schema": "gold",
+      "owner": false
+    },
+    {
+      "user": "nexus",
+      "catalog": "iceberg",
+      "schema": "gold",
+      "owner": false
+    }
+  ],
+  "tables": [
+    {
+      "role": "admin|steward",
+      "catalog": "iceberg",
+      "schema": ".*",
+      "table": ".*",
+      "privileges": ["SELECT", "INSERT", "DELETE", "UPDATE", "OWNERSHIP", "GRANT_SELECT"]
+    },
+    {
+      "role": "analyst",
+      "catalog": "iceberg",
+      "schema": "bronze|silver|gold",
+      "table": ".*",
+      "privileges": ["SELECT"]
+    },
+    {
+      "role": "public",
+      "catalog": "iceberg",
+      "schema": "gold",
+      "table": ".*",
+      "privileges": ["SELECT"]
+    },
+    {
+      "user": "nexus",
+      "catalog": "iceberg",
+      "schema": "gold",
+      "table": ".*",
+      "privileges": ["SELECT"]
+    }
+  ],
+  "queries": [
+    {
+      "role": "admin|steward|analyst|public",
+      "allow": ["execute", "view", "kill"]
+    },
+    {
+      "user": "nexus",
+      "allow": ["execute", "view"]
+    }
+  ],
+  "system_information": [
+    {
+      "role": "admin|steward",
+      "allow": ["read", "write"]
+    }
+  ]
+}
