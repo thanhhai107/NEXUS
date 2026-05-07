@@ -13,7 +13,7 @@ It creates:
 - SSH, master UI, MinIO console, and internal cluster firewall rules
 - A small VM service account for logging and monitoring
 - `/etc/nexus-node.env` and `/etc/nexus-elastic.env` on each VM
-- Optional repo provisioning into `/opt/nexus/app` and `/opt/nexus/docker-elk`
+- Optional repo provisioning into `/opt/nexus/nexus` and `/opt/nexus/docker-elk`
 
 It does not install Kubernetes or Ansible.
 
@@ -84,7 +84,7 @@ docker_elk_repo_ref = "main"
 When these URLs are set, the startup script clones or syncs to the latest
 commit on the configured branch:
 
-- Nexus repo: `/opt/nexus/app`
+- Nexus repo: `/opt/nexus/nexus`
 - ShopX `docker-elk` repo: `/opt/nexus/docker-elk`
 
 It does not run Docker Compose automatically.
@@ -115,7 +115,7 @@ After the VM is running, SSH into the target VM and run the stack you want.
 Run the Nexus stack on the master VM from the Nexus repo:
 
 ```bash
-cd /opt/nexus/app
+cd /opt/nexus/nexus
 docker compose -f infra/docker/docker-compose.yml up -d
 ```
 

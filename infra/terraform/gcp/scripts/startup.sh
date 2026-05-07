@@ -29,6 +29,8 @@ sync_git_repo() {
     git clone "${repo_url}" "${target_dir}"
   fi
 
+  chown -R ubuntu:ubuntu "${target_dir}"
+  git config --global --add safe.directory "${target_dir}"
   git -C "${target_dir}" remote set-url origin "${repo_url}"
   git -C "${target_dir}" fetch origin --tags --prune
   if git -C "${target_dir}" show-ref --verify --quiet "refs/remotes/origin/${repo_ref}"; then
@@ -52,7 +54,7 @@ DOCKER_ELK_REPO_REF="$(metadata_attr docker-elk-repo-ref)"
 SSH_PASSWORD_LOGIN="$(metadata_attr ssh-password-login)"
 SSH_PASSWORD="$(metadata_attr ssh-password)"
 SSH_USER="$(metadata_attr ssh-user)"
-NEXUS_APP_DIR="/opt/nexus/app"
+NEXUS_APP_DIR="/opt/nexus/nexus"
 DOCKER_ELK_APP_DIR="/opt/nexus/docker-elk"
 
 if [ "${NEXUS_NODE_ROLE}" = "master" ]; then
