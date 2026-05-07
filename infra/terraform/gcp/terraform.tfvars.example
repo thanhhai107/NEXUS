@@ -7,14 +7,25 @@ cluster_name = "nexus"
 
 network_name       = "default"
 machine_type       = "e2-custom-12-16384"
-worker_count       = 
-boot_disk_size_gb  = 
+worker_count       = 4
+boot_disk_size_gb  = 200
 boot_disk_type     = "pd-balanced"
 
 allowed_admin_cidrs = [
-  "YOUR_IP/32"
+  "0.0.0.0/0"
 ]
 
 ssh_user       = "ubuntu"
 ssh_public_key = ""
 enable_oslogin = false
+
+enable_ssh_password_login = true
+ssh_password              = "CHANGE_ME_TO_A_STRONG_PASSWORD"
+
+# Optional repo provisioning. Startup will clone/pull these repos onto each VM,
+# but it will not start Docker Compose automatically.
+nexus_repo_url = "https://github.com/thanhhai107/NEXUS.git"
+nexus_repo_ref = "main"
+
+docker_elk_repo_url = "https://github.com/thanhhai107/docker-elk.git"
+docker_elk_repo_ref = "main"

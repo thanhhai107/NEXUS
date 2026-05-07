@@ -1,4 +1,4 @@
-﻿terraform {
+terraform {
   required_version = ">= 1.6.0"
 
   required_providers {
@@ -98,6 +98,43 @@ variable "enable_oslogin" {
   default     = false
 }
 
+variable "enable_ssh_password_login" {
+  description = "Enable SSH password authentication for ssh_user."
+  type        = bool
+  default     = false
+}
+
+variable "ssh_password" {
+  description = "Password for ssh_user when enable_ssh_password_login is true."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "nexus_repo_url" {
+  description = "Git URL for the Nexus repo. Leave empty to skip provisioning this repo on VMs."
+  type        = string
+  default     = "https://github.com/thanhhai107/NEXUS.git"
+}
+
+variable "nexus_repo_ref" {
+  description = "Git branch, tag, or commit to checkout for the Nexus repo."
+  type        = string
+  default     = "main"
+}
+
+variable "docker_elk_repo_url" {
+  description = "Git URL for the docker-elk ShopX demo repo. Leave empty to skip provisioning this repo on VMs."
+  type        = string
+  default     = "https://github.com/thanhhai107/docker-elk.git"
+}
+
+variable "docker_elk_repo_ref" {
+  description = "Git branch, tag, or commit to checkout for the docker-elk ShopX demo repo."
+  type        = string
+  default     = "main"
+}
+
 
 locals {
   cluster_tag = "${var.cluster_name}-cluster"
@@ -105,8 +142,15 @@ locals {
   worker_tag  = "${var.cluster_name}-worker"
 
   common_metadata = {
-    nexus-cluster-name = var.cluster_name
-    enable-oslogin     = var.enable_oslogin ? "TRUE" : "FALSE"
+    nexus-cluster-name  = var.cluster_name
+    nexus-repo-ref      = var.nexus_repo_ref
+    nexus-repo-url      = var.nexus_repo_url
+    docker-elk-repo-ref = var.docker_elk_repo_ref
+    docker-elk-repo-url = var.docker_elk_repo_url
+    ssh-password-login  = var.enable_ssh_password_login ? "TRUE" : "FALSE"
+    ssh-password        = var.ssh_password
+    ssh-user            = var.ssh_user
+    enable-oslogin      = var.enable_oslogin ? "TRUE" : "FALSE"
   }
 
   optional_ssh_metadata = var.ssh_public_key == "" ? {} : {
@@ -171,7 +215,7 @@ resource "google_compute_firewall" "master_ui" {
 
   allow {
     protocol = "tcp"
-    ports    = ["8000", "8080", "8085", "8088"]
+    ports    = ["8000", "5601", "8080", "8085", "8088"]
   }
 }
 
@@ -270,7 +314,6 @@ resource "google_compute_instance" "workers" {
 
   network_interface {
     network = data.google_compute_network.selected.self_link
-    access_config {}
   }
 
   metadata = merge(local.common_metadata, local.optional_ssh_metadata, {
@@ -309,8 +352,8 @@ output "workers" {
     for worker in google_compute_instance.workers : {
       name       = worker.name
       private_ip = worker.network_interface[0].network_ip
-      public_ip  = worker.network_interface[0].access_config[0].nat_ip
-      ssh        = "ssh ${var.ssh_user}@${worker.network_interface[0].access_config[0].nat_ip}"
+      public_ip  = ""
+      ssh        = "ssh -J ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip} ${var.ssh_user}@${worker.network_interface[0].network_ip}"
     }
   ]
 }
@@ -318,9 +361,9 @@ output "workers" {
 output "service_urls" {
   value = {
     airflow  = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8080"
+    kibana   = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:5601"
     trino    = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8085"
     superset = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8088"
     fastapi  = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8000"
   }
 }
-
