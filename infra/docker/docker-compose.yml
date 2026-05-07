@@ -1,4 +1,4 @@
-﻿name: nexus
+name: nexus
 
 services:
   minio:
@@ -133,9 +133,9 @@ services:
       WAQI_API_TOKEN: ${WAQI_API_TOKEN:-}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
       NEXUS_BUCKET: ${NEXUS_BUCKET:-nexus-lakehouse}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gpt-4o-mini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
+      NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
     command: >
       bash -c "airflow db migrate &&
       (airflow users create --username $${AIRFLOW_ADMIN_USERNAME} --password $${AIRFLOW_ADMIN_PASSWORD}
@@ -185,9 +185,9 @@ services:
       WAQI_API_TOKEN: ${WAQI_API_TOKEN:-}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
       NEXUS_BUCKET: ${NEXUS_BUCKET:-nexus-lakehouse}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gpt-4o-mini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
+      NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
     command: scheduler
     volumes:
       - ../../orchestration/airflow/dags:/opt/airflow/dags

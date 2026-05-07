@@ -1,4 +1,4 @@
-﻿# NEXUS: Network for Extracting, Unifying, and Supervising Open Data
+# NEXUS: Network for Extracting, Unifying, and Supervising Open Data
 
 NEXUS is a student-project-friendly data lakehouse scaffold for ingesting, governing, processing, and serving heterogeneous open data. It uses a medallion architecture with MinIO, Iceberg, Spark, dbt, Trino, Superset, Airflow, and an optional FastAPI metadata service.
 
@@ -210,7 +210,7 @@ For each batch, the agent writes one auditable decision and remediation plan to 
 - `WARNING`: continue the pipeline, but mark the batch with a warning.
 - `FAIL`: stop the pipeline and keep data in quarantine.
 
-The agent can call an LLM when `OPENAI_API_KEY` is configured. If no key is configured, or if the LLM response is invalid, it falls back to deterministic rules:
+The agent can call an LLM when `GEMINI_API_KEY` is configured. If no key is configured, or if the LLM response is invalid, it falls back to deterministic rules:
 
 - Quality gate failed or readiness score below 50: `FAIL`
 - Readiness score from 50 to below 80: `WARNING`

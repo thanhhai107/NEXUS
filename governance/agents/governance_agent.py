@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -55,33 +55,36 @@ def _collect_evidence(dataset_name: str, batch_id: str) -> dict[str, Any]:
 
 
 def _llm_decision(evidence: dict[str, Any]) -> AgentDecision | None:
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         return None
 
-    url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/") + "/chat/completions"
-    model = os.getenv("NEXUS_AGENT_MODEL", "gpt-4o-mini")
+    model = os.getenv("NEXUS_AGENT_MODEL", "gemini-2.5-flash")
+    base_url = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
+    url = f"{base_url}/models/{model}:generateContent?key={api_key}"
+
     payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": "Return only valid JSON. Do not include markdown."},
-            {"role": "user", "content": build_prompt(evidence)},
+        "system_instruction": {
+            "parts": [{"text": "Return only valid JSON. Do not include markdown."}]
+        },
+        "contents": [
+            {"role": "user", "parts": [{"text": build_prompt(evidence)}]}
         ],
-        "temperature": 0,
+        "generationConfig": {
+            "temperature": 0,
+            "responseMimeType": "application/json",
+        }
     }
 
     try:
         response = requests.post(
             url,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
+            headers={"Content-Type": "application/json"},
             json=payload,
             timeout=30,
         )
         response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
+        content = response.json()["candidates"][0]["content"]["parts"][0]["text"]
         parsed = json.loads(content)
         parsed["dataset_name"] = evidence["dataset_name"]
         parsed["batch_id"] = evidence["batch_id"]
