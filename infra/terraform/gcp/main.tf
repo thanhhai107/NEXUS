@@ -120,7 +120,7 @@ variable "nexus_repo_url" {
 variable "nexus_repo_ref" {
   description = "Git branch, tag, or commit to checkout for the Nexus repo."
   type        = string
-  default     = "main"
+  default     = "master"
 }
 
 variable "docker_elk_repo_url" {

@@ -25,7 +25,7 @@ ssh_password              = "CHANGE_ME_TO_A_STRONG_PASSWORD"
 # Optional repo provisioning. Startup will clone/pull these repos onto each VM,
 # but it will not start Docker Compose automatically.
 nexus_repo_url = "https://github.com/thanhhai107/NEXUS.git"
-nexus_repo_ref = "main"
+nexus_repo_ref = "master"
 
 docker_elk_repo_url = "https://github.com/thanhhai107/docker-elk.git"
 docker_elk_repo_ref = "main"

@@ -15,6 +15,8 @@ metadata_instance() {
     "http://metadata.google.internal/computeMetadata/v1/instance/${path}" || true
 }
 
+BOOTSTRAP_USER="ubuntu"
+
 sync_git_repo() {
   local repo_url="$1"
   local repo_ref="$2"
@@ -29,7 +31,7 @@ sync_git_repo() {
     git clone "${repo_url}" "${target_dir}"
   fi
 
-  chown -R ubuntu:ubuntu "${target_dir}"
+  chown -R "${BOOTSTRAP_USER}:${BOOTSTRAP_USER}" "${target_dir}"
   git config --global --add safe.directory "${target_dir}"
   git -C "${target_dir}" remote set-url origin "${repo_url}"
   git -C "${target_dir}" fetch origin --tags --prune
@@ -39,7 +41,7 @@ sync_git_repo() {
   else
     git -C "${target_dir}" checkout --detach "${repo_ref}"
   fi
-  chown -R ubuntu:ubuntu "${target_dir}"
+  chown -R "${BOOTSTRAP_USER}:${BOOTSTRAP_USER}" "${target_dir}"
 }
 
 NEXUS_CLUSTER_NAME="$(metadata_attr nexus-cluster-name)"
@@ -54,6 +56,9 @@ DOCKER_ELK_REPO_REF="$(metadata_attr docker-elk-repo-ref)"
 SSH_PASSWORD_LOGIN="$(metadata_attr ssh-password-login)"
 SSH_PASSWORD="$(metadata_attr ssh-password)"
 SSH_USER="$(metadata_attr ssh-user)"
+if [ -n "${SSH_USER}" ]; then
+  BOOTSTRAP_USER="${SSH_USER}"
+fi
 NEXUS_APP_DIR="/opt/nexus/nexus"
 DOCKER_ELK_APP_DIR="/opt/nexus/docker-elk"
 
@@ -95,7 +100,7 @@ apt-get install -y \
   docker-compose-plugin
 
 systemctl enable --now docker
-usermod -aG docker ubuntu || true
+usermod -aG docker "${BOOTSTRAP_USER}" || true
 
 if [ "${SSH_PASSWORD_LOGIN}" = "TRUE" ] && [ -n "${SSH_PASSWORD}" ] && [ -n "${SSH_USER}" ]; then
   echo "${SSH_USER}:${SSH_PASSWORD}" | chpasswd
@@ -123,7 +128,7 @@ mkdir -p \
   /data/trino \
   /var/log/nexus
 
-chown -R ubuntu:ubuntu /opt/nexus /data /var/log/nexus
+chown -R "${BOOTSTRAP_USER}:${BOOTSTRAP_USER}" /opt/nexus /data /var/log/nexus
 chown -R 1000:1000 /data/elasticsearch
 chown -R 999:999 /data/postgres
 

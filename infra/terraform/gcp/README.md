@@ -75,7 +75,7 @@ By default, the VM boots with both demo repos already present:
 
 ```hcl
 nexus_repo_url = "https://github.com/thanhhai107/NEXUS.git"
-nexus_repo_ref = "main"
+nexus_repo_ref = "master"
 
 docker_elk_repo_url = "https://github.com/thanhhai107/docker-elk.git"
 docker_elk_repo_ref = "main"
