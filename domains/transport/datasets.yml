@@ -1,4 +1,4 @@
-﻿datasets:
+datasets:
   us_accidents:
     domain: transport
     description: Primary Transport batch dataset based on Kaggle US Accidents.
@@ -61,6 +61,23 @@
     freshness_hours: 1
     primary_keys:
     - event_id
+    governance:
+      owner: transport-data-platform
+      steward: transport-data-steward
+      sensitivity: internal
+      retention:
+        policy: internal-event-standard
+        days: 90
+      access_policy:
+        allowed_roles:
+        - admin
+        - steward
+        - analyst
+        denied_roles:
+        - public
+        api_access: true
+        trino_access: true
+        superset_access: true
     target:
       raw_path: s3a://nexus-lakehouse/raw/transport_events/
       bronze_table: nexus.bronze.transport_events

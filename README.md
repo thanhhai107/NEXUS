@@ -25,7 +25,7 @@ Sources -> Ingestion -> Raw -> Bronze -> Silver -> Gold -> Serving
 
 Core layers:
 
-- **Sources**: Transport, Environment, and Education open-data APIs/files, with Transport as the first runnable domain.
+- **Sources**: Transport and Environment open-data APIs/files, with Transport as the first runnable domain.
 - **Ingestion**: Python loaders write source-preserving raw JSONL envelopes.
 - **Storage**: MinIO provides S3-compatible object storage for local development.
 - **Tables**: Apache Iceberg manages Bronze, Silver, and Gold datasets.
@@ -128,7 +128,7 @@ Supported streaming sources:
 | `tfl` | Transport | `transport-tfl` | Transport for London line status. |
 | `gtfs` | Transport | `transport-gtfs` | GTFS Realtime feed wrapper; set `GTFS_REALTIME_URL`. |
 | `singapore` | Transport | `transport-sg-traffic` | Data.gov.sg traffic images. |
-| `education_sim` | Education | `education-events` | Optional simulated attendance/enrollment events. |
+
 
 Examples:
 
@@ -136,11 +136,11 @@ Examples:
 python ingestion/streaming/producer.py --source openaq --events 5
 python ingestion/streaming/producer.py --source tfl --events 5
 python ingestion/streaming/producer.py --source singapore --events 5
-python ingestion/streaming/producer.py --source education_sim --events 5
+
 python -m cli.nexus quality stream --source openaq --sample-events 25
 ```
 
-To run a specific source in Airflow, set `NEXUS_STREAM_SOURCE` in `.env`. Education remains batch-first; `education_sim` is only for optional streaming demonstrations.
+
 
 The Transport catalog also includes NYC TLC Trip Record Data as a secondary batch source. It is configured in `domains/*/datasets.yml`, but the default DAG starts with US Accidents to keep the first Transport pipeline small.
 
@@ -150,14 +150,7 @@ Environment sources are configured:
 - World Air Quality Index project air-quality API stream
 - NOAA NCEI Climate Data Online
 
-Education catalog sources are configured:
-
-- World Bank Education indicators
-- UNESCO UIS Education indicators
-- College Scorecard
-- Optional simulated attendance/enrollment events
-
-Environment and Transport streaming sources are cataloged with schemas and quality rules. Education data remains batch-first because it is not naturally real-time.
+Environment and Transport streaming sources are cataloged with schemas and quality rules.
 
 Raw records use this envelope shape:
 

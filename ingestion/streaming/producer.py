@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import json
@@ -19,7 +19,7 @@ TOPICS = {
     "tfl": "transport-tfl",
     "gtfs": "transport-gtfs",
     "singapore": "transport-sg-traffic",
-    "education_sim": "education-events",
+
 }
 
 
@@ -54,17 +54,7 @@ def sim_env() -> dict[str, object]:
     }
 
 
-def sim_edu() -> dict[str, object]:
-    return {
-        "event_id": str(uuid.uuid4()),
-        "source": "simulated-education-producer",
-        "event_type": random.choice(["attendance_update", "enrollment_update"]),
-        "event_time": now_iso(),
-        "school_id": f"SCH-{random.randint(100, 999)}",
-        "country": random.choice(["VN", "US", "SG", "ID"]),
-        "grade_level": random.choice(["primary", "lower_secondary", "upper_secondary"]),
-        "event_count": random.randint(1, 200),
-    }
+
 
 
 def api_json(url: str, api_key: str | None = None, header: str = "Authorization") -> Any:
@@ -246,8 +236,7 @@ def event_stream(source: str, api_url: str | None, api_key: str | None, events: 
         except Exception as exc:
             print(f"{source} API unavailable, using fallback: {exc}")
 
-    if source == "education_sim":
-        return [sim_edu() for _ in range(events)]
+
     if source in {"openaq", "waqi"}:
         return [sim_env() for _ in range(events)]
     return [sim_transport() for _ in range(events)]
@@ -285,7 +274,7 @@ def default_url(source: str) -> str | None:
         "tfl": os.getenv("TFL_API_URL", "https://api.tfl.gov.uk/Line/Mode/tube,dlr,overground,elizabeth-line/Status"),
         "gtfs": os.getenv("GTFS_REALTIME_URL"),
         "singapore": os.getenv("SG_TRAFFIC_API_URL", "https://api-open.data.gov.sg/v2/real-time/api/traffic-images"),
-        "education_sim": None,
+
     }
     return urls.get(source)
 

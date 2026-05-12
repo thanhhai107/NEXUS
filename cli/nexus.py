@@ -35,7 +35,6 @@ SOURCE_DATASETS = {
     "tfl": "tfl_transport_status",
     "gtfs": "gtfs_realtime_events",
     "singapore": "sg_traffic",
-    "education_sim": "education_events",
 }
 
 

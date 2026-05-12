@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
@@ -32,7 +32,7 @@ sync_git_repo() {
   fi
 
   chown -R "${BOOTSTRAP_USER}:${BOOTSTRAP_USER}" "${target_dir}"
-  git config --global --add safe.directory "${target_dir}"
+  git config --system --add safe.directory "${target_dir}"
   git -C "${target_dir}" remote set-url origin "${repo_url}"
   git -C "${target_dir}" fetch origin --tags --prune
   if git -C "${target_dir}" show-ref --verify --quiet "refs/remotes/origin/${repo_ref}"; then
