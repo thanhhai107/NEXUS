@@ -48,6 +48,7 @@ project_id = "your-gcp-project-id"
 allowed_admin_cidrs = ["YOUR_PUBLIC_IP/32"]
 ssh_public_key = "ssh-ed25519 YOUR_PUBLIC_KEY nexus"
 enable_oslogin = false
+enable_master_worker_ssh = true
 ```
 
 If you intentionally want SSH open to the whole Internet, use:
@@ -109,6 +110,35 @@ Workers do not have public IPs. Connect through the master VM as a jump host:
 ```bash
 ssh -J ubuntu@<MASTER_PUBLIC_IP> ubuntu@<WORKER_PRIVATE_IP>
 ```
+
+When `enable_master_worker_ssh = true`, Terraform also creates an internal
+cluster SSH key and adds its public key to all VMs. On the master VM, install
+the generated private key from instance metadata once:
+
+```bash
+install -m 700 -d ~/.ssh
+curl -fsS -H "Metadata-Flavor: Google" \
+  http://metadata.google.internal/computeMetadata/v1/instance/attributes/nexus-master-worker-private-key-b64 \
+  | base64 -d > ~/.ssh/id_ed25519_nexus_cluster
+chmod 600 ~/.ssh/id_ed25519_nexus_cluster
+cat > ~/.ssh/config <<'EOF'
+Host nexus-worker-* 10.*
+  User ubuntu
+  IdentityFile ~/.ssh/id_ed25519_nexus_cluster
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new
+EOF
+chmod 600 ~/.ssh/config
+```
+
+Then SSH to workers directly from the master VM:
+
+```bash
+ssh ubuntu@<WORKER_PRIVATE_IP>
+```
+
+The generated private key is stored in Terraform state, so keep the state file
+private.
 
 After the VM is running, SSH into the target VM and run the stack you want.
 

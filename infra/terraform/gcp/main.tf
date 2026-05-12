@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/google"
       version = ">= 6.0, < 8.0"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = ">= 4.0, < 5.0"
+    }
   }
 }
 
@@ -98,6 +102,12 @@ variable "enable_oslogin" {
   default     = false
 }
 
+variable "enable_master_worker_ssh" {
+  description = "Generate an internal SSH key so the master VM can SSH to private worker VMs without a password."
+  type        = bool
+  default     = true
+}
+
 variable "enable_ssh_password_login" {
   description = "Enable SSH password authentication for ssh_user."
   type        = bool
@@ -153,9 +163,31 @@ locals {
     enable-oslogin      = var.enable_oslogin ? "TRUE" : "FALSE"
   }
 
-  optional_ssh_metadata = var.ssh_public_key == "" ? {} : {
-    ssh-keys = "${var.ssh_user}:${var.ssh_public_key}"
+  admin_ssh_keys = var.ssh_public_key == "" ? [] : [
+    "${var.ssh_user}:${var.ssh_public_key}"
+  ]
+  master_worker_ssh_keys = var.enable_master_worker_ssh ? [
+    "${var.ssh_user}:${tls_private_key.master_worker[0].public_key_openssh}"
+  ] : []
+  ssh_keys = concat(local.admin_ssh_keys, local.master_worker_ssh_keys)
+
+  optional_ssh_metadata = length(local.ssh_keys) == 0 ? {} : {
+    ssh-keys = join("\n", local.ssh_keys)
   }
+  master_worker_private_key_metadata = var.enable_master_worker_ssh ? {
+    nexus-master-worker-private-key-b64 = base64encode(tls_private_key.master_worker[0].private_key_openssh)
+  } : {}
+}
+
+resource "tls_private_key" "master_worker" {
+  count     = var.enable_master_worker_ssh ? 1 : 0
+  algorithm = "ED25519"
+}
+
+output "master_worker_ssh_private_key" {
+  description = "Internal private key installed on the master when enable_master_worker_ssh is true. Stored in Terraform state."
+  value       = var.enable_master_worker_ssh ? tls_private_key.master_worker[0].private_key_openssh : ""
+  sensitive   = true
 }
 
 resource "google_project_service" "required" {
@@ -279,7 +311,7 @@ resource "google_compute_instance" "master" {
     }
   }
 
-  metadata = merge(local.common_metadata, local.optional_ssh_metadata, {
+  metadata = merge(local.common_metadata, local.optional_ssh_metadata, local.master_worker_private_key_metadata, {
     nexus-node-role = "master"
   })
 
