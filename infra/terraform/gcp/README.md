@@ -93,25 +93,24 @@ Startup also writes `/etc/nexus-elastic.env` on every VM. The master gets
 Local changes inside `/opt/nexus/docker-elk` can be overwritten on VM boot
 because the startup script fast-forwards/resets the configured branch.
 
+Startup also prepares every Elasticsearch host by setting
+`vm.max_map_count=262144` immediately and persisting it in
+`/etc/sysctl.d/99-elasticsearch.conf`. This avoids Elasticsearch exit code `78`
+from the bootstrap check when the default Linux value is too low.
+
 ## Start Distributed Elasticsearch
 
-Start Elasticsearch on each worker first:
+On the master VM, start Elasticsearch across the master and all workers with one
+helper:
 
 ```bash
-ssh -J ubuntu@<MASTER_PUBLIC_IP> ubuntu@<WORKER_PRIVATE_IP>
-start-amazon-search-elasticsearch
+start-amazon-search-elasticsearch-cluster
 ```
 
-Repeat for all workers:
-
-```text
-nexus-worker-1
-nexus-worker-2
-nexus-worker-3
-nexus-worker-4
-```
-
-Then start the master demo stack.
+The helper SSHes from the master to each worker and runs
+`start-amazon-search-elasticsearch` there, then starts the master Elasticsearch
+container. The startup script installs the internal master-to-worker SSH key on
+the master automatically when `enable_master_worker_ssh = true`.
 
 ## Start Demo On Master
 
@@ -130,6 +129,7 @@ start-amazon-search-demo
 The helper runs:
 
 ```bash
+start-amazon-search-elasticsearch-cluster
 cd /opt/nexus/docker-elk
 docker compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch backend frontend
 docker compose exec -T backend python scripts/ingest_all.py --reset
@@ -214,8 +214,10 @@ ssh -J ubuntu@<MASTER_PUBLIC_IP> ubuntu@<WORKER_PRIVATE_IP>
 ```
 
 When `enable_master_worker_ssh = true`, Terraform creates an internal cluster
-SSH key and stores it in Terraform state. Install it on the master if you need
-direct master-to-worker SSH:
+SSH key, stores it in Terraform state, and the startup script installs it on the
+master for commands such as `start-amazon-search-elasticsearch-cluster`.
+
+If you ever need to reinstall it manually, run this on the master:
 
 ```bash
 install -m 700 -d ~/.ssh

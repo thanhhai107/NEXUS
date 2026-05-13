@@ -17,6 +17,33 @@ metadata_instance() {
 
 BOOTSTRAP_USER="ubuntu"
 
+install_master_worker_ssh() {
+  if [ "${NEXUS_NODE_ROLE}" != "master" ]; then
+    return 0
+  fi
+
+  local private_key_b64
+  private_key_b64="$(metadata_attr nexus-master-worker-private-key-b64)"
+  if [ -z "${private_key_b64}" ]; then
+    return 0
+  fi
+
+  install -m 0700 -d "/home/${BOOTSTRAP_USER}/.ssh"
+  printf "%s" "${private_key_b64}" \
+    | base64 -d >"/home/${BOOTSTRAP_USER}/.ssh/id_ed25519_nexus_cluster"
+  chmod 0600 "/home/${BOOTSTRAP_USER}/.ssh/id_ed25519_nexus_cluster"
+
+  cat >"/home/${BOOTSTRAP_USER}/.ssh/config" <<EOF
+Host ${NEXUS_CLUSTER_NAME}-worker-* 10.*
+  User ${BOOTSTRAP_USER}
+  IdentityFile ~/.ssh/id_ed25519_nexus_cluster
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new
+EOF
+  chmod 0600 "/home/${BOOTSTRAP_USER}/.ssh/config"
+  chown -R "${BOOTSTRAP_USER}:${BOOTSTRAP_USER}" "/home/${BOOTSTRAP_USER}/.ssh"
+}
+
 sync_git_repo() {
   local repo_url="$1"
   local repo_ref="$2"
@@ -88,6 +115,37 @@ EOF
   chmod 0755 /usr/local/bin/start-amazon-search-elasticsearch
 
   if [ "${NEXUS_NODE_ROLE}" = "master" ]; then
+    cat >/usr/local/bin/start-amazon-search-elasticsearch-cluster <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+. /etc/nexus-node.env
+. /etc/amazon-search-demo.env
+
+if [ "${NEXUS_NODE_ROLE}" != "master" ]; then
+  echo "Run this command on the master VM."
+  exit 1
+fi
+
+DOCKER="docker"
+if ! docker info >/dev/null 2>&1; then
+  DOCKER="sudo docker"
+fi
+
+for i in $(seq 1 "${NEXUS_WORKER_COUNT:-4}"); do
+  worker="${NEXUS_CLUSTER_NAME}-worker-${i}"
+  echo "Starting Elasticsearch on ${worker}..."
+  ssh -o BatchMode=yes "${worker}" "start-amazon-search-elasticsearch" &
+done
+wait
+
+echo "Starting Elasticsearch on ${NEXUS_NODE_NAME}..."
+cd "${AMAZON_SEARCH_DEMO_DIR}"
+${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env up -d elasticsearch
+${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env ps elasticsearch
+EOF
+    chmod 0755 /usr/local/bin/start-amazon-search-elasticsearch-cluster
+
     cat >/usr/local/bin/start-amazon-search-demo <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -104,6 +162,8 @@ DOCKER="docker"
 if ! docker info >/dev/null 2>&1; then
   DOCKER="sudo docker"
 fi
+
+start-amazon-search-elasticsearch-cluster
 
 cd "${AMAZON_SEARCH_DEMO_DIR}"
 ${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch backend frontend
@@ -125,7 +185,25 @@ EOF
   fi
 }
 
+setup_elasticsearch_host() {
+  local required_max_map_count="262144"
+  local sysctl_file="/etc/sysctl.d/99-elasticsearch.conf"
+  local current_value
+
+  current_value="$(sysctl -n vm.max_map_count 2>/dev/null || echo 0)"
+  if [ "${current_value}" -lt "${required_max_map_count}" ]; then
+    sysctl -w "vm.max_map_count=${required_max_map_count}"
+  fi
+
+  if [ ! -f "${sysctl_file}" ] || ! grep -q "^vm.max_map_count=${required_max_map_count}$" "${sysctl_file}"; then
+    printf "vm.max_map_count=%s\n" "${required_max_map_count}" >"${sysctl_file}"
+  fi
+
+  sysctl --system >/dev/null
+}
+
 NEXUS_CLUSTER_NAME="$(metadata_attr nexus-cluster-name)"
+NEXUS_WORKER_COUNT="$(metadata_attr nexus-worker-count)"
 NEXUS_NODE_ROLE="$(metadata_attr nexus-node-role)"
 NEXUS_NODE_INDEX="$(metadata_attr nexus-node-index)"
 NEXUS_NODE_NAME="$(metadata_instance name)"
@@ -143,6 +221,10 @@ fi
 NEXUS_APP_DIR="/opt/nexus/nexus"
 DOCKER_ELK_APP_DIR="/opt/nexus/docker-elk"
 
+if [ -z "${NEXUS_WORKER_COUNT}" ]; then
+  NEXUS_WORKER_COUNT="4"
+fi
+
 if [ "${NEXUS_NODE_ROLE}" = "master" ]; then
   NEXUS_NODE_ROLES="master"
 else
@@ -150,9 +232,12 @@ else
 fi
 
 ES_SEED_HOSTS="${NEXUS_CLUSTER_NAME}-master-1"
-for i in 1 2 3 4; do
+for i in $(seq 1 "${NEXUS_WORKER_COUNT}"); do
   ES_SEED_HOSTS="${ES_SEED_HOSTS},${NEXUS_CLUSTER_NAME}-worker-${i}"
 done
+
+setup_elasticsearch_host
+install_master_worker_ssh
 
 apt-get update -y
 apt-get install -y \
@@ -224,6 +309,7 @@ NEXUS_NODE_ROLE=${NEXUS_NODE_ROLE}
 NEXUS_NODE_INDEX=${NEXUS_NODE_INDEX}
 NEXUS_NODE_NAME=${NEXUS_NODE_NAME}
 NEXUS_NODE_IP=${NEXUS_NODE_IP}
+NEXUS_WORKER_COUNT=${NEXUS_WORKER_COUNT}
 NEXUS_HOME=/opt/nexus
 NEXUS_DATA=/data
 EOF

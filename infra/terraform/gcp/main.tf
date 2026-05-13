@@ -153,6 +153,7 @@ locals {
 
   common_metadata = {
     nexus-cluster-name  = var.cluster_name
+    nexus-worker-count  = tostring(var.worker_count)
     nexus-repo-ref      = var.nexus_repo_ref
     nexus-repo-url      = var.nexus_repo_url
     docker-elk-repo-ref = var.docker_elk_repo_ref
