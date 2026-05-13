@@ -44,6 +44,69 @@ sync_git_repo() {
   chown -R "${BOOTSTRAP_USER}:${BOOTSTRAP_USER}" "${target_dir}"
 }
 
+write_search_demo_config() {
+  if [ ! -d "${DOCKER_ELK_APP_DIR}" ]; then
+    return 0
+  fi
+
+  cat >"${DOCKER_ELK_APP_DIR}/.env" <<EOF
+ELASTIC_VERSION=8.17.0
+ES_JAVA_OPTS=-Xms1g -Xmx1g
+
+POSTGRES_DB=amazon_search
+POSTGRES_USER=search
+POSTGRES_PASSWORD=search_demo
+
+MEILI_MASTER_KEY=masterKey
+EOF
+  chown "${BOOTSTRAP_USER}:${BOOTSTRAP_USER}" "${DOCKER_ELK_APP_DIR}/.env"
+  chmod 0600 "${DOCKER_ELK_APP_DIR}/.env"
+
+  cat >/etc/amazon-search-demo.env <<EOF
+AMAZON_SEARCH_DEMO_DIR=${DOCKER_ELK_APP_DIR}
+AMAZON_SEARCH_STREAMLIT_URL=http://${NEXUS_NODE_IP}:8501
+AMAZON_SEARCH_FASTAPI_URL=http://${NEXUS_NODE_IP}:8000
+EOF
+  chmod 0644 /etc/amazon-search-demo.env
+
+  if [ "${NEXUS_NODE_ROLE}" = "master" ]; then
+    cat >/usr/local/bin/start-amazon-search-demo <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+. /etc/nexus-node.env
+. /etc/amazon-search-demo.env
+
+if [ "${NEXUS_NODE_ROLE}" != "master" ]; then
+  echo "Run this command on the master VM."
+  exit 1
+fi
+
+DOCKER="docker"
+if ! docker info >/dev/null 2>&1; then
+  DOCKER="sudo docker"
+fi
+
+cd "${AMAZON_SEARCH_DEMO_DIR}"
+${DOCKER} compose up -d --build
+
+if [ "$#" -eq 0 ]; then
+  set -- --reset
+fi
+
+${DOCKER} compose exec -T backend python scripts/ingest_all.py "$@"
+
+cat <<URLS
+
+Amazon Search demo is starting:
+  Streamlit: http://$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip):8501
+  FastAPI:   http://$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip):8000/docs
+URLS
+EOF
+    chmod 0755 /usr/local/bin/start-amazon-search-demo
+  fi
+}
+
 NEXUS_CLUSTER_NAME="$(metadata_attr nexus-cluster-name)"
 NEXUS_NODE_ROLE="$(metadata_attr nexus-node-role)"
 NEXUS_NODE_INDEX="$(metadata_attr nexus-node-index)"
@@ -153,6 +216,7 @@ chmod 0644 /etc/nexus-node.env /etc/nexus-elastic.env
 
 sync_git_repo "${NEXUS_REPO_URL}" "${NEXUS_REPO_REF}" "${NEXUS_APP_DIR}"
 sync_git_repo "${DOCKER_ELK_REPO_URL}" "${DOCKER_ELK_REPO_REF}" "${DOCKER_ELK_APP_DIR}"
+write_search_demo_config
 
 cat >/var/log/nexus/startup-complete.log <<EOF
 NEXUS startup completed.

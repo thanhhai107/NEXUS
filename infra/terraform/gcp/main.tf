@@ -134,13 +134,13 @@ variable "nexus_repo_ref" {
 }
 
 variable "docker_elk_repo_url" {
-  description = "Git URL for the docker-elk ShopX demo repo. Leave empty to skip provisioning this repo on VMs."
+  description = "Git URL for the Amazon Search demo repo. Leave empty to skip provisioning this repo on VMs."
   type        = string
   default     = "https://github.com/thanhhai107/docker-elk.git"
 }
 
 variable "docker_elk_repo_ref" {
-  description = "Git branch, tag, or commit to checkout for the docker-elk ShopX demo repo."
+  description = "Git branch, tag, or commit to checkout for the Amazon Search demo repo."
   type        = string
   default     = "main"
 }
@@ -247,7 +247,7 @@ resource "google_compute_firewall" "master_ui" {
 
   allow {
     protocol = "tcp"
-    ports    = ["8000", "5601", "8080", "8085", "8088"]
+    ports    = ["8000", "8501", "8080", "8085", "8088"]
   }
 }
 
@@ -281,6 +281,25 @@ resource "google_compute_firewall" "internal" {
 
   allow {
     protocol = "icmp"
+  }
+}
+
+resource "google_compute_router" "nat" {
+  name    = "${var.cluster_name}-nat-router"
+  network = data.google_compute_network.selected.self_link
+  region  = var.region
+}
+
+resource "google_compute_router_nat" "workers" {
+  name                               = "${var.cluster_name}-workers-nat"
+  router                             = google_compute_router.nat.name
+  region                             = google_compute_router.nat.region
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+
+  log_config {
+    enable = true
+    filter = "ERRORS_ONLY"
   }
 }
 
@@ -392,10 +411,16 @@ output "workers" {
 
 output "service_urls" {
   value = {
-    airflow  = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8080"
-    kibana   = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:5601"
-    trino    = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8085"
-    superset = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8088"
-    fastapi  = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8000"
+    amazon_search_streamlit = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8501"
+    amazon_search_fastapi   = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8000"
+    amazon_search_docs      = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8000/docs"
+    nexus_airflow           = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8080"
+    nexus_trino             = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8085"
+    nexus_superset          = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8088"
   }
+}
+
+output "search_engine_tunnel_command" {
+  description = "Use this when you need local access to PostgreSQL, Elasticsearch, or Meilisearch without exposing them publicly."
+  value       = "ssh -L 5432:127.0.0.1:5432 -L 9200:127.0.0.1:9200 -L 7700:127.0.0.1:7700 ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}"
 }

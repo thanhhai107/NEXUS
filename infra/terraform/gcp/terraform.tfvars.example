@@ -23,8 +23,9 @@ enable_master_worker_ssh = true
 enable_ssh_password_login = true
 ssh_password              = "CHANGE_ME_TO_A_STRONG_PASSWORD"
 
-# Optional repo provisioning. Startup will clone/pull these repos onto each VM,
-# but it will not start Docker Compose automatically.
+# Optional repo provisioning. Startup will clone/pull these repos onto each VM.
+# The Amazon Search demo repo gets a generated .env file and can be started on
+# the master VM with: start-amazon-search-demo
 nexus_repo_url = "https://github.com/thanhhai107/NEXUS.git"
 nexus_repo_ref = "master"
 
