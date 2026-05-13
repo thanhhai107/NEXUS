@@ -52,6 +52,7 @@ write_search_demo_config() {
   cat >"${DOCKER_ELK_APP_DIR}/.env" <<EOF
 ELASTIC_VERSION=8.17.0
 ES_JAVA_OPTS=-Xms1g -Xmx1g
+ES_CLUSTER_NAME=amazon-search
 
 POSTGRES_DB=amazon_search
 POSTGRES_USER=search
@@ -68,6 +69,23 @@ AMAZON_SEARCH_STREAMLIT_URL=http://${NEXUS_NODE_IP}:8501
 AMAZON_SEARCH_FASTAPI_URL=http://${NEXUS_NODE_IP}:8000
 EOF
   chmod 0644 /etc/amazon-search-demo.env
+
+  cat >/usr/local/bin/start-amazon-search-elasticsearch <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+. /etc/amazon-search-demo.env
+
+DOCKER="docker"
+if ! docker info >/dev/null 2>&1; then
+  DOCKER="sudo docker"
+fi
+
+cd "${AMAZON_SEARCH_DEMO_DIR}"
+${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env up -d elasticsearch
+${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env ps elasticsearch
+EOF
+  chmod 0755 /usr/local/bin/start-amazon-search-elasticsearch
 
   if [ "${NEXUS_NODE_ROLE}" = "master" ]; then
     cat >/usr/local/bin/start-amazon-search-demo <<'EOF'
@@ -88,7 +106,7 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 cd "${AMAZON_SEARCH_DEMO_DIR}"
-${DOCKER} compose up -d --build
+${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch backend frontend
 
 if [ "$#" -eq 0 ]; then
   set -- --reset
@@ -130,6 +148,11 @@ if [ "${NEXUS_NODE_ROLE}" = "master" ]; then
 else
   NEXUS_NODE_ROLES="data,ingest"
 fi
+
+ES_SEED_HOSTS="${NEXUS_CLUSTER_NAME}-master-1"
+for i in 1 2 3 4; do
+  ES_SEED_HOSTS="${ES_SEED_HOSTS},${NEXUS_CLUSTER_NAME}-worker-${i}"
+done
 
 apt-get update -y
 apt-get install -y \
@@ -209,6 +232,10 @@ cat >/etc/nexus-elastic.env <<EOF
 NEXUS_NODE_NAME=${NEXUS_NODE_NAME}
 NEXUS_NODE_IP=${NEXUS_NODE_IP}
 NEXUS_NODE_ROLES=${NEXUS_NODE_ROLES}
+ES_CLUSTER_NAME=amazon-search
+ES_SEED_HOSTS=${ES_SEED_HOSTS}
+ES_INITIAL_MASTER_NODES=${NEXUS_CLUSTER_NAME}-master-1
+ELASTICSEARCH_DATA=/data/elasticsearch
 ES_JAVA_OPTS=-Xms4g -Xmx4g
 EOF
 

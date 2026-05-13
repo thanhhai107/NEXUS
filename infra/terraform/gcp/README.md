@@ -11,11 +11,13 @@ Terraform nay tao cum VM GCP cho demo Amazon Electronics Search:
 - Repo demo duoc clone vao `/opt/nexus/docker-elk`
 - Helper `start-amazon-search-demo` tren master de start stack va ingest sample data
 
-Demo search moi chay tren master VM bang Docker Compose:
+Demo search moi chay bang Docker Compose:
 
 - Streamlit frontend: TCP `8501`
 - FastAPI backend: TCP `8000`
-- PostgreSQL, Elasticsearch, Meilisearch: khong mo public; truy cap bang SSH tunnel khi can
+- PostgreSQL va Meilisearch: tren master VM
+- Elasticsearch: phan tan tren master + worker VMs
+- PostgreSQL, Elasticsearch, Meilisearch khong mo public; truy cap bang SSH tunnel khi can
 
 ## Files
 
@@ -76,7 +78,7 @@ The Amazon Search demo repo is placed at:
 /opt/nexus/docker-elk
 ```
 
-Startup writes `/opt/nexus/docker-elk/.env` with demo defaults:
+Startup writes `/opt/nexus/docker-elk/.env` with demo defaults on every VM:
 
 ```text
 POSTGRES_DB=amazon_search
@@ -85,10 +87,33 @@ POSTGRES_PASSWORD=search_demo
 MEILI_MASTER_KEY=masterKey
 ```
 
+Startup also writes `/etc/nexus-elastic.env` on every VM. The master gets
+`NEXUS_NODE_ROLES=master`; workers get `NEXUS_NODE_ROLES=data,ingest`.
+
 Local changes inside `/opt/nexus/docker-elk` can be overwritten on VM boot
 because the startup script fast-forwards/resets the configured branch.
 
-## Start Demo
+## Start Distributed Elasticsearch
+
+Start Elasticsearch on each worker first:
+
+```bash
+ssh -J ubuntu@<MASTER_PUBLIC_IP> ubuntu@<WORKER_PRIVATE_IP>
+start-amazon-search-elasticsearch
+```
+
+Repeat for all workers:
+
+```text
+nexus-worker-1
+nexus-worker-2
+nexus-worker-3
+nexus-worker-4
+```
+
+Then start the master demo stack.
+
+## Start Demo On Master
 
 After `terraform apply`, SSH to the master:
 
@@ -106,7 +131,7 @@ The helper runs:
 
 ```bash
 cd /opt/nexus/docker-elk
-docker compose up -d --build
+docker compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch backend frontend
 docker compose exec -T backend python scripts/ingest_all.py --reset
 ```
 
@@ -123,6 +148,23 @@ The same URLs are available from:
 
 ```bash
 terraform output service_urls
+```
+
+Verify Elasticsearch is distributed:
+
+```bash
+curl "http://localhost:9200/_cat/nodes?v&h=name,node.role,master,ip"
+curl "http://localhost:9200/_cluster/health?pretty"
+```
+
+Expected nodes:
+
+```text
+nexus-master-1    master/coordinating
+nexus-worker-1    data,ingest
+nexus-worker-2    data,ingest
+nexus-worker-3    data,ingest
+nexus-worker-4    data,ingest
 ```
 
 ## Full Dataset
