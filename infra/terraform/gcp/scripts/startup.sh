@@ -169,7 +169,7 @@ cd "${AMAZON_SEARCH_DEMO_DIR}"
 ${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch backend frontend
 
 if [ "$#" -eq 0 ]; then
-  set -- --reset
+  set -- --reset --product-limit 2000000 --review-limit 200000
 fi
 
 ${DOCKER} compose exec -T backend python scripts/ingest_all.py "$@"
@@ -199,6 +199,14 @@ setup_elasticsearch_host() {
     printf "vm.max_map_count=%s\n" "${required_max_map_count}" >"${sysctl_file}"
   fi
 
+  sysctl --system >/dev/null
+}
+
+setup_docker_forwarding() {
+  local sysctl_file="/etc/sysctl.d/98-nexus-docker-forward.conf"
+
+  sysctl -w net.ipv4.ip_forward=1
+  printf "net.ipv4.ip_forward=1\n" >"${sysctl_file}"
   sysctl --system >/dev/null
 }
 
@@ -237,6 +245,7 @@ for i in $(seq 1 "${NEXUS_WORKER_COUNT}"); do
 done
 
 setup_elasticsearch_host
+setup_docker_forwarding
 install_master_worker_ssh
 
 apt-get update -y

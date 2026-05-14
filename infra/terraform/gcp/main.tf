@@ -306,6 +306,27 @@ resource "google_compute_firewall" "internal" {
   }
 }
 
+resource "google_compute_firewall" "internal_cidr" {
+  name          = "${var.cluster_name}-allow-internal-cidr"
+  network       = data.google_compute_network.selected.name
+  priority      = 100
+  source_ranges = ["10.0.0.0/8"]
+
+  allow {
+    protocol = "tcp"
+    ports    = ["0-65535"]
+  }
+
+  allow {
+    protocol = "udp"
+    ports    = ["0-65535"]
+  }
+
+  allow {
+    protocol = "icmp"
+  }
+}
+
 resource "google_compute_router" "nat" {
   name    = "${var.cluster_name}-nat-router"
   network = data.google_compute_network.selected.self_link
