@@ -16,7 +16,7 @@ terraform {
 provider "google" {
   project = var.project_id
   region  = var.region
-  zone    = var.zone
+  zone    = var.master_zone
 }
 
 variable "project_id" {
@@ -37,9 +37,26 @@ variable "region" {
 }
 
 variable "zone" {
-  description = "Google Cloud zone."
+  description = "Deprecated. Use master_zone and worker_zones."
   type        = string
-  default     = "asia-southeast1-a"
+  default     = null
+}
+
+variable "master_zone" {
+  description = "Google Cloud zone for the master node."
+  type        = string
+  default     = "asia-southeast1-b"
+}
+
+variable "worker_zones" {
+  description = "Google Cloud zones for worker nodes, in worker index order."
+  type        = list(string)
+  default = [
+    "asia-southeast1-b",
+    "asia-southeast1-b",
+    "asia-southeast1-c",
+    "asia-southeast1-c"
+  ]
 }
 
 variable "cluster_name" {
@@ -178,6 +195,10 @@ locals {
   master_worker_private_key_metadata = var.enable_master_worker_ssh ? {
     nexus-master-worker-private-key-b64 = base64encode(tls_private_key.master_worker[0].private_key_openssh)
   } : {}
+
+  worker_zones = [
+    for index in range(var.worker_count) : var.worker_zones[index % length(var.worker_zones)]
+  ]
 }
 
 resource "tls_private_key" "master_worker" {
@@ -307,7 +328,7 @@ resource "google_compute_router_nat" "workers" {
 resource "google_compute_instance" "master" {
   name         = "${var.cluster_name}-master-1"
   machine_type = var.machine_type
-  zone         = var.zone
+  zone         = var.master_zone
   tags         = [local.cluster_tag, local.master_tag]
 
   labels = {
@@ -347,7 +368,7 @@ resource "google_compute_instance" "workers" {
   count        = var.worker_count
   name         = "${var.cluster_name}-worker-${count.index + 1}"
   machine_type = var.machine_type
-  zone         = var.zone
+  zone         = local.worker_zones[count.index]
   tags         = [local.cluster_tag, local.worker_tag]
 
   labels = {
@@ -393,6 +414,7 @@ output "master_static_ip" {
 output "master" {
   value = {
     name       = google_compute_instance.master.name
+    zone       = google_compute_instance.master.zone
     private_ip = google_compute_instance.master.network_interface[0].network_ip
     public_ip  = google_compute_instance.master.network_interface[0].access_config[0].nat_ip
     ssh        = "ssh ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}"
@@ -403,6 +425,7 @@ output "workers" {
   value = [
     for worker in google_compute_instance.workers : {
       name       = worker.name
+      zone       = worker.zone
       private_ip = worker.network_interface[0].network_ip
       public_ip  = ""
       ssh        = "ssh -J ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip} ${var.ssh_user}@${worker.network_interface[0].network_ip}"

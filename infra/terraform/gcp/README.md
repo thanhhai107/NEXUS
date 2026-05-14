@@ -45,10 +45,27 @@ Set at least:
 
 ```hcl
 project_id = "your-gcp-project-id"
+master_zone = "asia-southeast1-b"
+worker_zones = [
+  "asia-southeast1-b",
+  "asia-southeast1-b",
+  "asia-southeast1-c",
+  "asia-southeast1-c"
+]
 allowed_admin_cidrs = ["YOUR_PUBLIC_IP/32"]
 ssh_public_key = "ssh-ed25519 YOUR_PUBLIC_KEY nexus"
 enable_oslogin = false
 enable_master_worker_ssh = true
+```
+
+Default zone placement:
+
+```text
+nexus-master-1   asia-southeast1-b
+nexus-worker-1   asia-southeast1-b
+nexus-worker-2   asia-southeast1-b
+nexus-worker-3   asia-southeast1-c
+nexus-worker-4   asia-southeast1-c
 ```
 
 For a short classroom demo you can temporarily use:
