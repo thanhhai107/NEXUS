@@ -169,7 +169,7 @@ cd "${AMAZON_SEARCH_DEMO_DIR}"
 ${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch backend frontend
 
 if [ "$#" -eq 0 ]; then
-  set -- --reset --product-limit 2000000 --review-limit 200000
+  set -- --reset --product-limit 100000 --review-limit 100000
 fi
 
 ${DOCKER} compose exec -T backend python scripts/ingest_all.py "$@"

@@ -149,7 +149,7 @@ The helper runs:
 start-amazon-search-elasticsearch-cluster
 cd /opt/nexus/docker-elk
 docker compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch backend frontend
-docker compose exec -T backend python scripts/ingest_all.py --reset --product-limit 2000000 --review-limit 200000
+docker compose exec -T backend python scripts/ingest_all.py --reset --product-limit 100000 --review-limit 100000
 ```
 
 It uses `data/sample` if you have not downloaded the full Amazon dataset yet.
@@ -191,7 +191,7 @@ On the master VM:
 ```bash
 cd /opt/nexus/docker-elk
 python3 data/download_datasets.py --reviews
-docker compose exec -T backend python scripts/ingest_all.py --reset --product-limit 2000000 --review-limit 200000
+docker compose exec -T backend python scripts/ingest_all.py --reset --product-limit 100000 --review-limit 100000
 ```
 
 Lower the limits if the VM does not have enough disk, RAM, or time.
