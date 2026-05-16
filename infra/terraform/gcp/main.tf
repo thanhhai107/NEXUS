@@ -269,7 +269,7 @@ resource "google_compute_firewall" "master_ui" {
 
   allow {
     protocol = "tcp"
-    ports    = ["8000", "8501", "8080", "8085", "8088"]
+    ports    = ["5601", "8000", "8501", "8080", "8085", "8088"]
   }
 }
 
@@ -459,6 +459,7 @@ output "service_urls" {
     amazon_search_streamlit = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8501"
     amazon_search_fastapi   = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8000"
     amazon_search_docs      = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8000/docs"
+    amazon_search_kibana    = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:5601"
     nexus_airflow           = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8080"
     nexus_trino             = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8085"
     nexus_superset          = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8088"
@@ -466,6 +467,6 @@ output "service_urls" {
 }
 
 output "search_engine_tunnel_command" {
-  description = "Use this when you need local access to PostgreSQL, Elasticsearch, or Meilisearch without exposing them publicly."
-  value       = "ssh -L 5432:127.0.0.1:5432 -L 9200:127.0.0.1:9200 -L 7700:127.0.0.1:7700 ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}"
+  description = "Use this when you need local access to PostgreSQL, Elasticsearch, Meilisearch, or Kibana without exposing them publicly."
+  value       = "ssh -L 5432:127.0.0.1:5432 -L 9200:127.0.0.1:9200 -L 7700:127.0.0.1:7700 -L 5601:127.0.0.1:5601 ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}"
 }

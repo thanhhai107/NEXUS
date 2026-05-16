@@ -94,6 +94,7 @@ EOF
 AMAZON_SEARCH_DEMO_DIR=${DOCKER_ELK_APP_DIR}
 AMAZON_SEARCH_STREAMLIT_URL=http://${NEXUS_NODE_IP}:8501
 AMAZON_SEARCH_FASTAPI_URL=http://${NEXUS_NODE_IP}:8000
+AMAZON_SEARCH_KIBANA_URL=http://${NEXUS_NODE_IP}:5601
 EOF
   chmod 0644 /etc/amazon-search-demo.env
 
@@ -166,13 +167,14 @@ fi
 start-amazon-search-elasticsearch-cluster
 
 cd "${AMAZON_SEARCH_DEMO_DIR}"
-${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch backend frontend
+${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch kibana backend frontend
 
 cat <<URLS
 
 Amazon Search demo is starting:
   Streamlit: http://$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip):8501
   FastAPI:   http://$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip):8000/docs
+  Kibana:    http://$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip):5601
 
 Ingest is not run automatically. To ingest data, run:
   cd ${AMAZON_SEARCH_DEMO_DIR}
