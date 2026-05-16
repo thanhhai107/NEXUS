@@ -1,10 +1,10 @@
 project_id = "your-gcp-project-id"
 enable_required_apis = true
 region = "asia-southeast1"
-master_zone = "asia-southeast1-b"
+master_zone = "asia-southeast1-c"
 worker_zones = [
-  "asia-southeast1-b",
-  "asia-southeast1-b",
+  "asia-southeast1-c",
+  "asia-southeast1-c",
   "asia-southeast1-c",
   "asia-southeast1-c"
 ]

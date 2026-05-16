@@ -45,15 +45,15 @@ variable "zone" {
 variable "master_zone" {
   description = "Google Cloud zone for the master node."
   type        = string
-  default     = "asia-southeast1-b"
+  default     = "asia-southeast1-c"
 }
 
 variable "worker_zones" {
   description = "Google Cloud zones for worker nodes, in worker index order."
   type        = list(string)
   default = [
-    "asia-southeast1-b",
-    "asia-southeast1-b",
+    "asia-southeast1-c",
+    "asia-southeast1-c",
     "asia-southeast1-c",
     "asia-southeast1-c"
   ]

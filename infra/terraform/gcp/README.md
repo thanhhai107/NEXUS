@@ -45,10 +45,10 @@ Set at least:
 
 ```hcl
 project_id = "your-gcp-project-id"
-master_zone = "asia-southeast1-b"
+master_zone = "asia-southeast1-c"
 worker_zones = [
-  "asia-southeast1-b",
-  "asia-southeast1-b",
+  "asia-southeast1-c",
+  "asia-southeast1-c",
   "asia-southeast1-c",
   "asia-southeast1-c"
 ]
@@ -61,9 +61,9 @@ enable_master_worker_ssh = true
 Default zone placement:
 
 ```text
-nexus-master-1   asia-southeast1-b
-nexus-worker-1   asia-southeast1-b
-nexus-worker-2   asia-southeast1-b
+nexus-master-1   asia-southeast1-c
+nexus-worker-1   asia-southeast1-c
+nexus-worker-2   asia-southeast1-c
 nexus-worker-3   asia-southeast1-c
 nexus-worker-4   asia-southeast1-c
 ```
