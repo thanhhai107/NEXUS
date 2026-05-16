@@ -1,4 +1,4 @@
-﻿datasets:
+datasets:
   openaq_measurements:
     required_columns:
     - location_id
@@ -22,3 +22,28 @@
     - datatype
     - value
     freshness_column: date
+  londonair_monitoring:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    - site_code
+    freshness_column: event_time
+  openmeteo_air_quality:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    - latitude
+    - longitude
+    freshness_column: event_time
+  openweather_current:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    freshness_column: event_time
+

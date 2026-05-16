@@ -19,7 +19,9 @@ TOPICS = {
     "tfl": "transport-tfl",
     "gtfs": "transport-gtfs",
     "singapore": "transport-sg-traffic",
-
+    "londonair": "environment-londonair",
+    "openmeteo": "environment-openmeteo",
+    "openweather": "environment-openweather",
 }
 
 
@@ -172,6 +174,104 @@ def norm_sg(record: dict[str, Any]) -> dict[str, object]:
     }
 
 
+def norm_londonair(payload: Any) -> list[dict[str, object]]:
+    """Flatten LondonAir nested LocalAuthority > Site > Species structure."""
+    authorities = payload if isinstance(payload, list) else [payload]
+    events: list[dict[str, object]] = []
+    for auth in authorities:
+        if not isinstance(auth, dict):
+            continue
+        borough_code = auth.get("@LocalAuthorityCode", "")
+        borough_name = auth.get("@LocalAuthorityName", "")
+        sites = auth.get("Site") or []
+        if isinstance(sites, dict):
+            sites = [sites]
+        for site in sites:
+            if not isinstance(site, dict):
+                continue
+            species_list = site.get("Species") or []
+            if isinstance(species_list, dict):
+                species_list = [species_list]
+            for species in species_list:
+                if not isinstance(species, dict):
+                    continue
+                events.append({
+                    "event_id": str(uuid.uuid4()),
+                    "source": "londonair",
+                    "event_type": "air_quality_index",
+                    "event_time": str(site.get("@BulletinDate") or now_iso()),
+                    "site_code": site.get("@SiteCode", ""),
+                    "site_name": site.get("@SiteName", ""),
+                    "site_type": site.get("@SiteType", ""),
+                    "borough_code": borough_code,
+                    "borough_name": borough_name,
+                    "species_code": species.get("@SpeciesCode", ""),
+                    "species_description": species.get("@SpeciesDescription", ""),
+                    "air_quality_index": species.get("@AirQualityIndex"),
+                    "air_quality_band": species.get("@AirQualityBand"),
+                    "latitude": site.get("@Latitude"),
+                    "longitude": site.get("@Longitude"),
+                })
+    return events
+
+
+def norm_openmeteo_aq(payload: dict[str, Any]) -> list[dict[str, object]]:
+    """Flatten OpenMeteo air quality response into per-hour events."""
+    lat = payload.get("latitude")
+    lon = payload.get("longitude")
+    current = payload.get("current") or {}
+    if current:
+        return [{
+            "event_id": str(uuid.uuid4()),
+            "source": "openmeteo",
+            "event_type": "air_quality_current",
+            "event_time": str(current.get("time") or now_iso()),
+            "latitude": lat,
+            "longitude": lon,
+            "pm10": current.get("pm10"),
+            "pm2_5": current.get("pm2_5"),
+            "european_aqi": current.get("european_aqi"),
+            "us_aqi": current.get("us_aqi"),
+        }]
+    return [{
+        "event_id": str(uuid.uuid4()),
+        "source": "openmeteo",
+        "event_type": "air_quality_poll",
+        "event_time": now_iso(),
+        "latitude": lat,
+        "longitude": lon,
+    }]
+
+
+def norm_openweather(payload: dict[str, Any]) -> dict[str, object]:
+    """Normalize OpenWeather current weather response."""
+    coord = payload.get("coord") or {}
+    main_data = payload.get("main") or {}
+    wind = payload.get("wind") or {}
+    clouds_data = payload.get("clouds") or {}
+    weather_list = payload.get("weather") or [{}]
+    weather = weather_list[0] if weather_list else {}
+    return {
+        "event_id": str(uuid.uuid4()),
+        "source": "openweather",
+        "event_type": "current_weather",
+        "event_time": now_iso(),
+        "city_name": payload.get("name", ""),
+        "latitude": coord.get("lat"),
+        "longitude": coord.get("lon"),
+        "temp": main_data.get("temp"),
+        "feels_like": main_data.get("feels_like"),
+        "pressure": main_data.get("pressure"),
+        "humidity": main_data.get("humidity"),
+        "wind_speed": wind.get("speed"),
+        "wind_deg": wind.get("deg"),
+        "clouds": clouds_data.get("all"),
+        "visibility": payload.get("visibility"),
+        "weather_main": weather.get("main"),
+        "weather_description": weather.get("description"),
+    }
+
+
 def sg_events(payload: Any, limit: int) -> list[dict[str, object]]:
     items = list_records(payload)
     events: list[dict[str, object]] = []
@@ -213,6 +313,15 @@ def api_events(source: str, api_url: str, api_key: str | None, limit: int) -> li
 
     if source == "waqi":
         return [norm_waqi(payload)]
+    if source == "londonair":
+        auth_list = payload if isinstance(payload, list) else payload.get("HourlyAirQualityIndex", {}).get("LocalAuthority", [])
+        if isinstance(auth_list, dict):
+            auth_list = [auth_list]
+        return norm_londonair(auth_list)[:limit]
+    if source == "openmeteo":
+        return norm_openmeteo_aq(payload)[:limit]
+    if source == "openweather":
+        return [norm_openweather(payload)]
 
     records = list_records(payload)
     if source == "openaq":
@@ -237,7 +346,7 @@ def event_stream(source: str, api_url: str | None, api_key: str | None, events: 
             print(f"{source} API unavailable, using fallback: {exc}")
 
 
-    if source in {"openaq", "waqi"}:
+    if source in {"openaq", "waqi", "londonair", "openmeteo", "openweather"}:
         return [sim_env() for _ in range(events)]
     return [sim_transport() for _ in range(events)]
 
@@ -274,7 +383,9 @@ def default_url(source: str) -> str | None:
         "tfl": os.getenv("TFL_API_URL", "https://api.tfl.gov.uk/Line/Mode/tube,dlr,overground,elizabeth-line/Status"),
         "gtfs": os.getenv("GTFS_REALTIME_URL"),
         "singapore": os.getenv("SG_TRAFFIC_API_URL", "https://api-open.data.gov.sg/v2/real-time/api/traffic-images"),
-
+        "londonair": os.getenv("LONDONAIR_API_BASE_URL", "https://api.erg.ic.ac.uk/AirQuality") + os.getenv("LONDONAIR_HOURLY_INDEX_ENDPOINT", "/Hourly/MonitoringIndex/GroupName=London/Json"),
+        "openmeteo": os.getenv("OPENMETEO_API_URL", "https://air-quality-api.open-meteo.com") + "/v1/air-quality?latitude=51.5074&longitude=-0.1278&current=pm10,pm2_5,european_aqi,us_aqi",
+        "openweather": os.getenv("OPENWEATHER_API_URL", "https://api.openweathermap.org") + "/data/2.5/weather?q=London&units=metric&appid=" + (os.getenv("OPENWEATHER_API_KEY") or ""),
     }
     return urls.get(source)
 
@@ -285,6 +396,9 @@ def default_key(source: str) -> str | None:
         "openaq": os.getenv("OPENAQ_API_KEY"),
         "waqi": os.getenv("WAQI_API_TOKEN"),
         "tfl": os.getenv("TFL_API_KEY"),
+        "londonair": os.getenv("LONDONAIR_API_KEY"),
+        "openmeteo": None,
+        "openweather": os.getenv("OPENWEATHER_API_KEY"),
     }
     return keys.get(source)
 

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import sys
@@ -26,16 +26,59 @@ def extract_records(payload: Any) -> list[dict[str, Any]]:
     raise ValueError("Unsupported API response shape")
 
 
-def ingest_api(dataset: str, url: str, api_key: str | None = None) -> str:
-    """Ingest records from an HTTP API into the raw local landing zone."""
+def ingest_api_records(
+    url: str,
+    api_key: str | None = None,
+    max_pages: int = 5,
+    page_size: int = 50,
+) -> list[dict[str, Any]]:
+    """Fetch records from a REST API, following pagination if present.
+
+    Supports JSON:API-style pagination (used by DfT Road Traffic API)
+    where `links.next` indicates the next page URL.
+    Falls back to a single non-paginated request if pagination params fail.
+    """
     headers = {"Accept": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
-    response = requests.get(url, headers=headers, timeout=30)
+    # First try a simple single request (works for most APIs)
+    params = {"page[size]": str(page_size)} if page_size else {}
+    response = requests.get(url, headers=headers, params=params, timeout=30)
     response.raise_for_status()
+    payload = response.json()
+    all_records = extract_records(payload)
 
-    records = extract_records(response.json())
+    # If the response has pagination links, follow them
+    if isinstance(payload, dict):
+        next_url = (
+            payload.get("next_page_url")
+            or (payload.get("links", {}) if isinstance(payload.get("links"), dict) else {}).get("next")
+        )
+        page = 1
+        while next_url and page < max_pages:
+            page += 1
+            response = requests.get(next_url, headers=headers, timeout=30)
+            response.raise_for_status()
+            payload = response.json()
+            records = extract_records(payload)
+            if not records:
+                break
+            all_records.extend(records)
+            if isinstance(payload, dict):
+                next_url = (
+                    payload.get("next_page_url")
+                    or (payload.get("links", {}) if isinstance(payload.get("links"), dict) else {}).get("next")
+                )
+            else:
+                next_url = None
+
+    return all_records
+
+
+def ingest_api(dataset: str, url: str, api_key: str | None = None) -> str:
+    """Ingest records from an HTTP API into the raw local landing zone."""
+    records = ingest_api_records(url, api_key)
     output_path = write_jsonl(dataset=dataset, records=records, source=url)
     print(f"Ingested {len(records)} records for dataset={dataset} into {output_path}")
     return str(output_path)

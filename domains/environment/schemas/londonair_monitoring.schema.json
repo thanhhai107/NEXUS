@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LondonAir Monitoring Reading",
+  "type": "object",
+  "properties": {
+    "event_id": {"type": "string"},
+    "source": {"type": "string"},
+    "event_type": {"type": "string"},
+    "event_time": {"type": "string"},
+    "site_code": {"type": "string"},
+    "site_name": {"type": "string"},
+    "site_type": {"type": "string"},
+    "borough_code": {"type": "string"},
+    "borough_name": {"type": "string"},
+    "species_code": {"type": "string"},
+    "species_description": {"type": "string"},
+    "air_quality_index": {"type": ["string", "number", "null"]},
+    "air_quality_band": {"type": ["string", "null"]},
+    "latitude": {"type": ["string", "number", "null"]},
+    "longitude": {"type": ["string", "number", "null"]}
+  },
+  "required": ["event_id", "source", "event_type", "event_time", "site_code"]
+}
