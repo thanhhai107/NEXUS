@@ -86,6 +86,8 @@ POSTGRES_USER=search
 POSTGRES_PASSWORD=search_demo
 
 MEILI_MASTER_KEY=masterKey
+
+ELASTIC_SEMANTIC_INFERENCE_ID=my-elser
 EOF
   chown "${BOOTSTRAP_USER}:${BOOTSTRAP_USER}" "${DOCKER_ELK_APP_DIR}/.env"
   chmod 0600 "${DOCKER_ELK_APP_DIR}/.env"
@@ -235,6 +237,8 @@ fi
 
 if [ "${NEXUS_NODE_ROLE}" = "master" ]; then
   NEXUS_NODE_ROLES="master"
+elif [ "${NEXUS_NODE_INDEX}" = "1" ]; then
+  NEXUS_NODE_ROLES="data,ingest,ml"
 else
   NEXUS_NODE_ROLES="data,ingest"
 fi
