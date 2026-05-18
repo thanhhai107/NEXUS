@@ -7,14 +7,15 @@ Terraform nay tao cum VM GCP cho demo Amazon Electronics Search:
 - Ubuntu 22.04 LTS
 - Docker va Docker Compose plugin
 - Cloud NAT de worker private pull Docker images / git repos
-- Firewall cho SSH, Streamlit UI va FastAPI tren master
+- Firewall cho SSH, Kibana, Streamlit UI va FastAPI tren master
 - Repo demo duoc clone vao `/opt/nexus/docker-elk`
-- Helper `start-amazon-search-demo` tren master de start stack va ingest sample data
+- Helper `start-demo` tren master de start stack
 
 Demo search moi chay bang Docker Compose:
 
 - Streamlit frontend: TCP `8501`
 - FastAPI backend: TCP `8000`
+- Kibana: TCP `5601`
 - PostgreSQL va Meilisearch: tren master VM
 - Elasticsearch: phan tan tren master + worker VMs
 - PostgreSQL, Elasticsearch, Meilisearch khong mo public; truy cap bang SSH tunnel khi can
@@ -45,10 +46,10 @@ Set at least:
 
 ```hcl
 project_id = "your-gcp-project-id"
-master_zone = "asia-southeast1-b"
+master_zone = "asia-southeast1-c"
 worker_zones = [
-  "asia-southeast1-b",
-  "asia-southeast1-b",
+  "asia-southeast1-c",
+  "asia-southeast1-c",
   "asia-southeast1-c",
   "asia-southeast1-c"
 ]
@@ -61,9 +62,9 @@ enable_master_worker_ssh = true
 Default zone placement:
 
 ```text
-nexus-master-1   asia-southeast1-b
-nexus-worker-1   asia-southeast1-b
-nexus-worker-2   asia-southeast1-b
+nexus-master-1   asia-southeast1-c
+nexus-worker-1   asia-southeast1-c
+nexus-worker-2   asia-southeast1-c
 nexus-worker-3   asia-southeast1-c
 nexus-worker-4   asia-southeast1-c
 ```
@@ -74,7 +75,7 @@ For a short classroom demo you can temporarily use:
 allowed_admin_cidrs = ["0.0.0.0/0"]
 ```
 
-Prefer a narrow `/32` CIDR when possible. Only `22`, `8000`, `8501`, and the
+Prefer a narrow `/32` CIDR when possible. Only `22`, `5601`, `8000`, `8501`, and the
 optional Nexus UI ports are public through this Terraform config.
 
 ## Repo Provisioning
@@ -140,7 +141,7 @@ ssh ubuntu@<MASTER_PUBLIC_IP>
 Run:
 
 ```bash
-start-amazon-search-demo
+start-demo
 ```
 
 The helper runs:
@@ -148,17 +149,24 @@ The helper runs:
 ```bash
 start-amazon-search-elasticsearch-cluster
 cd /opt/nexus/docker-elk
-docker compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch backend frontend
-docker compose exec -T backend python scripts/ingest_all.py --reset --product-limit 2000000 --review-limit 200000
+docker compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch kibana backend frontend
 ```
 
-It uses `data/sample` if you have not downloaded the full Amazon dataset yet.
+It does not ingest data automatically. Run ingest explicitly when you are ready:
+
+```bash
+cd /opt/nexus/docker-elk
+docker compose exec -T backend python scripts/ingest_all.py --reset
+```
+
+The ingest command uses `data/sample` if you have not downloaded the full Amazon dataset yet.
 
 Open:
 
 ```text
 http://<MASTER_PUBLIC_IP>:8501
 http://<MASTER_PUBLIC_IP>:8000/docs
+http://<MASTER_PUBLIC_IP>:5601
 ```
 
 The same URLs are available from:
@@ -172,6 +180,17 @@ Verify Elasticsearch is distributed:
 ```bash
 curl "http://localhost:9200/_cat/nodes?v&h=name,node.role,master,ip"
 curl "http://localhost:9200/_cluster/health?pretty"
+```
+
+Or use Kibana Dev Tools at `http://<MASTER_PUBLIC_IP>:5601`:
+
+```http
+GET _cluster/health?pretty
+GET _cat/nodes?v&h=name,node.role,master,ip,heap.percent,ram.percent,cpu,load_1m
+GET _cat/shards/amazon_electronics_products?v
+GET _cat/shards/amazon_electronics_reviews?v
+GET amazon_electronics_products/_stats
+GET _cat/thread_pool/search?v
 ```
 
 Expected nodes:
@@ -191,7 +210,7 @@ On the master VM:
 ```bash
 cd /opt/nexus/docker-elk
 python3 data/download_datasets.py --reviews
-docker compose exec -T backend python scripts/ingest_all.py --reset --product-limit 2000000 --review-limit 200000
+docker compose exec -T backend python scripts/ingest_all.py --reset --product-limit 100000 --review-limit 100000
 ```
 
 Lower the limits if the VM does not have enough disk, RAM, or time.

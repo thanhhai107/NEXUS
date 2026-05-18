@@ -86,6 +86,8 @@ POSTGRES_USER=search
 POSTGRES_PASSWORD=search_demo
 
 MEILI_MASTER_KEY=masterKey
+
+ELASTIC_SEMANTIC_INFERENCE_ID=my-elser-endpoint
 EOF
   chown "${BOOTSTRAP_USER}:${BOOTSTRAP_USER}" "${DOCKER_ELK_APP_DIR}/.env"
   chmod 0600 "${DOCKER_ELK_APP_DIR}/.env"
@@ -94,6 +96,7 @@ EOF
 AMAZON_SEARCH_DEMO_DIR=${DOCKER_ELK_APP_DIR}
 AMAZON_SEARCH_STREAMLIT_URL=http://${NEXUS_NODE_IP}:8501
 AMAZON_SEARCH_FASTAPI_URL=http://${NEXUS_NODE_IP}:8000
+AMAZON_SEARCH_KIBANA_URL=http://${NEXUS_NODE_IP}:5601
 EOF
   chmod 0644 /etc/amazon-search-demo.env
 
@@ -146,7 +149,7 @@ ${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env ps elasticse
 EOF
     chmod 0755 /usr/local/bin/start-amazon-search-elasticsearch-cluster
 
-    cat >/usr/local/bin/start-amazon-search-demo <<'EOF'
+    cat >/usr/local/bin/start-demo <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -166,22 +169,21 @@ fi
 start-amazon-search-elasticsearch-cluster
 
 cd "${AMAZON_SEARCH_DEMO_DIR}"
-${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch backend frontend
-
-if [ "$#" -eq 0 ]; then
-  set -- --reset --product-limit 2000000 --review-limit 200000
-fi
-
-${DOCKER} compose exec -T backend python scripts/ingest_all.py "$@"
+${DOCKER} compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch kibana backend frontend
 
 cat <<URLS
 
 Amazon Search demo is starting:
   Streamlit: http://$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip):8501
   FastAPI:   http://$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip):8000/docs
+  Kibana:    http://$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip):5601
+
+Ingest is not run automatically. To ingest data, run:
+  cd ${AMAZON_SEARCH_DEMO_DIR}
+  docker compose exec -T backend python scripts/ingest_all.py --reset
 URLS
 EOF
-    chmod 0755 /usr/local/bin/start-amazon-search-demo
+    chmod 0755 /usr/local/bin/start-demo
   fi
 }
 
@@ -235,6 +237,8 @@ fi
 
 if [ "${NEXUS_NODE_ROLE}" = "master" ]; then
   NEXUS_NODE_ROLES="master"
+elif [ "${NEXUS_NODE_INDEX}" = "1" ]; then
+  NEXUS_NODE_ROLES="data,ingest,ml"
 else
   NEXUS_NODE_ROLES="data,ingest"
 fi
