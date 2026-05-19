@@ -6,7 +6,6 @@ from typing import Any, Mapping
 from common.config import load_dataset_catalog
 from governance.metadata import dataset_governance_metadata
 
-
 SURFACE_FLAGS = {
     "api": "api_access",
     "trino": "trino_access",

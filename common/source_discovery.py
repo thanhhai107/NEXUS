@@ -5,7 +5,6 @@ import re
 from pathlib import Path
 from typing import Any, Iterable
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_REPOSITORY_URL = "https://github.com/Akapi895/data-bigdata"
 DEFAULT_SOURCE_DIR = PROJECT_ROOT / "source_discovery"
@@ -131,6 +130,60 @@ def sync_discovery(
     }
 
 
+def integrate_schema_into_domain(
+    schema_name: str,
+    domain: str,
+    dataset: str,
+    source_dir: Path = DEFAULT_SOURCE_DIR,
+    domains_dir: Path = PROJECT_ROOT / "domains",
+) -> dict[str, Any]:
+    """Materialize a discovered schema into domains/<domain> and register a dataset stub."""
+    schema_definition = load_schema_definition(schema_name, source_dir)
+    nexus_schema = to_nexus_json_schema(schema_name, schema_definition)
+
+    domain_dir = domains_dir / domain
+    schemas_dir = domain_dir / "schemas"
+    schemas_dir.mkdir(parents=True, exist_ok=True)
+
+    schema_rel_path = Path("domains") / domain / "schemas" / f"{dataset}.schema.json"
+    schema_path = domains_dir / domain / "schemas" / f"{dataset}.schema.json"
+    _write_json(schema_path, nexus_schema)
+
+    datasets_path = domain_dir / "datasets.yml"
+    catalog = _read_yaml(datasets_path)
+    datasets = catalog.setdefault("datasets", {})
+    dataset_entry = datasets.get(dataset, {})
+    if not isinstance(dataset_entry, dict):
+        dataset_entry = {}
+
+    dataset_entry.update(
+        {
+            "domain": domain,
+            "description": dataset_entry.get("description") or f"Imported from source discovery schema {schema_name}.",
+            "source_type": dataset_entry.get("source_type") or "api_stream",
+            "source_uri": dataset_entry.get("source_uri") or "https://example.com/replace-me",
+            "schema_path": str(schema_rel_path),
+            "source_discovery": {
+                "repository": SOURCE_REPOSITORY_URL,
+                "source_file": f"source_discovery/{ALL_SCHEMAS_FILE}",
+                "schema_names": [schema_name],
+            },
+            "freshness_hours": dataset_entry.get("freshness_hours") or 24,
+            "primary_keys": dataset_entry.get("primary_keys") or [],
+        }
+    )
+    datasets[dataset] = dataset_entry
+    _write_yaml(datasets_path, catalog)
+
+    return {
+        "domain": domain,
+        "dataset": dataset,
+        "schema_name": schema_name,
+        "schema_path": str(schema_path),
+        "datasets_path": str(datasets_path),
+    }
+
+
 def schema_filename(schema_name: str) -> str:
     """Return a filesystem-safe schema filename stem."""
     safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", schema_name).strip("._")
@@ -178,6 +231,33 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def _read_yaml(path: Path) -> dict[str, Any]:
+    try:
+        import yaml
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "PyYAML is required for source-discovery integration. Install dependencies from requirements.txt."
+        ) from exc
+
+    if not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8") as file:
+        return yaml.safe_load(file) or {}
+
+
+def _write_yaml(path: Path, payload: dict[str, Any]) -> None:
+    try:
+        import yaml
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "PyYAML is required for source-discovery integration. Install dependencies from requirements.txt."
+        ) from exc
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as file:
+        yaml.safe_dump(payload, file, sort_keys=False, allow_unicode=True)
 
 
 def _title(schema_name: str) -> str:

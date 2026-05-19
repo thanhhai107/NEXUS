@@ -5,7 +5,6 @@ from typing import Any
 
 import yaml
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = PROJECT_ROOT / "config"
 DOMAINS_DIR = PROJECT_ROOT / "domains"

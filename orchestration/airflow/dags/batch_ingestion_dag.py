@@ -5,9 +5,8 @@ from datetime import datetime
 from pathlib import Path
 
 from airflow import DAG
-from airflow.operators.python import BranchPythonOperator
 from airflow.operators.bash import BashOperator
-
+from airflow.operators.python import BranchPythonOperator
 
 AGENT_DECISIONS_LOG = Path("/opt/airflow/runtime/logs/agent_decisions.jsonl")
 

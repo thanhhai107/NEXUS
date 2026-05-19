@@ -4,7 +4,6 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
-
 Record = Mapping[str, object]
 
 

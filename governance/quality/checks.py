@@ -7,7 +7,6 @@ from typing import Iterable, Mapping, Sequence
 
 from governance.quality.schema import validate_json_schema
 
-
 Record = Mapping[str, object]
 
 

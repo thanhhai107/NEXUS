@@ -5,7 +5,6 @@ from datetime import datetime
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
-
 with DAG(
     dag_id="nexus_streaming_pipeline",
     description="Produce streaming events and record lightweight quality and lineage metadata.",

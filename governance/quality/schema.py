@@ -6,7 +6,6 @@ from typing import Any, Mapping, Sequence
 
 from governance.quality.auto_fix import clean_column_name
 
-
 Record = Mapping[str, object]
 
 

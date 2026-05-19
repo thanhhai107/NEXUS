@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from governance.quality.auto_fix import apply_auto_fix, normalize_field_name, normalize_field_names
+from governance.quality.auto_fix import (
+    apply_auto_fix,
+    normalize_field_name,
+    normalize_field_names,
+)
 
 
 def test_auto_fix_trims_normalizes_and_fills_missing() -> None:

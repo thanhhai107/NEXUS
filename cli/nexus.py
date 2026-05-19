@@ -12,13 +12,34 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
+
 load_dotenv(PROJECT_ROOT / ".env", override=True)
 
 from common.config import load_dataset_catalog, load_quality_config
+from common.source_discovery import (
+    DEFAULT_OUTPUT_DIR as SOURCE_DISCOVERY_DEFAULT_OUTPUT_DIR,
+)
+from common.source_discovery import (
+    DEFAULT_SOURCE_DIR as SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
+)
+from common.source_discovery import integrate_schema_into_domain
+from common.source_discovery import (
+    schema_names as source_discovery_schema_names,
+)
+from common.source_discovery import (
+    source_summary as source_discovery_summary,
+)
+from common.source_discovery import (
+    sync_discovery as sync_source_discovery,
+)
 from governance.agents.governance_agent import review_batch
 from governance.audit import write_audit_event
 from governance.lineage import record_lineage
-from governance.quality.auto_fix import apply_auto_fix, normalize_field_name, normalize_field_names
+from governance.quality.auto_fix import (
+    apply_auto_fix,
+    normalize_field_name,
+    normalize_field_names,
+)
 from governance.quality.checks import evaluate_quality_status, run_quality_checks
 from governance.quality.metrics import write_quality_metric
 from governance.quality.quarantine import quarantine_records
@@ -28,18 +49,10 @@ from governance.quality.schema import (
     records_failing_json_schema,
 )
 from governance.schema_history import save_schema_snapshot
+from ingestion.batch.api_ingestion import ingest_api_records
 from ingestion.batch.common import read_csv_records, write_jsonl
 from ingestion.batch.csv_download_ingestion import download_csv
-from ingestion.batch.api_ingestion import ingest_api_records
 from ingestion.streaming.producer import default_key, default_url, event_stream
-from common.source_discovery import (
-    DEFAULT_OUTPUT_DIR as SOURCE_DISCOVERY_DEFAULT_OUTPUT_DIR,
-    DEFAULT_SOURCE_DIR as SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
-    schema_names as source_discovery_schema_names,
-    source_summary as source_discovery_summary,
-    sync_discovery as sync_source_discovery,
-)
-
 
 SOURCE_DATASETS = {
     "transport": "transport_events",
@@ -65,6 +78,7 @@ def local_source(dataset_config: dict[str, Any], override: Path | None) -> Path:
 
 
 import re as _re
+
 
 def _expand_env(value: str) -> str:
     """Expand ${VAR} patterns in a string using os.environ."""
@@ -557,6 +571,16 @@ def sync_source_discovery_metadata(args: argparse.Namespace) -> None:
     print(json.dumps(result, indent=2))
 
 
+def integrate_source_discovery_schema(args: argparse.Namespace) -> None:
+    result = integrate_schema_into_domain(
+        schema_name=args.schema,
+        domain=args.domain,
+        dataset=args.dataset,
+        source_dir=args.source_dir,
+    )
+    print(json.dumps(result, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="NEXUS operational CLI.")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -664,6 +688,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Schema name to export. Repeat for multiple schemas. Defaults to all schemas.",
     )
     source_discovery_sync_command.set_defaults(func=sync_source_discovery_metadata)
+
+    source_discovery_integrate_command = source_discovery_subcommands.add_parser(
+        "integrate",
+        help="Integrate one discovered schema into domains/<domain>/datasets.yml and schemas/",
+    )
+    source_discovery_integrate_command.add_argument("--schema", required=True, help="Discovery schema name")
+    source_discovery_integrate_command.add_argument("--domain", required=True, help="Domain folder name")
+    source_discovery_integrate_command.add_argument("--dataset", required=True, help="Dataset key in catalog")
+    source_discovery_integrate_command.add_argument(
+        "--source-dir",
+        type=Path,
+        default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
+    )
+    source_discovery_integrate_command.set_defaults(func=integrate_source_discovery_schema)
 
     return parser
 
