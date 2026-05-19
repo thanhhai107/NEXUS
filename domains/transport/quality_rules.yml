@@ -1,4 +1,4 @@
-﻿datasets:
+datasets:
   us_accidents:
     required_columns:
     - ID
@@ -50,3 +50,43 @@
     - event_type
     - event_time
     freshness_column: event_time
+  stats19_collisions:
+    required_columns:
+    - accident_index
+    - accident_severity
+    - latitude
+    - longitude
+    - date
+    freshness_column: date
+    auto_fix:
+      trim_strings: true
+      normalize_column_names: true
+  naptan_stops:
+    required_columns:
+    - atcocode
+    - commonname
+    - latitude
+    - longitude
+    - stoptype
+    freshness_column: modificationdatetime
+    auto_fix:
+      trim_strings: true
+      normalize_column_names: true
+  london_journeys:
+    required_columns:
+    - period_beginning
+    - reporting_period
+    freshness_column: period_beginning
+    auto_fix:
+      trim_strings: true
+      normalize_column_names: true
+  dft_road_traffic:
+    required_columns:
+    - count_point_id
+    - latitude
+    - longitude
+    freshness_column: aadf_year
+    auto_fix:
+      trim_strings: true
+      normalize_column_names: true
+

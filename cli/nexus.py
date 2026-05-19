@@ -3,12 +3,16 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
+
+from dotenv import load_dotenv
+load_dotenv(PROJECT_ROOT / ".env", override=True)
 
 from common.config import load_dataset_catalog, load_quality_config
 from governance.agents.governance_agent import review_batch
@@ -25,6 +29,8 @@ from governance.quality.schema import (
 )
 from governance.schema_history import save_schema_snapshot
 from ingestion.batch.common import read_csv_records, write_jsonl
+from ingestion.batch.csv_download_ingestion import download_csv
+from ingestion.batch.api_ingestion import ingest_api_records
 from ingestion.streaming.producer import default_key, default_url, event_stream
 from common.source_discovery import (
     DEFAULT_OUTPUT_DIR as SOURCE_DISCOVERY_DEFAULT_OUTPUT_DIR,
@@ -42,6 +48,9 @@ SOURCE_DATASETS = {
     "tfl": "tfl_transport_status",
     "gtfs": "gtfs_realtime_events",
     "singapore": "sg_traffic",
+    "londonair": "londonair_monitoring",
+    "openmeteo": "openmeteo_air_quality",
+    "openweather": "openweather_current",
 }
 
 
@@ -53,6 +62,65 @@ def local_source(dataset_config: dict[str, Any], override: Path | None) -> Path:
     if not source or str(source).startswith(("http://", "https://", "${")):
         raise ValueError("This runner needs a local CSV source. Pass --source for this dataset.")
     return PROJECT_ROOT / str(source)
+
+
+import re as _re
+
+def _expand_env(value: str) -> str:
+    """Expand ${VAR} patterns in a string using os.environ."""
+    return _re.sub(
+        r"\$\{([^}]+)\}",
+        lambda m: os.environ.get(m.group(1), ""),
+        value,
+    )
+
+
+def resolve_records(
+    dataset_config: dict[str, Any],
+    dataset: str,
+    override_source: Path | None,
+) -> tuple[list[dict[str, str]], str]:
+    """Resolve records from the appropriate source based on dataset source_type.
+
+    Returns (records, source_label) where source_label is the path/URL used.
+    """
+    source_type = dataset_config.get("source_type", "csv")
+
+    if override_source:
+        records = read_csv_records(override_source)
+        return records, str(override_source)
+
+    if source_type == "csv_download":
+        url = _expand_env(dataset_config.get("source_uri", ""))
+        if not url:
+            raise ValueError(
+                f"Dataset {dataset} is csv_download but no valid source_uri found. "
+                f"Check .env for the required URL variable."
+            )
+        downloads_dir = PROJECT_ROOT / "runtime" / "downloads"
+        downloads_dir.mkdir(parents=True, exist_ok=True)
+        csv_path = download_csv(url)
+        try:
+            records = read_csv_records(csv_path)
+            return records, url
+        finally:
+            csv_path.unlink(missing_ok=True)
+
+    if source_type == "rest_api":
+        url = _expand_env(dataset_config.get("source_uri", ""))
+        if not url:
+            raise ValueError(
+                f"Dataset {dataset} is rest_api but no valid source_uri found. "
+                f"Check .env for the required URL variable."
+            )
+        api_key_env = dataset_config.get("api_key_env")
+        api_key = os.environ.get(api_key_env) if api_key_env else None
+        records = ingest_api_records(url, api_key)
+        return records, url
+
+    source_path = local_source(dataset_config, None)
+    records = read_csv_records(source_path)
+    return records, str(source_path)
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
@@ -119,13 +187,12 @@ def run_batch(args: argparse.Namespace) -> None:
     if not rules:
         raise SystemExit(f"No quality rules configured for dataset: {args.dataset}")
 
-    source_path = local_source(dataset_config, args.source)
-    records = read_csv_records(source_path)
+    records, source_label = resolve_records(dataset_config, args.dataset, args.source)
     auto_fix_result = apply_auto_fix(records, rules.get("auto_fix"))
     json_schema = effective_schema(dataset_config, rules)
     schema_coercion_result = coerce_records_to_schema(auto_fix_result.records, json_schema)
     records = schema_coercion_result.records
-    raw_path = write_jsonl(args.dataset, records, str(source_path))
+    raw_path = write_jsonl(args.dataset, records, source_label)
     print(f"Ingested {len(records)} auto-fixed records for dataset={args.dataset} into {raw_path}")
 
     required_columns = normalize_field_names(rules["required_columns"], rules.get("auto_fix"))
@@ -148,7 +215,7 @@ def run_batch(args: argparse.Namespace) -> None:
             json_schema,
             batch_id=args.batch_id,
             run_id=args.run_id,
-            source_path=source_path,
+            source_path=source_label,
             actor=args.actor,
         )
 
@@ -164,7 +231,7 @@ def run_batch(args: argparse.Namespace) -> None:
             reason="missing_required_values",
             batch_id=args.batch_id,
             run_id=args.run_id,
-            source_path=source_path,
+            source_path=source_label,
             actor=args.actor,
         )
 
@@ -176,7 +243,7 @@ def run_batch(args: argparse.Namespace) -> None:
             reason="json_schema_validation_failed",
             batch_id=args.batch_id,
             run_id=args.run_id,
-            source_path=source_path,
+            source_path=source_label,
             actor=args.actor,
         )
 
@@ -196,7 +263,7 @@ def run_batch(args: argparse.Namespace) -> None:
         details=details,
         batch_id=args.batch_id,
         run_id=args.run_id,
-        source_path=source_path,
+        source_path=source_label,
         actor=args.actor,
     )
     write_quality_metric(
@@ -209,7 +276,7 @@ def run_batch(args: argparse.Namespace) -> None:
         thresholds=thresholds,
         threshold_violations=threshold_violations,
         run_id=args.run_id,
-        source_path=source_path,
+        source_path=source_label,
         actor=args.actor,
     )
 

@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NaPTAN Access Node (Stop/Station)",
+  "type": "object",
+  "properties": {
+    "atcocode": {"type": "string"},
+    "naptancode": {"type": "string"},
+    "commonname": {"type": "string"},
+    "shortcommonname": {"type": "string"},
+    "landmark": {"type": "string"},
+    "street": {"type": "string"},
+    "indicator": {"type": "string"},
+    "bearing": {"type": "string"},
+    "nptglocalitycode": {"type": "string"},
+    "localityname": {"type": "string"},
+    "parentlocalityname": {"type": "string"},
+    "town": {"type": "string"},
+    "suburb": {"type": "string"},
+    "easting": {"type": ["string", "integer"]},
+    "northing": {"type": ["string", "integer"]},
+    "longitude": {"type": ["string", "number"]},
+    "latitude": {"type": ["string", "number"]},
+    "stoptype": {"type": "string"},
+    "busstoptype": {"type": "string"},
+    "timingstatus": {"type": "string"},
+    "administrativeareacode": {"type": "string"},
+    "creationdatetime": {"type": "string"},
+    "modificationdatetime": {"type": "string"},
+    "status": {"type": "string"}
+  },
+  "required": ["atcocode", "commonname", "latitude", "longitude", "stoptype"]
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "STATS19 Collision Record",
+  "type": "object",
+  "properties": {
+    "accident_index": {"type": "string"},
+    "accident_year": {"type": ["string", "integer"]},
+    "accident_reference": {"type": "string"},
+    "longitude": {"type": ["string", "number"]},
+    "latitude": {"type": ["string", "number"]},
+    "accident_severity": {"type": ["string", "integer"]},
+    "number_of_vehicles": {"type": ["string", "integer"]},
+    "number_of_casualties": {"type": ["string", "integer"]},
+    "date": {"type": "string"},
+    "time": {"type": "string"},
+    "day_of_week": {"type": ["string", "integer"]},
+    "local_authority_district": {"type": ["string", "integer"]},
+    "local_authority_ons_district": {"type": "string"},
+    "local_authority_highway": {"type": "string"},
+    "first_road_class": {"type": ["string", "integer"]},
+    "road_type": {"type": ["string", "integer"]},
+    "speed_limit": {"type": ["string", "integer"]},
+    "light_conditions": {"type": ["string", "integer"]},
+    "weather_conditions": {"type": ["string", "integer"]},
+    "road_surface_conditions": {"type": ["string", "integer"]},
+    "urban_or_rural_area": {"type": ["string", "integer"]},
+    "police_force": {"type": ["string", "integer"]},
+    "lsoa_of_accident_location": {"type": "string"}
+  },
+  "required": ["accident_index", "accident_severity", "latitude", "longitude", "date"]
+}

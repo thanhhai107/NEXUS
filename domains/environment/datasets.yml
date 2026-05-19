@@ -1,4 +1,4 @@
-﻿datasets:
+datasets:
   openaq_measurements:
     domain: environment
     description: Environment poll-based streaming source for air-quality measurements
@@ -99,3 +99,107 @@
       bronze_table: nexus.bronze.ncei_cdo_climate
       silver_table: nexus.silver.ncei_cdo_climate
       gold_table: nexus.gold.ncei_climate_summary
+  londonair_monitoring:
+    domain: environment
+    description: London Air Quality Network hourly monitoring index from Imperial College API.
+    source_type: api_stream
+    source_uri: ${LONDONAIR_API_BASE_URL}/Hourly/MonitoringIndex/GroupName=London/Json
+    docs_uri: https://api.erg.ic.ac.uk/AirQuality/help
+    topic: environment-londonair
+    poll_seconds: 3600
+    schema_path: domains/environment/schemas/londonair_monitoring.schema.json
+    freshness_hours: 6
+    primary_keys:
+    - event_id
+    governance:
+      owner: environment-data-platform
+      steward: environment-data-steward
+      sensitivity: public
+      retention:
+        policy: open-data-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+        - admin
+        - steward
+        - analyst
+        - public
+        denied_roles: []
+        api_access: true
+        trino_access: true
+        superset_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/londonair_monitoring/
+      bronze_table: nexus.bronze.londonair_monitoring
+      silver_table: nexus.silver.londonair_monitoring
+      gold_table: nexus.gold.londonair_air_quality_summary
+  openmeteo_air_quality:
+    domain: environment
+    description: Open-Meteo air quality forecast and current readings.
+    source_type: api_stream
+    source_uri: ${OPENMETEO_API_URL}/v1/air-quality
+    docs_uri: https://open-meteo.com/en/docs/air-quality-api
+    topic: environment-openmeteo
+    poll_seconds: 3600
+    schema_path: domains/environment/schemas/openmeteo_air_quality.schema.json
+    freshness_hours: 6
+    primary_keys:
+    - event_id
+    governance:
+      owner: environment-data-platform
+      steward: environment-data-steward
+      sensitivity: public
+      retention:
+        policy: open-data-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+        - admin
+        - steward
+        - analyst
+        - public
+        denied_roles: []
+        api_access: true
+        trino_access: true
+        superset_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/openmeteo_air_quality/
+      bronze_table: nexus.bronze.openmeteo_air_quality
+      silver_table: nexus.silver.openmeteo_air_quality
+      gold_table: nexus.gold.openmeteo_air_quality_summary
+  openweather_current:
+    domain: environment
+    description: OpenWeatherMap current weather data for London.
+    source_type: api_stream
+    source_uri: ${OPENWEATHER_API_URL}/data/2.5/weather
+    docs_uri: https://openweathermap.org/current
+    api_key_env: OPENWEATHER_API_KEY
+    topic: environment-openweather
+    poll_seconds: 1800
+    schema_path: domains/environment/schemas/openweather_current.schema.json
+    freshness_hours: 1
+    primary_keys:
+    - event_id
+    governance:
+      owner: environment-data-platform
+      steward: environment-data-steward
+      sensitivity: public
+      retention:
+        policy: open-data-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+        - admin
+        - steward
+        - analyst
+        - public
+        denied_roles: []
+        api_access: true
+        trino_access: true
+        superset_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/openweather_current/
+      bronze_table: nexus.bronze.openweather_current
+      silver_table: nexus.silver.openweather_current
+      gold_table: nexus.gold.openweather_current_summary
+
