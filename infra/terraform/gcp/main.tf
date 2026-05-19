@@ -36,12 +36,6 @@ variable "region" {
   default     = "asia-southeast1"
 }
 
-variable "zone" {
-  description = "Deprecated. Use master_zone and worker_zones."
-  type        = string
-  default     = null
-}
-
 variable "master_zone" {
   description = "Google Cloud zone for the master node."
   type        = string
@@ -150,35 +144,20 @@ variable "nexus_repo_ref" {
   default     = "master"
 }
 
-variable "docker_elk_repo_url" {
-  description = "Git URL for the Amazon Search demo repo. Leave empty to skip provisioning this repo on VMs."
-  type        = string
-  default     = "https://github.com/thanhhai107/docker-elk.git"
-}
-
-variable "docker_elk_repo_ref" {
-  description = "Git branch, tag, or commit to checkout for the Amazon Search demo repo."
-  type        = string
-  default     = "main"
-}
-
-
 locals {
   cluster_tag = "${var.cluster_name}-cluster"
   master_tag  = "${var.cluster_name}-master"
   worker_tag  = "${var.cluster_name}-worker"
 
   common_metadata = {
-    nexus-cluster-name  = var.cluster_name
-    nexus-worker-count  = tostring(var.worker_count)
-    nexus-repo-ref      = var.nexus_repo_ref
-    nexus-repo-url      = var.nexus_repo_url
-    docker-elk-repo-ref = var.docker_elk_repo_ref
-    docker-elk-repo-url = var.docker_elk_repo_url
-    ssh-password-login  = var.enable_ssh_password_login ? "TRUE" : "FALSE"
-    ssh-password        = var.ssh_password
-    ssh-user            = var.ssh_user
-    enable-oslogin      = var.enable_oslogin ? "TRUE" : "FALSE"
+    nexus-cluster-name = var.cluster_name
+    nexus-worker-count = tostring(var.worker_count)
+    nexus-repo-ref     = var.nexus_repo_ref
+    nexus-repo-url     = var.nexus_repo_url
+    ssh-password-login = var.enable_ssh_password_login ? "TRUE" : "FALSE"
+    ssh-password       = var.ssh_password
+    ssh-user           = var.ssh_user
+    enable-oslogin     = var.enable_oslogin ? "TRUE" : "FALSE"
   }
 
   admin_ssh_keys = var.ssh_public_key == "" ? [] : [
@@ -269,19 +248,7 @@ resource "google_compute_firewall" "master_ui" {
 
   allow {
     protocol = "tcp"
-    ports    = ["5601", "8000", "8501", "8080", "8085", "8088"]
-  }
-}
-
-resource "google_compute_firewall" "minio_console" {
-  name          = "${var.cluster_name}-allow-minio-console"
-  network       = data.google_compute_network.selected.name
-  source_ranges = var.allowed_admin_cidrs
-  target_tags   = [local.worker_tag]
-
-  allow {
-    protocol = "tcp"
-    ports    = ["9001"]
+    ports    = ["8000", "8080", "8085", "8088", "9001"]
   }
 }
 
@@ -456,17 +423,15 @@ output "workers" {
 
 output "service_urls" {
   value = {
-    amazon_search_streamlit = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8501"
-    amazon_search_fastapi   = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8000"
-    amazon_search_docs      = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8000/docs"
-    amazon_search_kibana    = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:5601"
-    nexus_airflow           = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8080"
-    nexus_trino             = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8085"
-    nexus_superset          = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8088"
+    nexus_api           = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8000/docs"
+    nexus_airflow       = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8080"
+    nexus_trino         = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8085"
+    nexus_superset      = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8088"
+    nexus_minio_console = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:9001"
   }
 }
 
-output "search_engine_tunnel_command" {
-  description = "Use this when you need local access to PostgreSQL, Elasticsearch, Meilisearch, or Kibana without exposing them publicly."
-  value       = "ssh -L 5432:127.0.0.1:5432 -L 9200:127.0.0.1:9200 -L 7700:127.0.0.1:7700 -L 5601:127.0.0.1:5601 ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}"
+output "nexus_tunnel_command" {
+  description = "Use this when you need local access to Nexus services without exposing them publicly."
+  value       = "ssh -L 8000:127.0.0.1:8000 -L 8080:127.0.0.1:8080 -L 8085:127.0.0.1:8085 -L 8088:127.0.0.1:8088 -L 9000:127.0.0.1:9000 -L 9001:127.0.0.1:9001 ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}"
 }

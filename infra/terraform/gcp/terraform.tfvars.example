@@ -1,4 +1,4 @@
-project_id = "your-gcp-project-id"
+project_id = "nexus-496808"
 enable_required_apis = true
 region = "asia-southeast1"
 master_zone = "asia-southeast1-c"
@@ -14,7 +14,7 @@ cluster_name = "nexus"
 network_name       = "default"
 machine_type       = "e2-custom-12-16384"
 worker_count       = 4
-boot_disk_size_gb  = 200
+boot_disk_size_gb  = 75
 boot_disk_type     = "pd-balanced"
 
 allowed_admin_cidrs = [
@@ -29,11 +29,7 @@ enable_master_worker_ssh = true
 enable_ssh_password_login = true
 ssh_password              = "CHANGE_ME_TO_A_STRONG_PASSWORD"
 
-# Optional repo provisioning. Startup will clone/pull these repos onto each VM.
-# The Amazon Search demo repo gets a generated .env file and can be started on
-# the master VM with: start-demo
+# Optional Nexus repo provisioning. Leave nexus_repo_url empty if you will copy
+# the repository manually.
 nexus_repo_url = "https://github.com/thanhhai107/NEXUS.git"
 nexus_repo_ref = "master"
-
-docker_elk_repo_url = "https://github.com/thanhhai107/docker-elk.git"
-docker_elk_repo_ref = "main"

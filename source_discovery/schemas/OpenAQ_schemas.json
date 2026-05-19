@@ -1,0 +1,753 @@
+{
+  "source": "OpenAQ",
+  "base_url": "https://api.openaq.org",
+  "source_type": "rest",
+  "api_version": "v3",
+  "collected_at": "2026-05-14T23:45:02.148978",
+  "metadata": {
+    "format": "JSON",
+    "coverage": "Global",
+    "stations": "12,000+",
+    "api_version": "v3",
+    "auth": "X-API-Key header required"
+  },
+  "stats": {
+    "total_endpoints": 9,
+    "total_schemas": 10
+  },
+  "endpoints": [
+    {
+      "path": "/v3/locations",
+      "method": "GET",
+      "operation_id": "get_locations",
+      "summary": "Get air quality monitoring locations",
+      "tags": [
+        "Locations"
+      ],
+      "parameters": [
+        {
+          "name": "limit",
+          "in": "query"
+        },
+        {
+          "name": "page",
+          "in": "query"
+        },
+        {
+          "name": "offset",
+          "in": "query"
+        },
+        {
+          "name": "city",
+          "in": "query"
+        },
+        {
+          "name": "country",
+          "in": "query"
+        },
+        {
+          "name": "coordinates",
+          "in": "query"
+        },
+        {
+          "name": "parameter",
+          "in": "query"
+        },
+        {
+          "name": "entity",
+          "in": "query"
+        },
+        {
+          "name": "provider",
+          "in": "query"
+        },
+        {
+          "name": "isMobile",
+          "in": "query"
+        },
+        {
+          "name": "isMonitor",
+          "in": "query"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Location list with meta"
+        }
+      }
+    },
+    {
+      "path": "/v3/locations/{location_id}",
+      "method": "GET",
+      "operation_id": "get_location",
+      "summary": "Get specific location details",
+      "tags": [
+        "Locations"
+      ],
+      "parameters": [
+        {
+          "name": "location_id",
+          "in": "path",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Location details"
+        }
+      }
+    },
+    {
+      "path": "/v3/countries",
+      "method": "GET",
+      "operation_id": "get_countries",
+      "summary": "Get countries with air quality data",
+      "tags": [
+        "Countries"
+      ],
+      "parameters": [
+        {
+          "name": "limit",
+          "in": "query"
+        },
+        {
+          "name": "offset",
+          "in": "query"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Country list"
+        }
+      }
+    },
+    {
+      "path": "/v3/parameters",
+      "method": "GET",
+      "operation_id": "get_parameters",
+      "summary": "Get available air quality parameters",
+      "tags": [
+        "Parameters"
+      ],
+      "parameters": [
+        {
+          "name": "limit",
+          "in": "query"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Parameter list"
+        }
+      }
+    },
+    {
+      "path": "/v3/sensors",
+      "method": "GET",
+      "operation_id": "get_sensors",
+      "summary": "Get sensors",
+      "tags": [
+        "Sensors"
+      ],
+      "parameters": [
+        {
+          "name": "location_id",
+          "in": "query"
+        },
+        {
+          "name": "limit",
+          "in": "query"
+        },
+        {
+          "name": "parameter",
+          "in": "query"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Sensor list"
+        }
+      }
+    },
+    {
+      "path": "/v3/sensors/{sensor_id}",
+      "method": "GET",
+      "operation_id": "get_sensor",
+      "summary": "Get specific sensor details",
+      "tags": [
+        "Sensors"
+      ],
+      "parameters": [
+        {
+          "name": "sensor_id",
+          "in": "path",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Sensor details"
+        }
+      }
+    },
+    {
+      "path": "/v3/sensors/{sensor_id}/measurements",
+      "method": "GET",
+      "operation_id": "get_sensor_measurements",
+      "summary": "Get measurements for a sensor",
+      "tags": [
+        "Sensors",
+        "Measurements"
+      ],
+      "parameters": [
+        {
+          "name": "sensor_id",
+          "in": "path",
+          "required": true
+        },
+        {
+          "name": "date_from",
+          "in": "query"
+        },
+        {
+          "name": "date_to",
+          "in": "query"
+        },
+        {
+          "name": "limit",
+          "in": "query"
+        },
+        {
+          "name": "offset",
+          "in": "query"
+        },
+        {
+          "name": "sort",
+          "in": "query"
+        },
+        {
+          "name": "aggregation",
+          "in": "query"
+        },
+        {
+          "name": "frequency",
+          "in": "query"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Sensor measurements"
+        }
+      }
+    },
+    {
+      "path": "/v3/sensors/{sensor_id}/hours",
+      "method": "GET",
+      "operation_id": "get_sensor_hours",
+      "summary": "Get hourly aggregated measurements",
+      "tags": [
+        "Sensors",
+        "Aggregation"
+      ],
+      "parameters": [
+        {
+          "name": "sensor_id",
+          "in": "path",
+          "required": true
+        },
+        {
+          "name": "date_from",
+          "in": "query"
+        },
+        {
+          "name": "date_to",
+          "in": "query"
+        },
+        {
+          "name": "limit",
+          "in": "query"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Hourly aggregation"
+        }
+      }
+    },
+    {
+      "path": "/v3/sensors/{sensor_id}/days",
+      "method": "GET",
+      "operation_id": "get_sensor_days",
+      "summary": "Get daily aggregated measurements",
+      "tags": [
+        "Sensors",
+        "Aggregation"
+      ],
+      "parameters": [
+        {
+          "name": "sensor_id",
+          "in": "path",
+          "required": true
+        },
+        {
+          "name": "date_from",
+          "in": "query"
+        },
+        {
+          "name": "date_to",
+          "in": "query"
+        },
+        {
+          "name": "limit",
+          "in": "query"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Daily aggregation"
+        }
+      }
+    }
+  ],
+  "schemas": {
+    "OpenAQ_Location": {
+      "type": "object",
+      "description": "Air quality monitoring station",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "name": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "locality": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "timezone": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "country": {
+          "type": "OpenAQ_Country",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "owner": {
+          "type": "OpenAQ_Owner",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "provider": {
+          "type": "OpenAQ_Provider",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "isMobile": {
+          "type": "boolean",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "isMonitor": {
+          "type": "boolean",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "instruments": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "sensors": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "coordinates": {
+          "type": "OpenAQ_Coordinates",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "licenses": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "bounds": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "distance": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "datetimeFirst": {
+          "type": "OpenAQ_DateTime",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "datetimeLast": {
+          "type": "OpenAQ_DateTime",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "id",
+        "name",
+        "country"
+      ]
+    },
+    "OpenAQ_Country": {
+      "type": "object",
+      "description": "Country reference",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "code": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "name": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "id",
+        "code",
+        "name"
+      ]
+    },
+    "OpenAQ_Owner": {
+      "type": "object",
+      "description": "Data owner organization",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "name": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "id",
+        "name"
+      ]
+    },
+    "OpenAQ_Provider": {
+      "type": "object",
+      "description": "Data provider",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "name": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "id",
+        "name"
+      ]
+    },
+    "OpenAQ_Coordinates": {
+      "type": "object",
+      "description": "Geographic coordinates",
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "longitude": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "latitude",
+        "longitude"
+      ]
+    },
+    "OpenAQ_DateTime": {
+      "type": "object",
+      "description": "Datetime in UTC and local time",
+      "properties": {
+        "utc": {
+          "type": "string",
+          "format": "date-time",
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "local": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "utc"
+      ]
+    },
+    "OpenAQ_Sensor": {
+      "type": "object",
+      "description": "Sensor at monitoring location",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "name": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "parameter": {
+          "type": "OpenAQ_Parameter",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "id",
+        "name",
+        "parameter"
+      ]
+    },
+    "OpenAQ_Parameter": {
+      "type": "object",
+      "description": "Air quality parameter (pm25, pm10, no2, o3, etc.)",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "name": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "units": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "displayName": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "id",
+        "name",
+        "units"
+      ]
+    },
+    "OpenAQ_Instrument": {
+      "type": "object",
+      "description": "Monitoring instrument",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "name": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "id",
+        "name"
+      ]
+    },
+    "OpenAQ_License": {
+      "type": "object",
+      "description": "Data license information",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "name": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "attribution": {
+          "type": "object",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "dateFrom": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "dateTo": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "id",
+        "name"
+      ]
+    }
+  }
+}

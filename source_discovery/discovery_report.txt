@@ -1,0 +1,66 @@
+======================================================================
+NEXUS DATA SOURCE SCHEMA DISCOVERY REPORT
+Generated: 2026-05-14 23:06:43
+======================================================================
+
+----------------------------------------------------------------------
+SCHEMA DISCOVERY RESULTS
+----------------------------------------------------------------------
+
+Source                          Endpoints    Schemas Type                
+----------------------------------------------------------------------
+all_schemas                             0          0 unknown             
+DfT_Road_Traffic                        8          4 rest                
+London_Datastore                        3          2 data_portal         
+LondonAir                               7          7 rest                
+NaPTAN_NPTG                             5          3 rest                
+NCEI                                   13         10 rest                
+OpenAQ                                  9         10 rest                
+OpenMeteo                               5         14 rest                
+OpenWeather                            17         22 rest                
+OS_Open_Roads                           1          3 geospatial_download 
+STATS19                                 3          3 csv_download        
+TfL_GIS_Hub                             4          4 arcgis_hub          
+TfL_Open_Data                           4          3 static_files        
+TfL Unified API                        84        122 openapi             
+WAQI                                   11         17 rest                
+----------------------------------------------------------------------
+TOTAL                                 174        224
+
+Schema files: 15
+
+----------------------------------------------------------------------
+ENDPOINT VERIFICATION RESULTS
+----------------------------------------------------------------------
+
+Total sources verified: 17
+Total endpoints tested: 44
+Passed: 37
+Failed: 7
+
+Source                     Total   Pass   Fail Status    
+-------------------------------------------------------
+LondonAir                      5      4      1 PARTIAL   
+  [X] /Information/IndexHealthAdvice/Json        400 
+WAQI                           2      2      0 PASS      
+OpenWeather                    2      2      0 PASS      
+OpenAQ                         3      3      0 PASS      
+OpenMeteo                      1      1      0 PASS      
+OpenMeteo_AirQuality           1      1      0 PASS      
+NCEI                           3      3      0 PASS      
+TfL                            5      5      0 PASS      
+DfTRoadTraffic                 5      3      2 PARTIAL   
+  [X] /road-types                                404 
+  [X] /directions                                404 
+Singapore                      2      2      0 PASS      
+MobilityDatabase               2      2      0 PASS      
+GTFSRealtime                   1      0      1 FAIL      
+  [X] /                                          403 
+TfL_OpenData                   3      0      3 FAIL      
+  [X] Stations KML                               403 
+  [X] Bus Stops CSV                              403 
+  [X] Bus Sequences CSV                          403 
+TfL_GIS                        2      2      0 PASS      
+LondonDatastore                2      2      0 PASS      
+STATS19                        3      3      0 PASS      
+NaPTAN                         2      2      0 PASS      

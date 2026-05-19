@@ -93,6 +93,14 @@ datasets:
     topic: transport-tfl
     poll_seconds: 60
     schema_path: domains/transport/schemas/tfl_transport_status.schema.json
+    source_discovery:
+      repository: https://github.com/Akapi895/data-bigdata
+      source: TfL Unified API
+      source_file: source_discovery/schemas/TfL_Unified_API_schemas.json
+      schema_names:
+      - TfL_Unified_API_Tfl.Api.Presentation.Entities.Line
+      - TfL_Unified_API_Tfl.Api.Presentation.Entities.LineStatus
+      - TfL_Unified_API_Tfl.Api.Presentation.Entities.Disruption
     freshness_hours: 1
     primary_keys:
     - event_id

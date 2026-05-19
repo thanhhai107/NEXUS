@@ -1,259 +1,115 @@
-# GCP Terraform
+# GCP Terraform For NEXUS
 
-Terraform nay tao cum VM GCP cho demo Amazon Electronics Search:
+This Terraform profile creates a small Ubuntu VM cluster for NEXUS.
 
-- 1 master VM co public IP
-- 4 worker VM private-only theo mac dinh
-- Ubuntu 22.04 LTS
-- Docker va Docker Compose plugin
-- Cloud NAT de worker private pull Docker images / git repos
-- Firewall cho SSH, Kibana, Streamlit UI va FastAPI tren master
-- Repo demo duoc clone vao `/opt/nexus/docker-elk`
-- Helper `start-demo` tren master de start stack
+## What It Provisions
 
-Demo search moi chay bang Docker Compose:
+- 1 master VM with a public IP.
+- Private worker VMs.
+- Docker and Docker Compose plugin on every VM.
+- Optional Nexus repo checkout at `/opt/nexus/nexus`.
+- Internal master-to-worker SSH when enabled.
+- Firewall rules for SSH and Nexus user-facing services.
+- Cloud NAT so private workers can pull packages and images.
 
-- Streamlit frontend: TCP `8501`
-- FastAPI backend: TCP `8000`
-- Kibana: TCP `5601`
-- PostgreSQL va Meilisearch: tren master VM
-- Elasticsearch: phan tan tren master + worker VMs
-- PostgreSQL, Elasticsearch, Meilisearch khong mo public; truy cap bang SSH tunnel khi can
+The startup script writes `/etc/nexus-node.env` on every VM and installs these
+helpers on the master:
+
+```bash
+start-nexus-compose
+stop-nexus-compose
+```
 
 ## Files
 
 ```text
-main.tf                   Terraform resources and outputs
+main.tf                   Terraform resources, variables, outputs
 terraform.tfvars.example  Example variables
 scripts/startup.sh        VM bootstrap script
 ```
 
-## Usage
+## Configure
+
+```bash
+cd infra/terraform/gcp
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Set at least:
+
+```hcl
+project_id = "nexus-496808"
+allowed_admin_cidrs = ["YOUR_PUBLIC_IP/32"]
+ssh_public_key = "ssh-ed25519 YOUR_PUBLIC_KEY nexus"
+nexus_repo_url = "https://github.com/thanhhai107/NEXUS.git"
+nexus_repo_ref = "master"
+```
+
+Use `allowed_admin_cidrs = ["0.0.0.0/0"]` only for a short demo.
+
+## Apply
 
 ```bash
 gcloud auth application-default login
 gcloud config set project <PROJECT_ID>
 
-cd infra/terraform/gcp
-cp terraform.tfvars.example terraform.tfvars
 terraform init
 terraform plan -var-file="terraform.tfvars"
 terraform apply -var-file="terraform.tfvars"
 terraform output
 ```
 
-Set at least:
-
-```hcl
-project_id = "your-gcp-project-id"
-master_zone = "asia-southeast1-c"
-worker_zones = [
-  "asia-southeast1-c",
-  "asia-southeast1-c",
-  "asia-southeast1-c",
-  "asia-southeast1-c"
-]
-allowed_admin_cidrs = ["YOUR_PUBLIC_IP/32"]
-ssh_public_key = "ssh-ed25519 YOUR_PUBLIC_KEY nexus"
-enable_oslogin = false
-enable_master_worker_ssh = true
-```
-
-Default zone placement:
-
-```text
-nexus-master-1   asia-southeast1-c
-nexus-worker-1   asia-southeast1-c
-nexus-worker-2   asia-southeast1-c
-nexus-worker-3   asia-southeast1-c
-nexus-worker-4   asia-southeast1-c
-```
-
-For a short classroom demo you can temporarily use:
-
-```hcl
-allowed_admin_cidrs = ["0.0.0.0/0"]
-```
-
-Prefer a narrow `/32` CIDR when possible. Only `22`, `5601`, `8000`, `8501`, and the
-optional Nexus UI ports are public through this Terraform config.
-
-## Repo Provisioning
-
-By default, startup clones:
-
-```hcl
-nexus_repo_url = "https://github.com/thanhhai107/NEXUS.git"
-nexus_repo_ref = "master"
-
-docker_elk_repo_url = "https://github.com/thanhhai107/docker-elk.git"
-docker_elk_repo_ref = "main"
-```
-
-The Amazon Search demo repo is placed at:
-
-```text
-/opt/nexus/docker-elk
-```
-
-Startup writes `/opt/nexus/docker-elk/.env` with demo defaults on every VM:
-
-```text
-POSTGRES_DB=amazon_search
-POSTGRES_USER=search
-POSTGRES_PASSWORD=search_demo
-MEILI_MASTER_KEY=masterKey
-```
-
-Startup also writes `/etc/nexus-elastic.env` on every VM. The master gets
-`NEXUS_NODE_ROLES=master`; workers get `NEXUS_NODE_ROLES=data,ingest`.
-
-Local changes inside `/opt/nexus/docker-elk` can be overwritten on VM boot
-because the startup script fast-forwards/resets the configured branch.
-
-Startup also prepares every Elasticsearch host by setting
-`vm.max_map_count=262144` immediately and persisting it in
-`/etc/sysctl.d/99-elasticsearch.conf`. This avoids Elasticsearch exit code `78`
-from the bootstrap check when the default Linux value is too low.
-
-## Start Distributed Elasticsearch
-
-On the master VM, start Elasticsearch across the master and all workers with one
-helper:
+SSH to the master:
 
 ```bash
-start-amazon-search-elasticsearch-cluster
-```
-
-The helper SSHes from the master to each worker and runs
-`start-amazon-search-elasticsearch` there, then starts the master Elasticsearch
-container. The startup script installs the internal master-to-worker SSH key on
-the master automatically when `enable_master_worker_ssh = true`.
-
-## Start Demo On Master
-
-After `terraform apply`, SSH to the master:
-
-```bash
+terraform output master
 ssh ubuntu@<MASTER_PUBLIC_IP>
 ```
 
-Run:
+Start the local Nexus Docker Compose stack on the master:
 
 ```bash
-start-demo
+start-nexus-compose
 ```
 
-The helper runs:
+Stop it:
 
 ```bash
-start-amazon-search-elasticsearch-cluster
-cd /opt/nexus/docker-elk
-docker compose --env-file .env --env-file /etc/nexus-elastic.env up -d --build postgres meilisearch elasticsearch kibana backend frontend
+stop-nexus-compose
 ```
 
-It does not ingest data automatically. Run ingest explicitly when you are ready:
+## Public Services
+
+Terraform exposes only Nexus-facing ports on the master, restricted by
+`allowed_admin_cidrs`:
+
+| Port | Service |
+| ---: | --- |
+| 22 | SSH |
+| 8000 | FastAPI |
+| 8080 | Airflow |
+| 8085 | Trino |
+| 8088 | Superset |
+| 9001 | MinIO Console |
+
+Use the output below if you prefer SSH tunnels:
 
 ```bash
-cd /opt/nexus/docker-elk
-docker compose exec -T backend python scripts/ingest_all.py --reset
-```
-
-The ingest command uses `data/sample` if you have not downloaded the full Amazon dataset yet.
-
-Open:
-
-```text
-http://<MASTER_PUBLIC_IP>:8501
-http://<MASTER_PUBLIC_IP>:8000/docs
-http://<MASTER_PUBLIC_IP>:5601
-```
-
-The same URLs are available from:
-
-```bash
-terraform output service_urls
-```
-
-Verify Elasticsearch is distributed:
-
-```bash
-curl "http://localhost:9200/_cat/nodes?v&h=name,node.role,master,ip"
-curl "http://localhost:9200/_cluster/health?pretty"
-```
-
-Or use Kibana Dev Tools at `http://<MASTER_PUBLIC_IP>:5601`:
-
-```http
-GET _cluster/health?pretty
-GET _cat/nodes?v&h=name,node.role,master,ip,heap.percent,ram.percent,cpu,load_1m
-GET _cat/shards/amazon_electronics_products?v
-GET _cat/shards/amazon_electronics_reviews?v
-GET amazon_electronics_products/_stats
-GET _cat/thread_pool/search?v
-```
-
-Expected nodes:
-
-```text
-nexus-master-1    master/coordinating
-nexus-worker-1    data,ingest
-nexus-worker-2    data,ingest
-nexus-worker-3    data,ingest
-nexus-worker-4    data,ingest
-```
-
-## Full Dataset
-
-On the master VM:
-
-```bash
-cd /opt/nexus/docker-elk
-python3 data/download_datasets.py --reviews
-docker compose exec -T backend python scripts/ingest_all.py --reset --product-limit 100000 --review-limit 100000
-```
-
-Lower the limits if the VM does not have enough disk, RAM, or time.
-
-## Engine Access From Local Machine
-
-PostgreSQL, Elasticsearch and Meilisearch are intentionally not exposed
-publicly. Use the Terraform output:
-
-```bash
-terraform output search_engine_tunnel_command
-```
-
-Example:
-
-```bash
-ssh -L 5432:127.0.0.1:5432 \
-    -L 9200:127.0.0.1:9200 \
-    -L 7700:127.0.0.1:7700 \
-    ubuntu@<MASTER_PUBLIC_IP>
-```
-
-Then local URLs are:
-
-```text
-PostgreSQL:     127.0.0.1:5432
-Elasticsearch:  http://127.0.0.1:9200
-Meilisearch:    http://127.0.0.1:7700
+terraform output nexus_tunnel_command
 ```
 
 ## Worker Access
 
-Workers do not have public IPs. Connect through the master VM:
+Workers do not have public IPs. Connect through the master:
 
 ```bash
 ssh -J ubuntu@<MASTER_PUBLIC_IP> ubuntu@<WORKER_PRIVATE_IP>
 ```
 
-When `enable_master_worker_ssh = true`, Terraform creates an internal cluster
-SSH key, stores it in Terraform state, and the startup script installs it on the
-master for commands such as `start-amazon-search-elasticsearch-cluster`.
+When `enable_master_worker_ssh = true`, Terraform creates an internal key,
+stores it in Terraform state, and the startup script installs it on the master.
 
-If you ever need to reinstall it manually, run this on the master:
+To reinstall that key manually on the master:
 
 ```bash
 install -m 700 -d ~/.ssh
@@ -276,3 +132,5 @@ chmod 600 ~/.ssh/config
 ```bash
 terraform destroy -var-file="terraform.tfvars"
 ```
+
+Keep `.terraform/`, state files, and real `terraform.tfvars` out of Git.

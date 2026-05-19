@@ -1,0 +1,474 @@
+{
+  "generated_at": "2026-05-14T23:42:11.534035",
+  "summary": {
+    "total_sources": 14,
+    "total_endpoints": 39,
+    "passed": 33,
+    "failed": 6
+  },
+  "results": [
+    {
+      "source": "LondonAir",
+      "total": 5,
+      "passed": 4,
+      "failed": 1,
+      "endpoints": [
+        {
+          "path": "/Hourly/MonitoringIndex/GroupName=London/Json",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 1912.0,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        },
+        {
+          "path": "/Daily/MonitoringIndex/Latest/GroupName=London/Json",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 3701.83,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        },
+        {
+          "path": "/Information/MonitoringSites/GroupName=London/Json",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 495.41,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        },
+        {
+          "path": "/Information/Species/Json",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 239.53,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        },
+        {
+          "path": "/Information/IndexHealthAdvice/Json",
+          "method": "GET",
+          "status": 400,
+          "success": false,
+          "response_time_ms": 229.29,
+          "error": null,
+          "content_type": "text/html"
+        }
+      ]
+    },
+    {
+      "source": "WAQI",
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "endpoints": [
+        {
+          "path": "/feed/geo:40.7128;-74.0060/",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 465.59,
+          "error": null,
+          "content_type": "application/json; charset=UTF-8"
+        },
+        {
+          "path": "/search/",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 101.69,
+          "error": null,
+          "content_type": "application/json; charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "source": "OpenWeather",
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "endpoints": [
+        {
+          "path": "/data/2.5/weather",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 260.83,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        },
+        {
+          "path": "/data/2.5/forecast",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 159.26,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "OpenAQ",
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "endpoints": [
+        {
+          "path": "/v3/locations",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 1032.44,
+          "error": null,
+          "content_type": "application/json"
+        },
+        {
+          "path": "/v3/countries",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 341.39,
+          "error": null,
+          "content_type": "application/json"
+        },
+        {
+          "path": "/v3/parameters",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 751.6,
+          "error": null,
+          "content_type": "application/json"
+        }
+      ]
+    },
+    {
+      "source": "OpenMeteo",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "endpoints": [
+        {
+          "path": "/forecast",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 916.41,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "OpenMeteo_AirQuality",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "endpoints": [
+        {
+          "path": "/v1/air-quality",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 1037.99,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "NCEI",
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "endpoints": [
+        {
+          "path": "/datasets",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 1087.12,
+          "error": null,
+          "content_type": "application/json"
+        },
+        {
+          "path": "/datacategories",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 284.03,
+          "error": null,
+          "content_type": "application/json"
+        },
+        {
+          "path": "/stations",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 730.79,
+          "error": null,
+          "content_type": "application/json"
+        }
+      ]
+    },
+    {
+      "source": "TfL",
+      "total": 5,
+      "passed": 5,
+      "failed": 0,
+      "endpoints": [
+        {
+          "path": "/AirQuality",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 2515.25,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        },
+        {
+          "path": "/BikePoint",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 1013.81,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        },
+        {
+          "path": "/Line/Mode/tube",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 349.47,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        },
+        {
+          "path": "/Road",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 406.09,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        },
+        {
+          "path": "/StopPoint/Search",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 303.86,
+          "error": null,
+          "content_type": "application/json; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "DfTRoadTraffic",
+      "total": 5,
+      "passed": 3,
+      "failed": 2,
+      "endpoints": [
+        {
+          "path": "/count-points?page[size]=2",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 747.2,
+          "error": null,
+          "content_type": "application/json"
+        },
+        {
+          "path": "/regions",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 452.68,
+          "error": null,
+          "content_type": "application/json"
+        },
+        {
+          "path": "/local-authorities",
+          "method": "GET",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 1282.23,
+          "error": null,
+          "content_type": "application/json"
+        },
+        {
+          "path": "/road-types",
+          "method": "GET",
+          "status": 404,
+          "success": false,
+          "response_time_ms": 304.73,
+          "error": null,
+          "content_type": "application/json"
+        },
+        {
+          "path": "/directions",
+          "method": "GET",
+          "status": 404,
+          "success": false,
+          "response_time_ms": 1189.77,
+          "error": null,
+          "content_type": "application/json"
+        }
+      ]
+    },
+    {
+      "source": "TfL_OpenData",
+      "total": 3,
+      "passed": 0,
+      "failed": 3,
+      "endpoints": [
+        {
+          "path": "Stations KML",
+          "method": "HEAD",
+          "status": 403,
+          "success": false,
+          "response_time_ms": 170.88,
+          "error": null,
+          "content_type": "text/html; charset=UTF-8"
+        },
+        {
+          "path": "Bus Stops CSV",
+          "method": "HEAD",
+          "status": 403,
+          "success": false,
+          "response_time_ms": 110.67,
+          "error": null,
+          "content_type": "text/html; charset=UTF-8"
+        },
+        {
+          "path": "Bus Sequences CSV",
+          "method": "HEAD",
+          "status": 403,
+          "success": false,
+          "response_time_ms": 127.35,
+          "error": null,
+          "content_type": "text/html; charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "source": "TfL_GIS",
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "endpoints": [
+        {
+          "path": "TfL Stations Layer",
+          "method": "HEAD",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 1036.87,
+          "error": null,
+          "content_type": "text/html; charset=utf-8"
+        },
+        {
+          "path": "Borough Boundaries",
+          "method": "HEAD",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 817.69,
+          "error": null,
+          "content_type": "text/html; charset=utf-8"
+        }
+      ]
+    },
+    {
+      "source": "LondonDatastore",
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "endpoints": [
+        {
+          "path": "TfL Journeys CSV",
+          "method": "HEAD",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 717.61,
+          "error": null,
+          "content_type": "text/csv"
+        },
+        {
+          "path": "London Boroughs GeoPackage",
+          "method": "HEAD",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 244.54,
+          "error": null,
+          "content_type": "application/geopackage+sqlite3"
+        }
+      ]
+    },
+    {
+      "source": "STATS19",
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "endpoints": [
+        {
+          "path": "Collisions CSV",
+          "method": "GET(Range)",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 420.75,
+          "error": null,
+          "content_type": "text/csv"
+        },
+        {
+          "path": "Vehicles CSV",
+          "method": "GET(Range)",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 446.72,
+          "error": null,
+          "content_type": "text/csv"
+        },
+        {
+          "path": "Casualties CSV",
+          "method": "GET(Range)",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 417.44,
+          "error": null,
+          "content_type": "text/csv"
+        }
+      ]
+    },
+    {
+      "source": "NaPTAN",
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "endpoints": [
+        {
+          "path": "London Access Nodes CSV",
+          "method": "GET(Range)",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 968.83,
+          "error": null,
+          "content_type": "application/csv"
+        },
+        {
+          "path": "NPTG Localities CSV",
+          "method": "GET(Range)",
+          "status": 200,
+          "success": true,
+          "response_time_ms": 525.59,
+          "error": null,
+          "content_type": "application/csv"
+        }
+      ]
+    }
+  ]
+}

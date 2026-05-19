@@ -26,6 +26,13 @@ from governance.quality.schema import (
 from governance.schema_history import save_schema_snapshot
 from ingestion.batch.common import read_csv_records, write_jsonl
 from ingestion.streaming.producer import default_key, default_url, event_stream
+from common.source_discovery import (
+    DEFAULT_OUTPUT_DIR as SOURCE_DISCOVERY_DEFAULT_OUTPUT_DIR,
+    DEFAULT_SOURCE_DIR as SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
+    schema_names as source_discovery_schema_names,
+    source_summary as source_discovery_summary,
+    sync_discovery as sync_source_discovery,
+)
 
 
 SOURCE_DATASETS = {
@@ -464,6 +471,25 @@ def record_lineage_event(args: argparse.Namespace) -> None:
     print(f"Lineage written to {output_path}")
 
 
+def summarize_source_discovery(args: argparse.Namespace) -> None:
+    summary = source_discovery_summary(args.source_dir)
+    print(json.dumps(summary, indent=2))
+
+
+def list_source_discovery_schemas(args: argparse.Namespace) -> None:
+    names = source_discovery_schema_names(args.source_dir)
+    print(json.dumps({"schema_count": len(names), "schemas": names}, indent=2))
+
+
+def sync_source_discovery_metadata(args: argparse.Namespace) -> None:
+    result = sync_source_discovery(
+        source_dir=args.source_dir,
+        output_dir=args.output_dir,
+        selected_schemas=args.schema,
+    )
+    print(json.dumps(result, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="NEXUS operational CLI.")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -527,6 +553,50 @@ def build_parser() -> argparse.ArgumentParser:
     lineage_record.add_argument("--source-path")
     lineage_record.add_argument("--actor")
     lineage_record.set_defaults(func=record_lineage_event)
+
+    source_discovery = subcommands.add_parser(
+        "source-discovery",
+        help="Inspect and sync generated source discovery metadata",
+    )
+    source_discovery_subcommands = source_discovery.add_subparsers(
+        dest="source_discovery_command",
+        required=True,
+    )
+    source_discovery_summary_command = source_discovery_subcommands.add_parser(
+        "summary",
+        help="Show discovered source summary",
+    )
+    source_discovery_summary_command.add_argument(
+        "--source-dir",
+        type=Path,
+        default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
+    )
+    source_discovery_summary_command.set_defaults(func=summarize_source_discovery)
+
+    source_discovery_schemas = source_discovery_subcommands.add_parser("schemas", help="List discovered schema names")
+    source_discovery_schemas.add_argument(
+        "--source-dir",
+        type=Path,
+        default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
+    )
+    source_discovery_schemas.set_defaults(func=list_source_discovery_schemas)
+
+    source_discovery_sync_command = source_discovery_subcommands.add_parser(
+        "sync",
+        help="Write generated source metadata and JSON Schemas into runtime/source_discovery",
+    )
+    source_discovery_sync_command.add_argument(
+        "--source-dir",
+        type=Path,
+        default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
+    )
+    source_discovery_sync_command.add_argument("--output-dir", type=Path, default=SOURCE_DISCOVERY_DEFAULT_OUTPUT_DIR)
+    source_discovery_sync_command.add_argument(
+        "--schema",
+        action="append",
+        help="Schema name to export. Repeat for multiple schemas. Defaults to all schemas.",
+    )
+    source_discovery_sync_command.set_defaults(func=sync_source_discovery_metadata)
 
     return parser
 

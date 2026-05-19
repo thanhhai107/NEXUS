@@ -10,6 +10,14 @@
     topic: environment-openaq
     poll_seconds: 60
     schema_path: domains/environment/schemas/openaq_measurements.schema.json
+    source_discovery:
+      repository: https://github.com/Akapi895/data-bigdata
+      source: OpenAQ
+      source_file: source_discovery/schemas/OpenAQ_schemas.json
+      schema_names:
+      - OpenAQ_OpenAQ_Location
+      - OpenAQ_OpenAQ_Sensor
+      - OpenAQ_OpenAQ_Parameter
     freshness_hours: 6
     primary_keys:
     - location_id
@@ -48,6 +56,14 @@
     topic: environment-waqi
     poll_seconds: 60
     schema_path: domains/environment/schemas/waqi_air_quality.schema.json
+    source_discovery:
+      repository: https://github.com/Akapi895/data-bigdata
+      source: WAQI
+      source_file: source_discovery/schemas/WAQI_schemas.json
+      schema_names:
+      - WAQI_WAQI_AQIResponse
+      - WAQI_WAQI_StationData
+      - WAQI_WAQI_TimeData
     freshness_hours: 1
     primary_keys:
     - station_uid
@@ -65,6 +81,14 @@
     docs_uri: https://www.ncei.noaa.gov/cdo-web/webservices/v2
     api_key_env: NCEI_API_TOKEN
     schema_path: domains/environment/schemas/ncei_cdo_climate.schema.json
+    source_discovery:
+      repository: https://github.com/Akapi895/data-bigdata
+      source: NCEI
+      source_file: source_discovery/schemas/NCEI_schemas.json
+      schema_names:
+      - NCEI_NCEI_ClimateRecord
+      - NCEI_NCEI_Station
+      - NCEI_NCEI_Dataset
     freshness_hours: 720
     primary_keys:
     - station

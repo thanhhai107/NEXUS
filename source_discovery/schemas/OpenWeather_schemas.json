@@ -1,0 +1,2133 @@
+{
+  "source": "OpenWeather",
+  "base_url": "https://api.openweathermap.org",
+  "source_type": "rest",
+  "api_version": "3.0",
+  "collected_at": "2026-05-14T23:45:02.156263",
+  "metadata": {
+    "format": "JSON",
+    "api_type": "One Call API 3.0"
+  },
+  "stats": {
+    "total_endpoints": 17,
+    "total_schemas": 22
+  },
+  "endpoints": [
+    {
+      "path": "/data/3.0/onecall",
+      "method": "GET",
+      "operation_id": "get_one_call",
+      "summary": "One Call API 3.0 - Complete weather data",
+      "tags": [
+        "Weather",
+        "One Call"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true,
+          "description": "Latitude"
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true,
+          "description": "Longitude"
+        },
+        {
+          "name": "exclude",
+          "in": "query",
+          "description": "minutely,hourly,daily,alerts"
+        },
+        {
+          "name": "units",
+          "in": "query",
+          "description": "standard, metric, imperial"
+        },
+        {
+          "name": "lang",
+          "in": "query",
+          "description": "Language code"
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true,
+          "description": "API key"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Weather data"
+        }
+      }
+    },
+    {
+      "path": "/data/3.0/onecall/timemachine",
+      "method": "GET",
+      "operation_id": "get_timemachine",
+      "summary": "Historical weather data (up to 47+ years)",
+      "tags": [
+        "Historical"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "dt",
+          "in": "query",
+          "required": true,
+          "description": "Unix timestamp"
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Historical data"
+        }
+      }
+    },
+    {
+      "path": "/data/3.0/onecall/forecast",
+      "method": "GET",
+      "operation_id": "get_forecast",
+      "summary": "Weather forecast",
+      "tags": [
+        "Forecast"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Forecast data"
+        }
+      }
+    },
+    {
+      "path": "/data/2.5/weather",
+      "method": "GET",
+      "operation_id": "get_current",
+      "summary": "Current weather data",
+      "tags": [
+        "Weather"
+      ],
+      "parameters": [
+        {
+          "name": "q",
+          "in": "query",
+          "description": "City name"
+        },
+        {
+          "name": "lat",
+          "in": "query",
+          "description": "Latitude"
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "description": "Longitude"
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Current weather"
+        }
+      }
+    },
+    {
+      "path": "/data/2.5/forecast",
+      "method": "GET",
+      "operation_id": "get_forecast_5day",
+      "summary": "5 day / 3 hour forecast",
+      "tags": [
+        "Forecast"
+      ],
+      "parameters": [
+        {
+          "name": "q",
+          "in": "query",
+          "description": "City name"
+        },
+        {
+          "name": "lat",
+          "in": "query",
+          "description": "Latitude"
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "description": "Longitude"
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "5 day forecast"
+        }
+      }
+    },
+    {
+      "path": "/data/2.5/forecast/hourly",
+      "method": "GET",
+      "operation_id": "get_hourly_forecast",
+      "summary": "Hourly forecast for 4 days (96 timestamps)",
+      "tags": [
+        "Forecast"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "units",
+          "in": "query",
+          "description": "standard, metric, imperial"
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Hourly forecast"
+        }
+      }
+    },
+    {
+      "path": "/data/2.5/forecast/daily",
+      "method": "GET",
+      "operation_id": "get_daily_forecast",
+      "summary": "Daily forecast for 16 days",
+      "tags": [
+        "Forecast"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "cnt",
+          "in": "query",
+          "description": "Number of days (1-16)"
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Daily forecast"
+        }
+      }
+    },
+    {
+      "path": "/data/2.5/forecast/climatique",
+      "method": "GET",
+      "operation_id": "get_climatic_forecast",
+      "summary": "Climatic forecast for 30 days",
+      "tags": [
+        "Forecast"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Climatic forecast"
+        }
+      }
+    },
+    {
+      "path": "/data/2.5/history/climate",
+      "method": "GET",
+      "operation_id": "get_history_climate",
+      "summary": "Historical climate data",
+      "tags": [
+        "Historical"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "start",
+          "in": "query",
+          "required": true,
+          "description": "Start date (Unix)"
+        },
+        {
+          "name": "end",
+          "in": "query",
+          "required": true,
+          "description": "End date (Unix)"
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Climate data"
+        }
+      }
+    },
+    {
+      "path": "/data/2.5/air_pollution",
+      "method": "GET",
+      "operation_id": "get_air_pollution",
+      "summary": "Current air pollution data",
+      "tags": [
+        "Air Quality"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Air pollution data"
+        }
+      }
+    },
+    {
+      "path": "/data/2.5/air_pollution/forecast",
+      "method": "GET",
+      "operation_id": "get_air_pollution_forecast",
+      "summary": "Air pollution forecast (4 days ahead)",
+      "tags": [
+        "Air Quality"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Air pollution forecast"
+        }
+      }
+    },
+    {
+      "path": "/data/2.5/air_pollution/history",
+      "method": "GET",
+      "operation_id": "get_air_pollution_history",
+      "summary": "Historical air pollution data",
+      "tags": [
+        "Air Quality"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "start",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "end",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Historical air pollution"
+        }
+      }
+    },
+    {
+      "path": "/geo/1.0/direct",
+      "method": "GET",
+      "operation_id": "geocoding_direct",
+      "summary": "Forward geocoding (city name to coordinates)",
+      "tags": [
+        "Geocoding"
+      ],
+      "parameters": [
+        {
+          "name": "q",
+          "in": "query",
+          "required": true,
+          "description": "City name"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "description": "Max results"
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Geocoding results"
+        }
+      }
+    },
+    {
+      "path": "/geo/1.0/reverse",
+      "method": "GET",
+      "operation_id": "geocoding_reverse",
+      "summary": "Reverse geocoding (coordinates to city)",
+      "tags": [
+        "Geocoding"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "description": "Max results"
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Location details"
+        }
+      }
+    },
+    {
+      "path": "/data/3.0/solar_radiation",
+      "method": "GET",
+      "operation_id": "get_solar_radiation",
+      "summary": "Solar irradiance data",
+      "tags": [
+        "Solar"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "date",
+          "in": "query",
+          "description": "Date (YYYY-MM-DD)"
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Solar radiation data"
+        }
+      }
+    },
+    {
+      "path": "/data/2.5/fire_index",
+      "method": "GET",
+      "operation_id": "get_fire_index",
+      "summary": "Fire weather index",
+      "tags": [
+        "Fire"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Fire index data"
+        }
+      }
+    },
+    {
+      "path": "/data/2.5/roadrisk",
+      "method": "GET",
+      "operation_id": "get_road_risk",
+      "summary": "Road risk weather data",
+      "tags": [
+        "Road Risk"
+      ],
+      "parameters": [
+        {
+          "name": "lat",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "lon",
+          "in": "query",
+          "required": true
+        },
+        {
+          "name": "appid",
+          "in": "query",
+          "required": true
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Road risk data"
+        }
+      }
+    }
+  ],
+  "schemas": {
+    "OpenWeather_OneCallResponse": {
+      "type": "object",
+      "description": "One Call API 3.0 response",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "lon": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "timezone": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "timezone_offset": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "current": {
+          "type": "OpenWeather_Current",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "minutely": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "hourly": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "daily": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "alerts": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "lat",
+        "lon",
+        "timezone"
+      ]
+    },
+    "OpenWeather_Current": {
+      "type": "object",
+      "description": "Current weather conditions",
+      "properties": {
+        "dt": {
+          "type": "integer",
+          "format": null,
+          "description": "Unix timestamp",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "sunrise": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "sunset": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "temp": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "feels_like": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "pressure": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "humidity": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "dew_point": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "uvi": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "clouds": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "visibility": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "wind_speed": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "wind_deg": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "wind_gust": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "weather": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "rain": {
+          "type": "object",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "snow": {
+          "type": "object",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "dt",
+        "temp",
+        "pressure",
+        "humidity"
+      ]
+    },
+    "OpenWeather_HourlyForecast": {
+      "type": "object",
+      "description": "Hourly weather forecast",
+      "properties": {
+        "dt": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "temp": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "feels_like": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "pressure": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "humidity": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "dew_point": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "clouds": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "wind_speed": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "wind_deg": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "weather": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "pop": {
+          "type": "number",
+          "format": null,
+          "description": "Probability of precipitation",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "dt",
+        "temp"
+      ]
+    },
+    "OpenWeather_DailyForecast": {
+      "type": "object",
+      "description": "Daily weather forecast",
+      "properties": {
+        "dt": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "sunrise": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "sunset": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "moonrise": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "moonset": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "moon_phase": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "summary": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "temp": {
+          "type": "OpenWeather_Temp",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "feels_like": {
+          "type": "OpenWeather_FeelsLike",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "pressure": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "humidity": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "wind_speed": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "wind_deg": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "wind_gust": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "weather": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "clouds": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "pop": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "rain": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "snow": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "uvi": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "dt",
+        "sunrise",
+        "sunset",
+        "temp"
+      ]
+    },
+    "OpenWeather_Temp": {
+      "type": "object",
+      "description": "Temperature breakdown",
+      "properties": {
+        "day": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "min": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "max": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "night": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "eve": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "morn": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "day",
+        "min",
+        "max"
+      ]
+    },
+    "OpenWeather_FeelsLike": {
+      "type": "object",
+      "description": "Feels-like temperature",
+      "properties": {
+        "day": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "night": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "eve": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "morn": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "day"
+      ]
+    },
+    "OpenWeather_Weather": {
+      "type": "object",
+      "description": "Weather condition",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": null,
+          "description": "Weather condition ID",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "main": {
+          "type": "string",
+          "format": null,
+          "description": "Group: Thunderstorm, Drizzle, Rain, Snow, Clear, Clouds",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "description": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "icon": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "id",
+        "main"
+      ]
+    },
+    "OpenWeather_Alert": {
+      "type": "object",
+      "description": "Weather alert from authorities",
+      "properties": {
+        "sender_name": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "event": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "start": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "end": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "description": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "tags": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "event",
+        "start"
+      ]
+    },
+    "OpenWeather_MinutelyForecast": {
+      "type": "object",
+      "description": "Precipitation forecast for next hour",
+      "properties": {
+        "dt": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "precipitation": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "dt"
+      ]
+    },
+    "OpenWeather_AirPollution": {
+      "type": "object",
+      "description": "Air pollution response",
+      "properties": {
+        "coord": {
+          "type": "array",
+          "format": null,
+          "description": "[lon, lat]",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "list": {
+          "type": "array",
+          "format": null,
+          "description": "Array of pollution data",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "coord",
+        "list"
+      ]
+    },
+    "OpenWeather_AirPollutionData": {
+      "type": "object",
+      "description": "Air pollution measurement",
+      "properties": {
+        "dt": {
+          "type": "integer",
+          "format": null,
+          "description": "Unix timestamp",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "main": {
+          "type": "OpenWeather_AQIMain",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "components": {
+          "type": "OpenWeather_AQIComponents",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "stations": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "dt",
+        "main"
+      ]
+    },
+    "OpenWeather_AQIMain": {
+      "type": "object",
+      "description": "AQI index",
+      "properties": {
+        "aqi": {
+          "type": "integer",
+          "format": null,
+          "description": "Air Quality Index 1-5",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "aqi"
+      ]
+    },
+    "OpenWeather_AQIComponents": {
+      "type": "object",
+      "description": "Air quality components",
+      "properties": {
+        "co": {
+          "type": "number",
+          "format": null,
+          "description": "Carbon monoxide μg/m3",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "no": {
+          "type": "number",
+          "format": null,
+          "description": "Nitrogen monoxide μg/m3",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "no2": {
+          "type": "number",
+          "format": null,
+          "description": "Nitrogen dioxide μg/m3",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "o3": {
+          "type": "number",
+          "format": null,
+          "description": "Ozone μg/m3",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "so2": {
+          "type": "number",
+          "format": null,
+          "description": "Sulphur dioxide μg/m3",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "pm2_5": {
+          "type": "number",
+          "format": null,
+          "description": "PM2.5 μg/m3",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "pm10": {
+          "type": "number",
+          "format": null,
+          "description": "PM10 μg/m3",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "nh3": {
+          "type": "number",
+          "format": null,
+          "description": "Ammonia μg/m3",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "co",
+        "no2",
+        "o3",
+        "pm2_5",
+        "pm10"
+      ]
+    },
+    "OpenWeather_GeoLocation": {
+      "type": "object",
+      "description": "Geocoded location",
+      "properties": {
+        "name": {
+          "type": "string",
+          "format": null,
+          "description": "Location name",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "local_names": {
+          "type": "object",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "lat": {
+          "type": "number",
+          "format": "float",
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "lon": {
+          "type": "number",
+          "format": "float",
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "country": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "state": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "name",
+        "lat",
+        "lon",
+        "country"
+      ]
+    },
+    "OpenWeather_SolarRadiation": {
+      "type": "object",
+      "description": "Solar radiation data",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "lon": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "date": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "date_local": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "hours": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "summary": {
+          "type": "object",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "lat",
+        "lon"
+      ]
+    },
+    "OpenWeather_SolarHourly": {
+      "type": "object",
+      "description": "Hourly solar radiation",
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "date_local": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "hour": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "ghi": {
+          "type": "number",
+          "format": null,
+          "description": "Global Horizontal Irradiance",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "ghi_clear": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "dni": {
+          "type": "number",
+          "format": null,
+          "description": "Direct Normal Irradiance",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "dni_clear": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "dhi": {
+          "type": "number",
+          "format": null,
+          "description": "Diffuse Horizontal Irradiance",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "dhi_clear": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "sun_elevation": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "sun_azimuth": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "cloud_cover": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "date",
+        "hour"
+      ]
+    },
+    "OpenWeather_FireIndex": {
+      "type": "object",
+      "description": "Fire weather index",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "lon": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "date": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "data": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "lat",
+        "lon",
+        "data"
+      ]
+    },
+    "OpenWeather_RoadRisk": {
+      "type": "object",
+      "description": "Road risk weather data",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "lon": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "date": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "data": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "lat",
+        "lon",
+        "data"
+      ]
+    },
+    "OpenWeather_RoadRiskData": {
+      "type": "object",
+      "description": "Road risk data point",
+      "properties": {
+        "roadRisk": {
+          "type": "integer",
+          "format": null,
+          "description": "Road risk level 0-10",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "temp": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "windSpeed": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "windGust": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "humidity": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "clouds": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "rain": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "snow": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "weather": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "visibility": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "pressure": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "roadRisk"
+      ]
+    },
+    "OpenWeather_ForecastListItem": {
+      "type": "object",
+      "description": "Forecast list item",
+      "properties": {
+        "dt": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "main": {
+          "type": "OpenWeather_Main",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "weather": {
+          "type": "array",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "clouds": {
+          "type": "object",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "wind": {
+          "type": "object",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "visibility": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "pop": {
+          "type": "number",
+          "format": null,
+          "description": "Probability of precipitation",
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "rain": {
+          "type": "object",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "snow": {
+          "type": "object",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "dt_txt": {
+          "type": "string",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "dt",
+        "dt_txt"
+      ]
+    },
+    "OpenWeather_Main": {
+      "type": "object",
+      "description": "Main weather parameters",
+      "properties": {
+        "temp": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "feels_like": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "temp_min": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "temp_max": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "pressure": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "sea_level": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "grnd_level": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "humidity": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "temp",
+        "pressure",
+        "humidity"
+      ]
+    },
+    "OpenWeather_Wind": {
+      "type": "object",
+      "description": "Wind data",
+      "properties": {
+        "speed": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "deg": {
+          "type": "integer",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "gust": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "lat": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        },
+        "lon": {
+          "type": "number",
+          "format": null,
+          "description": null,
+          "nullable": false,
+          "enum": [],
+          "ref": null
+        }
+      },
+      "required_fields": [
+        "speed"
+      ]
+    }
+  }
+}
