@@ -7,7 +7,6 @@ from common.config import RUNTIME_DIR
 from governance.context import GovernanceContext, utc_now_iso
 from governance.storage import append_governance_event, read_governance_events
 
-
 DEFAULT_QUALITY_METRICS_LOG = RUNTIME_DIR / "metrics" / "quality.jsonl"
 
 

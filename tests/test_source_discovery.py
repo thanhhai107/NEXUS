@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 
 from common.source_discovery import (
+    integrate_schema_into_domain,
     load_schema_definition,
     schema_filename,
     source_summary,
@@ -57,6 +59,50 @@ def test_sync_discovery_writes_runtime_files(tmp_path) -> None:
 
 def test_schema_filename_is_safe() -> None:
     assert schema_filename("TfL Unified API/Foo:Bar") == "TfL_Unified_API_Foo_Bar"
+
+
+def test_integrate_schema_into_domain_writes_schema_and_dataset(tmp_path) -> None:
+    if importlib.util.find_spec("yaml") is None:
+        source_dir = make_source_discovery_dir(tmp_path)
+        domains_dir = tmp_path / "domains"
+        (domains_dir / "environment").mkdir(parents=True)
+        (domains_dir / "environment" / "datasets.yml").write_text("datasets: {}\n", encoding="utf-8")
+        try:
+            integrate_schema_into_domain(
+                schema_name="DemoSource_DemoRecord",
+                domain="environment",
+                dataset="demo_record",
+                source_dir=source_dir,
+                domains_dir=domains_dir,
+            )
+        except RuntimeError as exc:
+            assert "PyYAML is required for source-discovery integration" in str(exc)
+            return
+        raise AssertionError("Expected RuntimeError when yaml dependency is unavailable.")
+
+    source_dir = make_source_discovery_dir(tmp_path)
+    domains_dir = tmp_path / "domains"
+    (domains_dir / "environment").mkdir(parents=True)
+    (domains_dir / "environment" / "datasets.yml").write_text("datasets: {}\n", encoding="utf-8")
+
+    result = integrate_schema_into_domain(
+        schema_name="DemoSource_DemoRecord",
+        domain="environment",
+        dataset="demo_record",
+        source_dir=source_dir,
+        domains_dir=domains_dir,
+    )
+
+    schema_path = domains_dir / "environment" / "schemas" / "demo_record.schema.json"
+    assert schema_path.exists()
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    assert schema["x-source-discovery-schema"] == "DemoSource_DemoRecord"
+
+    datasets_path = domains_dir / "environment" / "datasets.yml"
+    datasets = datasets_path.read_text(encoding="utf-8")
+    assert "demo_record:" in datasets
+    assert "schema_path: domains/environment/schemas/demo_record.schema.json" in datasets
+    assert result["dataset"] == "demo_record"
 
 
 def make_source_discovery_dir(tmp_path):

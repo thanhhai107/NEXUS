@@ -7,6 +7,8 @@ from fastapi import FastAPI, Header, HTTPException
 from common.config import load_dataset_catalog
 from governance.agents.tools import (
     load_agent_decisions as read_agent_decisions,
+)
+from governance.agents.tools import (
     load_latest_schema_history,
     load_lineage_events,
     load_quality_history,
@@ -14,8 +16,11 @@ from governance.agents.tools import (
     load_quarantine_summary,
 )
 from governance.metadata import dataset_governance_metadata
-from governance.policy import evaluate_dataset_access, filter_datasets_for_role, normalize_role
-
+from governance.policy import (
+    evaluate_dataset_access,
+    filter_datasets_for_role,
+    normalize_role,
+)
 
 app = FastAPI(title="NEXUS Metadata API", version="0.1.0")
 

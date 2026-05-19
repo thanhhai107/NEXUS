@@ -3,10 +3,8 @@ from __future__ import annotations
 import json
 import os
 import re
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
-
 
 DEFAULT_EVENTS_TABLE = "nexus_governance_events"
 VALID_TABLE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")

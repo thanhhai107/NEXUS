@@ -10,7 +10,6 @@ from governance.agents.decision_schema import AgentDecision
 from governance.quality.metrics import load_quality_history as read_quality_history
 from governance.storage import read_governance_events, using_postgres_storage
 
-
 LOG_DIR = LOGS_DIR
 AUDIT_LOG = LOG_DIR / "audit.jsonl"
 LINEAGE_LOG = LOG_DIR / "lineage.jsonl"

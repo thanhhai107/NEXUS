@@ -3,7 +3,8 @@
 import argparse
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, count, current_timestamp, sum as spark_sum
+from pyspark.sql.functions import col, count, current_timestamp
+from pyspark.sql.functions import sum as spark_sum
 
 
 def build_spark() -> SparkSession:

@@ -11,7 +11,6 @@ from typing import Any
 
 import requests
 
-
 TOPICS = {
     "transport": "transport-events",
     "openaq": "environment-openaq",
