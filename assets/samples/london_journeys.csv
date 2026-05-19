@@ -1,0 +1,11 @@
+period_beginning,period_type,mode,journeys_millions
+2026-01-01,month,bus,100
+2026-02-01,month,tube,102
+2026-03-01,month,rail,104
+2026-04-01,month,bus,106
+2026-05-01,month,tube,108
+2026-06-01,month,rail,110
+2026-07-01,month,bus,112
+2026-08-01,month,tube,114
+2026-09-01,month,rail,116
+2026-10-01,month,bus,118

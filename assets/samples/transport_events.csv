@@ -1,0 +1,11 @@
+event_id,event_time,event_type,location,status
+evt-0,2026-05-19T12:00:00Z,incident,zone-0,open
+evt-1,2026-05-19T11:59:00Z,incident,zone-1,resolved
+evt-2,2026-05-19T11:58:00Z,incident,zone-2,open
+evt-3,2026-05-19T11:57:00Z,incident,zone-0,resolved
+evt-4,2026-05-19T11:56:00Z,incident,zone-1,open
+evt-5,2026-05-19T11:55:00Z,incident,zone-2,resolved
+evt-6,2026-05-19T11:54:00Z,incident,zone-0,open
+evt-7,2026-05-19T11:53:00Z,incident,zone-1,resolved
+evt-8,2026-05-19T11:52:00Z,incident,zone-2,open
+evt-9,2026-05-19T11:51:00Z,incident,zone-0,resolved

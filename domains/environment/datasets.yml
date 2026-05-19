@@ -5,6 +5,7 @@ datasets:
       from OpenAQ.
     source_type: api_stream
     source_uri: https://api.openaq.org/v3/measurements
+    local_sample_uri: assets/samples/openaq_measurements.csv
     docs_uri: https://docs.openaq.org/
     api_key_env: OPENAQ_API_KEY
     topic: environment-openaq
@@ -13,7 +14,7 @@ datasets:
     source_discovery:
       repository: https://github.com/Akapi895/data-bigdata
       source: OpenAQ
-      source_file: source_discovery/schemas/OpenAQ_schemas.json
+      source_file: assets/source_discovery/schemas/OpenAQ_schemas.json
       schema_names:
       - OpenAQ_OpenAQ_Location
       - OpenAQ_OpenAQ_Sensor
@@ -51,6 +52,7 @@ datasets:
       Index project.
     source_type: api_stream
     source_uri: https://api.waqi.info/feed/{city}/?token=${WAQI_API_TOKEN}
+    local_sample_uri: assets/samples/waqi_air_quality.csv
     docs_uri: https://aqicn.org/api/
     api_key_env: WAQI_API_TOKEN
     topic: environment-waqi
@@ -59,7 +61,7 @@ datasets:
     source_discovery:
       repository: https://github.com/Akapi895/data-bigdata
       source: WAQI
-      source_file: source_discovery/schemas/WAQI_schemas.json
+      source_file: assets/source_discovery/schemas/WAQI_schemas.json
       schema_names:
       - WAQI_WAQI_AQIResponse
       - WAQI_WAQI_StationData
@@ -78,13 +80,14 @@ datasets:
     description: Environment climate observations from NOAA NCEI Climate Data Online.
     source_type: rest_api
     source_uri: https://www.ncei.noaa.gov/cdo-web/api/v2/data
+    local_sample_uri: assets/samples/ncei_cdo_climate.csv
     docs_uri: https://www.ncei.noaa.gov/cdo-web/webservices/v2
     api_key_env: NCEI_API_TOKEN
     schema_path: domains/environment/schemas/ncei_cdo_climate.schema.json
     source_discovery:
       repository: https://github.com/Akapi895/data-bigdata
       source: NCEI
-      source_file: source_discovery/schemas/NCEI_schemas.json
+      source_file: assets/source_discovery/schemas/NCEI_schemas.json
       schema_names:
       - NCEI_NCEI_ClimateRecord
       - NCEI_NCEI_Station
@@ -104,6 +107,7 @@ datasets:
     description: London Air Quality Network hourly monitoring index from Imperial College API.
     source_type: api_stream
     source_uri: ${LONDONAIR_API_BASE_URL}/Hourly/MonitoringIndex/GroupName=London/Json
+    local_sample_uri: assets/samples/londonair_monitoring.csv
     docs_uri: https://api.erg.ic.ac.uk/AirQuality/help
     topic: environment-londonair
     poll_seconds: 3600
@@ -138,6 +142,7 @@ datasets:
     description: Open-Meteo air quality forecast and current readings.
     source_type: api_stream
     source_uri: ${OPENMETEO_API_URL}/v1/air-quality
+    local_sample_uri: assets/samples/openmeteo_air_quality.csv
     docs_uri: https://open-meteo.com/en/docs/air-quality-api
     topic: environment-openmeteo
     poll_seconds: 3600
@@ -172,6 +177,7 @@ datasets:
     description: OpenWeatherMap current weather data for London.
     source_type: api_stream
     source_uri: ${OPENWEATHER_API_URL}/data/2.5/weather
+    local_sample_uri: assets/samples/openweather_current.csv
     docs_uri: https://openweathermap.org/current
     api_key_env: OPENWEATHER_API_KEY
     topic: environment-openweather
@@ -202,4 +208,3 @@ datasets:
       bronze_table: nexus.bronze.openweather_current
       silver_table: nexus.silver.openweather_current
       gold_table: nexus.gold.openweather_current_summary
-

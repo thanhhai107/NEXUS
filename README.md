@@ -6,7 +6,7 @@ through Raw/Bronze/Silver/Gold layers, and exposes metadata through FastAPI,
 Trino, Superset, and Airflow.
 
 The generated source inventory is integrated in this repository under
-`source_discovery/`.
+`assets/source_discovery/`.
 
 ## What Is Included
 
@@ -31,9 +31,9 @@ infra/terraform/gcp/   Optional GCP VM cluster for Nexus
 orchestration/         Airflow DAGs
 processing/            Spark Bronze/Silver/Gold jobs
 runtime/               Local generated outputs
-samples/               Small demo data files
+assets/samples/        Sample files for each configured dataset (around 10 rows each)
 serving/               FastAPI, Trino, and Superset assets
-source_discovery/      Generated source inventory and schema metadata
+assets/source_discovery/ Generated source inventory and schema metadata
 tests/                 Unit tests
 transform/             dbt project
 ```
@@ -65,7 +65,7 @@ Local service URLs:
 ## Useful Commands
 
 ```powershell
-python ingestion/batch/csv_ingestion.py --dataset us_accidents --source samples/us_accidents_sample.csv
+python ingestion/batch/csv_ingestion.py --dataset us_accidents --source assets/samples/us_accidents_sample.csv
 python -m cli.nexus batch run --dataset us_accidents --batch-id latest
 python -m cli.nexus agent review --dataset us_accidents --batch-id latest
 python -m cli.nexus quality stream --source transport --sample-events 25
@@ -78,7 +78,7 @@ Quality check against a local CSV:
 ```powershell
 python -m cli.nexus quality check `
   --dataset us_accidents `
-  --source samples/us_accidents_sample.csv `
+  --source assets/samples/us_accidents_sample.csv `
   --required-columns ID Severity Start_Time Start_Lat Start_Lng State `
   --primary-keys ID `
   --freshness-column Start_Time `
@@ -87,7 +87,7 @@ python -m cli.nexus quality check `
 
 ## Source Discovery
 
-`source_discovery/` is a normal tracked directory containing the generated
+`assets/source_discovery/` is a normal tracked directory containing the generated
 source catalog, endpoint verification report, and schema JSON files used by
 Nexus. Collector scripts are not kept in this repo.
 

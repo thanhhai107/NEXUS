@@ -44,7 +44,7 @@ with DAG(
         bash_command=(
             "python /opt/airflow/ingestion/batch/csv_ingestion.py "
             "--dataset us_accidents "
-            "--source /opt/airflow/samples/us_accidents_sample.csv"
+            "--source /opt/airflow/assets/samples/us_accidents_sample.csv"
         ),
     )
 
@@ -53,7 +53,7 @@ with DAG(
         bash_command=(
             "python -m cli.nexus quality check "
             "--dataset us_accidents "
-            "--source /opt/airflow/samples/us_accidents_sample.csv "
+            "--source /opt/airflow/assets/samples/us_accidents_sample.csv "
             "--required-columns ID Severity Start_Time Start_Lat Start_Lng State "
             "--primary-keys ID "
             "--freshness-column Start_Time "
@@ -106,7 +106,7 @@ with DAG(
             "--outputs nexus.bronze.us_accidents "
             "--batch-id {{ run_id }} "
             "--run-id {{ run_id }} "
-            "--source-path /opt/airflow/samples/us_accidents_sample.csv "
+            "--source-path /opt/airflow/assets/samples/us_accidents_sample.csv "
             "--actor airflow"
         ),
     )
