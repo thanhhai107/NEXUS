@@ -4,7 +4,7 @@ datasets:
     description: Primary Transport batch dataset based on Kaggle US Accidents.
     source_type: kaggle_csv
     source_uri: https://www.kaggle.com/datasets/sobhanmoosavi/us-accidents
-    local_sample_uri: samples/us_accidents_sample.csv
+    local_sample_uri: assets/samples/us_accidents_sample.csv
     schema_path: domains/transport/schemas/us_accidents.schema.json
     freshness_hours: 24
     primary_keys:
@@ -36,6 +36,7 @@ datasets:
     description: Secondary Transport batch dataset based on NYC TLC trip records.
     source_type: parquet_batch
     source_uri: https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
+    local_sample_uri: assets/samples/nyc_tlc_trips.csv
     schema_path: domains/transport/schemas/nyc_tlc_trips.schema.json
     freshness_hours: 4320
     primary_keys:
@@ -55,6 +56,7 @@ datasets:
       fallback.
     source_type: api_stream
     source_uri: ${TRANSPORT_EVENTS_API_URL}
+    local_sample_uri: assets/samples/transport_events.csv
     fallback_source: simulated_kafka_producer
     topic: transport-events
     schema_path: domains/transport/schemas/transport_events.schema.json
@@ -88,6 +90,7 @@ datasets:
     description: Transport for London line status and disruption stream.
     source_type: api_stream
     source_uri: https://api.tfl.gov.uk/Line/Mode/tube,dlr,overground,elizabeth-line/Status
+    local_sample_uri: assets/samples/tfl_transport_status.csv
     docs_uri: https://api.tfl.gov.uk
     api_key_env: TFL_API_KEY
     topic: transport-tfl
@@ -96,7 +99,7 @@ datasets:
     source_discovery:
       repository: https://github.com/Akapi895/data-bigdata
       source: TfL Unified API
-      source_file: source_discovery/schemas/TfL_Unified_API_schemas.json
+      source_file: assets/source_discovery/schemas/TfL_Unified_API_schemas.json
       schema_names:
       - TfL_Unified_API_Tfl.Api.Presentation.Entities.Line
       - TfL_Unified_API_Tfl.Api.Presentation.Entities.LineStatus
@@ -115,6 +118,7 @@ datasets:
       trip updates, or service alerts.
     source_type: gtfs_realtime
     source_uri: ${GTFS_REALTIME_URL}
+    local_sample_uri: assets/samples/gtfs_realtime_events.csv
     docs_uri: https://gtfs.org/documentation/realtime/
     topic: transport-gtfs
     poll_seconds: 30
@@ -132,6 +136,7 @@ datasets:
     description: Singapore Data.gov.sg traffic images stream.
     source_type: api_stream
     source_uri: https://api-open.data.gov.sg/v2/real-time/api/traffic-images
+    local_sample_uri: assets/samples/sg_traffic.csv
     docs_uri: https://data.gov.sg/collections/traffic-images/view
     topic: transport-sg-traffic
     poll_seconds: 20
@@ -149,6 +154,7 @@ datasets:
     description: UK road collision records from DfT STATS19 open data (last 5 years).
     source_type: csv_download
     source_uri: ${STATS19_COLLISIONS_CSV_URL}
+    local_sample_uri: assets/samples/stats19_collisions.csv
     docs_uri: https://www.gov.uk/government/statistical-data-sets/road-safety-open-data
     schema_path: domains/transport/schemas/stats19_collisions.schema.json
     freshness_hours: 8760
@@ -181,6 +187,7 @@ datasets:
     description: National Public Transport Access Nodes for London (ATCO area 490).
     source_type: csv_download
     source_uri: ${NAPTAN_ACCESS_NODES_CSV_URL}
+    local_sample_uri: assets/samples/naptan_stops.csv
     docs_uri: https://beta-naptan.dft.gov.uk
     schema_path: domains/transport/schemas/naptan_stops.schema.json
     freshness_hours: 8760
@@ -213,6 +220,7 @@ datasets:
     description: TfL public transport journey counts by mode from London Datastore.
     source_type: csv_download
     source_uri: ${LONDON_PUBLIC_TRANSPORT_JOURNEYS_URL}
+    local_sample_uri: assets/samples/london_journeys.csv
     docs_uri: https://data.london.gov.uk
     schema_path: domains/transport/schemas/london_journeys.schema.json
     freshness_hours: 8760
@@ -246,6 +254,7 @@ datasets:
     description: DfT road traffic counts (AADF) for London region.
     source_type: rest_api
     source_uri: ${DFT_ROAD_TRAFFIC_API_BASE_URL}/count-points
+    local_sample_uri: assets/samples/dft_road_traffic.csv
     docs_uri: https://roadtraffic.dft.gov.uk/api
     schema_path: domains/transport/schemas/dft_road_traffic.schema.json
     freshness_hours: 8760

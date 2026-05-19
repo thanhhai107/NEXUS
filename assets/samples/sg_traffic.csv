@@ -1,0 +1,11 @@
+event_id,camera_id,image,timestamp,lat,lon
+sg-0,C000,https://example.com/cam/0.jpg,2026-05-19T12:00:00Z,1.300,103.800
+sg-1,C001,https://example.com/cam/1.jpg,2026-05-19T11:59:00Z,1.301,103.801
+sg-2,C002,https://example.com/cam/2.jpg,2026-05-19T11:58:00Z,1.302,103.802
+sg-3,C003,https://example.com/cam/3.jpg,2026-05-19T11:57:00Z,1.303,103.803
+sg-4,C004,https://example.com/cam/4.jpg,2026-05-19T11:56:00Z,1.304,103.804
+sg-5,C005,https://example.com/cam/5.jpg,2026-05-19T11:55:00Z,1.305,103.805
+sg-6,C006,https://example.com/cam/6.jpg,2026-05-19T11:54:00Z,1.306,103.806
+sg-7,C007,https://example.com/cam/7.jpg,2026-05-19T11:53:00Z,1.307,103.807
+sg-8,C008,https://example.com/cam/8.jpg,2026-05-19T11:52:00Z,1.308,103.808
+sg-9,C009,https://example.com/cam/9.jpg,2026-05-19T11:51:00Z,1.309,103.809

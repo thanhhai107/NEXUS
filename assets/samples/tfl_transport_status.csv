@@ -1,0 +1,11 @@
+event_id,line_id,line_name,status,observed_at
+tfl-0,0,Central,Minor Delays,2026-05-19T12:00:00Z
+tfl-1,1,Jubilee,Good Service,2026-05-19T11:55:00Z
+tfl-2,2,District,Good Service,2026-05-19T11:50:00Z
+tfl-3,3,Piccadilly,Minor Delays,2026-05-19T11:45:00Z
+tfl-4,4,Victoria,Good Service,2026-05-19T11:40:00Z
+tfl-5,0,Central,Good Service,2026-05-19T11:35:00Z
+tfl-6,1,Jubilee,Minor Delays,2026-05-19T11:30:00Z
+tfl-7,2,District,Good Service,2026-05-19T11:25:00Z
+tfl-8,3,Piccadilly,Good Service,2026-05-19T11:20:00Z
+tfl-9,4,Victoria,Minor Delays,2026-05-19T11:15:00Z
