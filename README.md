@@ -13,7 +13,8 @@ The generated source inventory is integrated in this repository under
 - Batch CSV/API ingestion and simulated Kafka streaming ingestion.
 - Transport and Environment domain catalogs, schemas, and quality rules.
 - Raw JSONL landing, Spark medallion jobs, dbt model scaffolding, and serving assets.
-- Governance audit logs, lineage, schema history, quarantine, quality metrics, and a lightweight governance agent.
+- Governance audit logs, Great Expectations validation, lineage, schema history, quarantine, quality metrics, and a lightweight governance agent.
+- Optional OpenMetadata catalog and OpenLineage backend through Marquez.
 - Generated source discovery metadata from `Akapi895/data-bigdata`.
 - Optional GCP VM provisioning for Nexus only.
 
@@ -62,6 +63,15 @@ Local service URLs:
 | MinIO Console | <http://localhost:9001> |
 | Kafka bootstrap | `localhost:29092` |
 
+Optional metadata stack URLs after starting the `metadata` profile:
+
+| Service | URL |
+| --- | --- |
+| OpenMetadata | <http://localhost:8585> |
+| OpenMetadata Ingestion Airflow | <http://localhost:8090> |
+| Marquez UI | <http://localhost:3000> |
+| Marquez OpenLineage API | <http://localhost:5000/api/v1/lineage> |
+
 ## Useful Commands
 
 ```powershell
@@ -96,6 +106,7 @@ Inspect the integrated inventory:
 ```powershell
 python -m cli.nexus source-discovery summary
 python -m cli.nexus source-discovery schemas
+python -m cli.nexus source-discovery coverage
 ```
 
 Sync selected discovery schemas into `runtime/source_discovery/`:
@@ -107,6 +118,7 @@ python -m cli.nexus source-discovery sync `
 ```
 
 The sync output is generated runtime data and is ignored by Git.
+The coverage command writes `assets/source_discovery/ingestion_coverage_map.json`.
 
 ## Data Flow
 
@@ -115,7 +127,7 @@ Batch flow:
 1. Read local CSV/API records.
 2. Apply configured auto-fix rules and JSON Schema coercion.
 3. Write raw JSONL envelopes under `runtime/raw/<dataset>/`.
-4. Run missing-value, duplicate, schema, freshness, and readiness checks.
+4. Run Great Expectations plus missing-value, duplicate, schema, freshness, and readiness checks.
 5. Quarantine invalid records under `runtime/quarantine/`.
 6. Write audit, quality metric, schema-history, and lineage events.
 7. Let the governance agent return `PASS`, `WARNING`, or `FAIL`.
@@ -144,6 +156,7 @@ Supported streaming sources:
 NEXUS governance is metadata-driven and safe to run locally:
 
 - `governance/quality/checks.py`: quality checks and readiness scoring.
+- `governance/quality/gx_validation.py`: GX Core validation using the existing domain quality rules.
 - `governance/quality/schema.py`: JSON Schema validation and type coercion.
 - `governance/quality/quarantine.py`: invalid-record quarantine.
 - `governance/audit.py`: auditable pipeline events.
@@ -153,6 +166,50 @@ NEXUS governance is metadata-driven and safe to run locally:
 
 Set `GEMINI_API_KEY` only if you want the governance agent to call an LLM.
 Without it, the agent uses deterministic rules.
+
+Great Expectations is installed as a Python dependency, not as a separate
+service. Airflow quality tasks run GX Core in-process and record the validation
+summary in audit and quality metrics. Set `NEXUS_GX_ENABLED=false` to disable
+GX locally while keeping the rest of the quality gate active.
+
+## Metadata Stack
+
+OpenMetadata and OpenLineage are installed as an optional Docker Compose
+profile so the default Nexus stack stays smaller.
+
+Start Nexus with OpenMetadata and Marquez:
+
+```powershell
+docker compose --env-file .env -f infra/docker/docker-compose.yml --profile metadata up -d
+```
+
+OpenLineage emission is opt-in. For Docker-based Airflow runs, set this in
+`.env` before starting the stack:
+
+```text
+OPENLINEAGE_URL=http://marquez:5000
+OPENLINEAGE_ENDPOINT=/api/v1/lineage
+OPENLINEAGE_NAMESPACE=nexus
+```
+
+For a lineage event recorded from the host shell, use `http://localhost:5000`
+instead:
+
+```powershell
+$env:OPENLINEAGE_URL = "http://localhost:5000"
+python -m cli.nexus lineage record --job-name demo --inputs raw.demo --outputs silver.demo
+```
+
+OpenMetadata requires an Elasticsearch service for its internal search index.
+That service lives only in the `metadata` profile and is separate from the old
+docker/elk stack.
+
+Reset only the OpenMetadata/Marquez state:
+
+```powershell
+docker compose --env-file .env -f infra/docker/docker-compose.yml --profile metadata down
+docker volume rm nexus_openmetadata-postgres-data nexus_openmetadata-es-data nexus_openmetadata-ingestion-dag-airflow nexus_openmetadata-ingestion-dags nexus_openmetadata-ingestion-tmp nexus_marquez-db-data
+```
 
 ## Adding A Dataset
 

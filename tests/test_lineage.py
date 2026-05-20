@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from governance.lineage import record_lineage
 
 
@@ -26,3 +28,57 @@ def test_record_lineage_writes_openlineage_event(tmp_path) -> None:
     assert event["outputs"][0]["name"] == "silver.demo"
     assert event["batch_id"] == "batch-1"
     assert event["actor"] == "tester"
+
+
+def test_record_lineage_emits_openlineage_event_when_configured(tmp_path, monkeypatch) -> None:
+    lineage_log = tmp_path / "lineage.jsonl"
+    captured = {}
+
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+    def fake_post(url, json, timeout):
+        captured["url"] = url
+        captured["json"] = json
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setenv("OPENLINEAGE_URL", "http://lineage:5000")
+    monkeypatch.setenv("OPENLINEAGE_NAMESPACE", "test-namespace")
+    monkeypatch.setenv("OPENLINEAGE_TIMEOUT_SECONDS", "1.5")
+    monkeypatch.setattr("requests.post", fake_post)
+
+    record_lineage(
+        "demo_job",
+        ["raw.demo"],
+        ["silver.demo"],
+        batch_id="batch-1",
+        run_id="run-1",
+        lineage_log=lineage_log,
+    )
+
+    assert captured["url"] == "http://lineage:5000/api/v1/lineage"
+    assert captured["timeout"] == 1.5
+    assert captured["json"]["job"]["namespace"] == "test-namespace"
+    assert captured["json"]["inputs"][0]["name"] == "raw.demo"
+    assert "job_name" not in captured["json"]
+
+
+def test_record_lineage_strict_mode_raises_on_openlineage_error(tmp_path, monkeypatch) -> None:
+    lineage_log = tmp_path / "lineage.jsonl"
+
+    def fake_post(url, json, timeout):
+        raise RuntimeError("cannot connect")
+
+    monkeypatch.setenv("OPENLINEAGE_URL", "http://lineage:5000")
+    monkeypatch.setenv("OPENLINEAGE_STRICT", "true")
+    monkeypatch.setattr("requests.post", fake_post)
+
+    with pytest.raises(RuntimeError, match="Failed to emit OpenLineage event"):
+        record_lineage(
+            "demo_job",
+            ["raw.demo"],
+            ["silver.demo"],
+            lineage_log=lineage_log,
+        )

@@ -3,8 +3,9 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
+from governance.quality.gx_validation import run_great_expectations_validation
 from governance.quality.schema import validate_json_schema
 
 Record = Mapping[str, object]
@@ -20,6 +21,7 @@ class QualityResult:
     freshness_score: float
     readiness_score: float
     issues: list[str] = field(default_factory=list)
+    gx_validation: dict[str, Any] = field(default_factory=dict)
 
 
 def missing_value_ratio(records: Sequence[Record], required_columns: Sequence[str]) -> float:
@@ -109,6 +111,13 @@ def run_quality_checks(
     schema_valid = required_schema_valid and json_schema_valid
     freshness = freshness_score(records, freshness_column, max_age_hours)
     readiness = readiness_score(missing, duplicates, schema_valid, freshness)
+    gx_validation = run_great_expectations_validation(
+        dataset=dataset,
+        records=records,
+        required_columns=required_columns,
+        primary_keys=primary_keys,
+        freshness_column=freshness_column,
+    )
 
     issues.extend(required_schema_issues)
     issues.extend(json_schema_issues)
@@ -118,6 +127,12 @@ def run_quality_checks(
         issues.append(f"Duplicate ratio is {duplicates:.2%}")
     if freshness < 1:
         issues.append(f"Freshness score is {freshness:.2%}")
+    if gx_validation.get("enabled") and gx_validation.get("success") is False:
+        if gx_validation.get("error"):
+            issues.append(f"Great Expectations validation error: {gx_validation['error']}")
+        elif gx_validation.get("failed_expectations"):
+            failed = ", ".join(str(item) for item in gx_validation["failed_expectations"])
+            issues.append(f"Great Expectations failed expectations: {failed}")
 
     return QualityResult(
         dataset=dataset,
@@ -128,6 +143,7 @@ def run_quality_checks(
         freshness_score=round(freshness, 4),
         readiness_score=readiness,
         issues=issues,
+        gx_validation=gx_validation,
     )
 
 

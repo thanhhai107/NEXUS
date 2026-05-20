@@ -44,6 +44,46 @@ def test_quality_result() -> None:
     assert result.dataset == "demo"
     assert result.schema_valid is True
     assert result.readiness_score == 1.0
+    assert result.gx_validation["enabled"] is True
+    assert result.gx_validation["success"] is True
+
+
+def test_great_expectations_validation_can_be_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("NEXUS_GX_ENABLED", "false")
+    now = datetime.now(timezone.utc).isoformat()
+
+    result = run_quality_checks(
+        dataset="demo",
+        records=[{"id": "1", "name": "A", "updated_at": now}],
+        required_columns=["id", "name", "updated_at"],
+        primary_keys=["id"],
+        freshness_column="updated_at",
+        max_age_hours=1,
+    )
+
+    assert result.gx_validation["enabled"] is False
+    assert result.gx_validation["success"] is None
+
+
+def test_great_expectations_reports_failed_expectations(monkeypatch) -> None:
+    monkeypatch.setenv("NEXUS_GX_ENABLED", "true")
+    now = datetime.now(timezone.utc).isoformat()
+
+    result = run_quality_checks(
+        dataset="demo",
+        records=[
+            {"id": "1", "name": "A", "updated_at": now},
+            {"id": "1", "name": "B", "updated_at": now},
+        ],
+        required_columns=["id", "name", "updated_at"],
+        primary_keys=["id"],
+        freshness_column="updated_at",
+        max_age_hours=1,
+    )
+
+    assert result.gx_validation["enabled"] is True
+    assert result.gx_validation["success"] is False
+    assert "expect_column_values_to_be_unique(column=id)" in result.gx_validation["failed_expectations"]
 
 
 def test_json_schema_is_enforced_after_type_coercion() -> None:

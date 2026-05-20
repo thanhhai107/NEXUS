@@ -37,6 +37,7 @@ def write_quality_metric(
         "duplicate_ratio": quality.get("duplicate_ratio"),
         "freshness_score": quality.get("freshness_score"),
         "schema_valid": quality.get("schema_valid"),
+        "gx_validation": dict(quality.get("gx_validation") or {}),
         "issues": list(quality.get("issues") or []),
         "auto_fix": dict(auto_fix or {}),
         "schema_coercion": dict(schema_coercion or {}),
