@@ -3,6 +3,15 @@ datasets:
     domain: environment
     description: Environment poll-based streaming source for air-quality measurements
       from OpenAQ.
+    nexus_demo:
+      status: primary
+      default_download: true
+      scope: greater_london
+      layers:
+      - historical_environment
+      modes:
+      - small_demo
+      - full_demo
     source_type: api_stream
     source_uri: https://api.openaq.org/v3/measurements
     local_sample_uri: assets/samples/openaq_measurements.csv
@@ -50,6 +59,15 @@ datasets:
     domain: environment
     description: Environment real-time air quality stream from the World Air Quality
       Index project.
+    nexus_demo:
+      status: primary_realtime_snapshot
+      default_download: true
+      scope: greater_london
+      layers:
+      - realtime_snapshot
+      modes:
+      - small_demo
+      - full_demo
     source_type: api_stream
     source_uri: https://api.waqi.info/feed/{city}/?token=${WAQI_API_TOKEN}
     local_sample_uri: assets/samples/waqi_air_quality.csv
@@ -78,6 +96,15 @@ datasets:
   ncei_cdo_climate:
     domain: environment
     description: Environment climate observations from NOAA NCEI Climate Data Online.
+    nexus_demo:
+      status: supporting
+      default_download: true
+      scope: greater_london
+      layers:
+      - historical_environment
+      modes:
+      - small_demo
+      - full_demo
     source_type: rest_api
     source_uri: https://www.ncei.noaa.gov/cdo-web/api/v2/data
     local_sample_uri: assets/samples/ncei_cdo_climate.csv
@@ -105,6 +132,15 @@ datasets:
   londonair_monitoring:
     domain: environment
     description: London Air Quality Network hourly monitoring index from Imperial College API.
+    nexus_demo:
+      status: primary
+      default_download: true
+      scope: greater_london
+      layers:
+      - historical_environment
+      modes:
+      - small_demo
+      - full_demo
     source_type: api_stream
     source_uri: ${LONDONAIR_API_BASE_URL}/Hourly/MonitoringIndex/GroupName=London/Json
     local_sample_uri: assets/samples/londonair_monitoring.csv
@@ -112,6 +148,14 @@ datasets:
     topic: environment-londonair
     poll_seconds: 3600
     schema_path: domains/environment/schemas/londonair_monitoring.schema.json
+    source_discovery:
+      repository: https://github.com/Akapi895/data-bigdata
+      source: LondonAir
+      source_file: assets/source_discovery/schemas/LondonAir_schemas.json
+      schema_names:
+      - LondonAir_LondonAir_MonitoringIndex
+      - LondonAir_LondonAir_Site
+      - LondonAir_LondonAir_Species
     freshness_hours: 6
     primary_keys:
     - event_id
@@ -140,6 +184,15 @@ datasets:
   openmeteo_air_quality:
     domain: environment
     description: Open-Meteo air quality forecast and current readings.
+    nexus_demo:
+      status: primary
+      default_download: true
+      scope: greater_london
+      layers:
+      - historical_environment
+      modes:
+      - small_demo
+      - full_demo
     source_type: api_stream
     source_uri: ${OPENMETEO_API_URL}/v1/air-quality
     local_sample_uri: assets/samples/openmeteo_air_quality.csv
@@ -147,6 +200,13 @@ datasets:
     topic: environment-openmeteo
     poll_seconds: 3600
     schema_path: domains/environment/schemas/openmeteo_air_quality.schema.json
+    source_discovery:
+      repository: https://github.com/Akapi895/data-bigdata
+      source: OpenMeteo
+      source_file: assets/source_discovery/schemas/OpenMeteo_schemas.json
+      schema_names:
+      - OpenMeteo_OpenMeteo_ForecastResponse
+      - OpenMeteo_OpenMeteo_AirQualityResponse
     freshness_hours: 6
     primary_keys:
     - event_id
@@ -175,6 +235,15 @@ datasets:
   openweather_current:
     domain: environment
     description: OpenWeatherMap current weather data for London.
+    nexus_demo:
+      status: supporting_realtime_snapshot
+      default_download: true
+      scope: greater_london
+      layers:
+      - realtime_snapshot
+      modes:
+      - small_demo
+      - full_demo
     source_type: api_stream
     source_uri: ${OPENWEATHER_API_URL}/data/2.5/weather
     local_sample_uri: assets/samples/openweather_current.csv
@@ -183,6 +252,13 @@ datasets:
     topic: environment-openweather
     poll_seconds: 1800
     schema_path: domains/environment/schemas/openweather_current.schema.json
+    source_discovery:
+      repository: https://github.com/Akapi895/data-bigdata
+      source: OpenWeather
+      source_file: assets/source_discovery/schemas/OpenWeather_schemas.json
+      schema_names:
+      - OpenWeather_OpenWeather_Current
+      - OpenWeather_OpenWeather_OneCallResponse
     freshness_hours: 1
     primary_keys:
     - event_id

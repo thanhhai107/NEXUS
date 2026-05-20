@@ -14,14 +14,27 @@ from ingestion.batch.common import write_jsonl
 
 
 def extract_records(payload: Any) -> list[dict[str, Any]]:
-    """Handle common public API shapes while staying explicit for new sources."""
+    """Handle common public API shapes while staying explicit for new sources.
+
+    Supports response shapes found via schema_discovery collectors:
+    - Flat list of records
+    - Dict with results/records/data/items/rows/features/readings/feed keys
+    - Nested dict like {"data": {"records": [...]}}
+    """
     if isinstance(payload, list):
         return [record for record in payload if isinstance(record, dict)]
     if isinstance(payload, dict):
-        for key in ("results", "records", "data", "items"):
+        for key in ("results", "records", "data", "items", "rows",
+                    "features", "readings", "feed", "events", "incidents",
+                    "measurements", "stations", "locations", "sensors"):
             value = payload.get(key)
             if isinstance(value, list):
                 return [record for record in value if isinstance(record, dict)]
+            if isinstance(value, dict):
+                for nested_key in ("records", "readings", "items", "results"):
+                    nested = value.get(nested_key)
+                    if isinstance(nested, list):
+                        return [r for r in nested if isinstance(r, dict)]
         return [payload]
     raise ValueError("Unsupported API response shape")
 
@@ -31,6 +44,7 @@ def ingest_api_records(
     api_key: str | None = None,
     max_pages: int = 5,
     page_size: int = 50,
+    auth_style: str = "bearer",
 ) -> list[dict[str, Any]]:
     """Fetch records from a REST API, following pagination if present.
 
@@ -39,11 +53,24 @@ def ingest_api_records(
     Falls back to a single non-paginated request if pagination params fail.
     """
     headers = {"Accept": "application/json"}
+    params = {}
     if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+        if auth_style == "x-api-key":
+            headers["X-API-Key"] = api_key
+        elif auth_style == "token-header":
+            headers["token"] = api_key
+        elif auth_style == "query-token":
+            params["token"] = api_key
+        elif auth_style == "query-appid":
+            params["appid"] = api_key
+        elif auth_style == "query-app_key":
+            params["app_key"] = api_key
+        else:
+            headers["Authorization"] = f"Bearer {api_key}"
 
     # First try a simple single request (works for most APIs)
-    params = {"page[size]": str(page_size)} if page_size else {}
+    if page_size:
+        params["page[size]"] = str(page_size)
     response = requests.get(url, headers=headers, params=params, timeout=30)
     response.raise_for_status()
     payload = response.json()
@@ -76,9 +103,9 @@ def ingest_api_records(
     return all_records
 
 
-def ingest_api(dataset: str, url: str, api_key: str | None = None) -> str:
+def ingest_api(dataset: str, url: str, api_key: str | None = None, auth_style: str = "bearer") -> str:
     """Ingest records from an HTTP API into the raw local landing zone."""
-    records = ingest_api_records(url, api_key)
+    records = ingest_api_records(url, api_key, auth_style=auth_style)
     output_path = write_jsonl(dataset=dataset, records=records, source=url)
     print(f"Ingested {len(records)} records for dataset={dataset} into {output_path}")
     return str(output_path)

@@ -1,0 +1,209 @@
+default_mode: full_demo
+output_dir: runtime/downloads
+
+spatial_scope:
+  name: Greater London
+  bbox:
+    south: 51.28
+    north: 51.69
+    west: -0.51
+    east: 0.33
+  center:
+    latitude: 51.5074
+    longitude: -0.1278
+
+modes:
+  small_demo:
+    core_start: "2024-01-01"
+    core_end: "2024-01-31"
+    transport_start: "2024-01-01"
+    transport_end: "2024-12-31"
+    transport_start_year: 2024
+    transport_end_year: 2024
+    borough_limit: 3
+    londonair_site_limit: 3
+    londonair_species:
+      - NO2
+    openaq_location_limit: 5
+    openaq_sensor_limit: 2
+    waqi_station_limit: 5
+    openweather_borough_limit: 3
+    ncei_station_limit: 1
+    dft_page_limit: 2
+  full_demo:
+    core_start: "2024-01-01"
+    core_end: "2024-12-31"
+    transport_start: "2020-01-01"
+    transport_end: "2024-12-31"
+    transport_start_year: 2020
+    transport_end_year: 2024
+    borough_limit: null
+    londonair_site_limit: null
+    londonair_species:
+      - NO2
+      - PM10
+      - PM25
+      - O3
+    openaq_location_limit: null
+    openaq_sensor_limit: null
+    waqi_station_limit: null
+    openweather_borough_limit: null
+    ncei_station_limit: 3
+    dft_page_limit: null
+
+sources:
+  default:
+    - openmeteo
+    - naptan
+    - london_journeys
+    - dft
+    - ncei
+    - tfl_status
+    - tfl_arrivals
+    - waqi
+    - openweather
+    - stats19
+    - openaq
+    - londonair
+  polling:
+    - tfl_status
+    - tfl_arrivals
+    - waqi
+    - openweather
+
+rate_limits:
+  default_delay_seconds: 0.1
+  openaq_delay_seconds: 0.125
+  londonair_delay_seconds: 0.2
+  ncei_delay_seconds: 0.25
+  waqi_delay_seconds: 1.0
+  openweather_delay_seconds: 0.2
+  tfl_delay_seconds: 0.2
+  dft_delay_seconds: 0.1
+
+retry:
+  max_retries: 5
+  backoff_base_seconds: 1.0
+  backoff_max_seconds: 60.0
+  timeout_seconds: 60
+
+openmeteo:
+  air_quality_url: https://air-quality-api.open-meteo.com/v1/air-quality
+  weather_url: https://archive-api.open-meteo.com/v1/archive
+  timezone: Europe/London
+  air_quality_hourly:
+    - pm10
+    - pm2_5
+    - nitrogen_dioxide
+    - ozone
+    - sulphur_dioxide
+    - carbon_monoxide
+    - european_aqi
+    - us_aqi
+  weather_hourly:
+    - temperature_2m
+    - relative_humidity_2m
+    - precipitation
+    - rain
+    - wind_speed_10m
+    - wind_direction_10m
+
+londonair:
+  base_url: https://api.erg.ic.ac.uk/AirQuality
+  fallback_site_codes:
+    - BG1
+    - BL0
+    - BN1
+    - BX1
+    - CD1
+    - CR5
+    - EN1
+    - GR4
+    - GR7
+    - HG1
+    - HG4
+    - HR1
+    - HS4
+    - HV1
+    - KC1
+    - LW1
+    - MY1
+    - RB4
+    - TD5
+    - TH4
+    - WA2
+    - WM0
+
+openaq:
+  base_url: https://api.openaq.org/v3
+  radius_meters: 40000
+  page_limit: 1000
+  measurement_endpoint: hours
+
+ncei:
+  base_url: https://www.ncei.noaa.gov/cdo-web/api/v2
+  dataset_id: GHCND
+  fallback_station_ids:
+    - GHCND:UKE00105915
+  datatypes:
+    - TMAX
+    - TMIN
+    - TAVG
+    - PRCP
+    - AWND
+
+waqi:
+  base_url: https://api.waqi.info
+
+openweather:
+  base_url: https://api.openweathermap.org
+  units: metric
+  include_air_pollution_forecast: true
+
+tfl:
+  base_url: https://api.tfl.gov.uk
+  selected_modes:
+    - tube
+    - bus
+    - dlr
+    - overground
+    - tram
+    - elizabeth-line
+  selected_line_ids:
+    - central
+    - northern
+    - piccadilly
+    - elizabeth
+  selected_stop_ids:
+    - 940GZZLUOXC
+    - 940GZZLUKSX
+    - 940GZZLUVIC
+
+dft_road_traffic:
+  base_url: https://roadtraffic.dft.gov.uk/api
+  region_id: 6
+  page_size: 500
+
+stats19:
+  max_bytes_per_file: 500000000
+  files:
+    collisions:
+      env: STATS19_COLLISIONS_CSV_URL
+      url: https://data.dft.gov.uk/road-accidents-safety-data/dft-road-casualty-statistics-collision-last-5-years.csv
+    vehicles:
+      env: STATS19_VEHICLES_CSV_URL
+      url: https://data.dft.gov.uk/road-accidents-safety-data/dft-road-casualty-statistics-vehicle-last-5-years.csv
+    casualties:
+      env: STATS19_CASUALTIES_CSV_URL
+      url: https://data.dft.gov.uk/road-accidents-safety-data/dft-road-casualty-statistics-casualty-last-5-years.csv
+
+naptan:
+  url: https://naptan.api.dft.gov.uk/v1/access-nodes
+  params:
+    atcoAreaCodes: "490"
+    dataFormat: csv
+  max_bytes: 200000000
+
+london_journeys:
+  url: https://data.london.gov.uk/download/ep8ow/06a805f6-77c6-481a-8b08-ddef56afffdd/tfl-journeys-type.csv
+  max_bytes: 50000000

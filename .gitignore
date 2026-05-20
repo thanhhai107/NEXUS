@@ -17,11 +17,13 @@ htmlcov/
 .venv/
 venv/
 env/
+docs/
 
 # Runtime outputs
 runtime/logs/*
 !runtime/logs/.gitkeep
 runtime/raw/*
+runtime/downloads/*
 !runtime/raw/.gitkeep
 runtime/quarantine/*
 !runtime/quarantine/.gitkeep
