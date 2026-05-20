@@ -145,7 +145,7 @@ def integrate_schema_into_domain(
     schemas_dir = domain_dir / "schemas"
     schemas_dir.mkdir(parents=True, exist_ok=True)
 
-    schema_rel_path = Path("domains") / domain / "schemas" / f"{dataset}.schema.json"
+    schema_rel_path = "/".join(["domains", domain, "schemas", f"{dataset}.schema.json"])
     schema_path = domains_dir / domain / "schemas" / f"{dataset}.schema.json"
     _write_json(schema_path, nexus_schema)
 

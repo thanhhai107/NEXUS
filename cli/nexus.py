@@ -54,6 +54,15 @@ from ingestion.batch.common import read_csv_records, write_jsonl
 from ingestion.batch.csv_download_ingestion import download_csv
 from ingestion.streaming.producer import default_key, default_url, event_stream
 
+AUTH_STYLES = {
+    "openaq_measurements": "x-api-key",
+    "ncei_cdo_climate": "token-header",
+    "waqi_air_quality": "query-token",
+    "openweather_current": "query-appid",
+    "tfl_transport_status": "query-app_key",
+}
+
+
 SOURCE_DATASETS = {
     "transport": "transport_events",
     "openaq": "openaq_measurements",
@@ -129,8 +138,27 @@ def resolve_records(
             )
         api_key_env = dataset_config.get("api_key_env")
         api_key = os.environ.get(api_key_env) if api_key_env else None
-        records = ingest_api_records(url, api_key)
+        auth_style = AUTH_STYLES.get(dataset, "bearer")
+        records = ingest_api_records(url, api_key, auth_style=auth_style)
         return records, url
+
+    if source_type == "api_stream":
+        url = _expand_env(dataset_config.get("source_uri", ""))
+        api_key_env = dataset_config.get("api_key_env")
+        api_key = os.environ.get(api_key_env) if api_key_env else None
+        if url:
+            try:
+                auth_style = AUTH_STYLES.get(dataset, "bearer")
+                records = ingest_api_records(url, api_key, auth_style=auth_style)
+                if records:
+                    return records, url
+            except Exception:
+                pass
+        local_path = dataset_config.get("local_sample_uri")
+        if local_path:
+            source_path = PROJECT_ROOT / str(local_path)
+            if source_path.exists():
+                return read_csv_records(source_path), str(source_path)
 
     source_path = local_source(dataset_config, None)
     records = read_csv_records(source_path)
