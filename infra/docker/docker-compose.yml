@@ -1,5 +1,106 @@
 name: nexus
 
+x-openmetadata-environment: &openmetadata-environment
+  OPENMETADATA_CLUSTER_NAME: ${OPENMETADATA_CLUSTER_NAME:-nexus-openmetadata}
+  SERVER_PORT: 8585
+  SERVER_ADMIN_PORT: 8586
+  LOG_LEVEL: ${OPENMETADATA_LOG_LEVEL:-INFO}
+  AUTHORIZER_CLASS_NAME: org.openmetadata.service.security.DefaultAuthorizer
+  AUTHORIZER_REQUEST_FILTER: org.openmetadata.service.security.JwtFilter
+  AUTHORIZER_ADMIN_PRINCIPALS: "${OPENMETADATA_AUTHORIZER_ADMIN_PRINCIPALS:-[admin]}"
+  AUTHORIZER_ALLOWED_REGISTRATION_DOMAIN: "${OPENMETADATA_AUTHORIZER_ALLOWED_REGISTRATION_DOMAIN:-[\"all\"]}"
+  AUTHORIZER_INGESTION_PRINCIPALS: "${OPENMETADATA_AUTHORIZER_INGESTION_PRINCIPALS:-[ingestion-bot]}"
+  AUTHORIZER_PRINCIPAL_DOMAIN: ${OPENMETADATA_AUTHORIZER_PRINCIPAL_DOMAIN:-open-metadata.org}
+  AUTHORIZER_ALLOWED_DOMAINS: "${OPENMETADATA_AUTHORIZER_ALLOWED_DOMAINS:-[]}"
+  AUTHORIZER_ENFORCE_PRINCIPAL_DOMAIN: "false"
+  AUTHORIZER_ENABLE_SECURE_SOCKET: "false"
+  AUTHENTICATION_PROVIDER: basic
+  AUTHENTICATION_RESPONSE_TYPE: id_token
+  AUTHENTICATION_PUBLIC_KEYS: "${OPENMETADATA_AUTHENTICATION_PUBLIC_KEYS:-[http://localhost:8585/api/v1/system/config/jwks]}"
+  AUTHENTICATION_AUTHORITY: https://accounts.google.com
+  AUTHENTICATION_CLIENT_ID: ""
+  AUTHENTICATION_CALLBACK_URL: ""
+  AUTHENTICATION_JWT_PRINCIPAL_CLAIMS: "${OPENMETADATA_AUTHENTICATION_JWT_PRINCIPAL_CLAIMS:-[email,preferred_username,sub]}"
+  AUTHENTICATION_JWT_PRINCIPAL_CLAIMS_MAPPING: "[]"
+  AUTHENTICATION_ENABLE_SELF_SIGNUP: "true"
+  AUTHENTICATION_CLIENT_TYPE: public
+  RSA_PUBLIC_KEY_FILE_PATH: ./conf/public_key.der
+  RSA_PRIVATE_KEY_FILE_PATH: ./conf/private_key.der
+  JWT_ISSUER: open-metadata.org
+  JWT_KEY_ID: ${OPENMETADATA_JWT_KEY_ID:-Gb389a-9f76-gdjs-a92j-0242bk94356}
+  PIPELINE_SERVICE_CLIENT_ENDPOINT: http://openmetadata-ingestion:8080
+  PIPELINE_SERVICE_CLIENT_HEALTH_CHECK_INTERVAL: 300
+  SERVER_HOST_API_URL: http://openmetadata-server:8585/api
+  PIPELINE_SERVICE_CLIENT_VERIFY_SSL: no-ssl
+  PIPELINE_SERVICE_CLIENT_SSL_CERT_PATH: ""
+  DB_DRIVER_CLASS: org.postgresql.Driver
+  DB_SCHEME: postgresql
+  DB_PARAMS: allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+  DB_USER: openmetadata_user
+  DB_USER_PASSWORD: openmetadata_password
+  DB_HOST: openmetadata-postgresql
+  DB_PORT: 5432
+  OM_DATABASE: openmetadata_db
+  ELASTICSEARCH_HOST: openmetadata-elasticsearch
+  ELASTICSEARCH_PORT: 9200
+  ELASTICSEARCH_SCHEME: http
+  ELASTICSEARCH_USER: ""
+  ELASTICSEARCH_PASSWORD: ""
+  SEARCH_TYPE: elasticsearch
+  ELASTICSEARCH_TRUST_STORE_PATH: ""
+  ELASTICSEARCH_TRUST_STORE_PASSWORD: ""
+  ELASTICSEARCH_CONNECTION_TIMEOUT_SECS: 5
+  ELASTICSEARCH_SOCKET_TIMEOUT_SECS: 60
+  ELASTICSEARCH_KEEP_ALIVE_TIMEOUT_SECS: 600
+  ELASTICSEARCH_BATCH_SIZE: 100
+  ELASTICSEARCH_PAYLOAD_BYTES_SIZE: 10485760
+  ELASTICSEARCH_INDEX_MAPPING_LANG: EN
+  EVENT_MONITOR: prometheus
+  EVENT_MONITOR_BATCH_SIZE: 10
+  EVENT_MONITOR_PATH_PATTERN: '["/api/v1/tables/*", "/api/v1/health-check"]'
+  EVENT_MONITOR_LATENCY: "[]"
+  PIPELINE_SERVICE_CLIENT_ENABLED: "true"
+  PIPELINE_SERVICE_CLIENT_CLASS_NAME: org.openmetadata.service.clients.pipeline.airflow.AirflowRESTClient
+  PIPELINE_SERVICE_IP_INFO_ENABLED: "false"
+  PIPELINE_SERVICE_CLIENT_HOST_IP: ""
+  PIPELINE_SERVICE_CLIENT_SECRETS_MANAGER_LOADER: noop
+  AIRFLOW_USERNAME: admin
+  AIRFLOW_PASSWORD: admin
+  AIRFLOW_TIMEOUT: 10
+  AIRFLOW_TRUST_STORE_PATH: ""
+  AIRFLOW_TRUST_STORE_PASSWORD: ""
+  FERNET_KEY: ${OPENMETADATA_FERNET_KEY:-jJ/9sz0g0OHxsfxOoSfdFdmk3ysNmPRnH3TUAbz3IHA=}
+  SECRET_MANAGER: db
+  OM_EMAIL_ENTITY: OpenMetadata
+  OM_SUPPORT_URL: https://slack.open-metadata.org
+  AUTHORIZER_ENABLE_SMTP: "false"
+  OPENMETADATA_SERVER_URL: ""
+  OPENMETADATA_SMTP_SENDER_MAIL: ""
+  SMTP_SERVER_ENDPOINT: ""
+  SMTP_SERVER_PORT: ""
+  SMTP_SERVER_USERNAME: ""
+  SMTP_SERVER_PWD: ""
+  SMTP_SERVER_STRATEGY: SMTP_TLS
+  OPENMETADATA_HEAP_OPTS: "${OPENMETADATA_HEAP_OPTS:--Xmx1G -Xms1G}"
+  MASK_PASSWORDS_API: "false"
+  WEB_CONF_URI_PATH: /api
+  WEB_CONF_HSTS_ENABLED: "false"
+  WEB_CONF_HSTS_MAX_AGE: 365 days
+  WEB_CONF_HSTS_INCLUDE_SUBDOMAINS: "true"
+  WEB_CONF_HSTS_PRELOAD: "true"
+  WEB_CONF_FRAME_OPTION_ENABLED: "false"
+  WEB_CONF_FRAME_OPTION: SAMEORIGIN
+  WEB_CONF_FRAME_ORIGIN: ""
+  WEB_CONF_CONTENT_TYPE_OPTIONS_ENABLED: "false"
+  WEB_CONF_XSS_PROTECTION_ENABLED: "false"
+  WEB_CONF_XSS_PROTECTION_ON: "true"
+  WEB_CONF_XSS_PROTECTION_BLOCK: "true"
+  WEB_CONF_XSS_CSP_ENABLED: "false"
+  WEB_CONF_XSS_CSP_POLICY: "default-src 'self'"
+  WEB_CONF_XSS_CSP_REPORT_ONLY_POLICY: ""
+  WEB_CONF_CACHE_CONTROL: ""
+  WEB_CONF_PRAGMA: ""
+
 services:
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
@@ -112,9 +213,10 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__WEBSERVER__SECRET_KEY: nexus-local-secret
-      _PIP_ADDITIONAL_REQUIREMENTS: requests kafka-python PyYAML jsonschema psycopg[binary]
+      _PIP_ADDITIONAL_REQUIREMENTS: requests kafka-python PyYAML jsonschema psycopg[binary] great_expectations==1.16.1
       NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
       NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db:5432/nexus_governance}
+      NEXUS_GX_ENABLED: ${NEXUS_GX_ENABLED:-true}
       AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_ADMIN_USERNAME:-admin}
       AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
@@ -133,6 +235,11 @@ services:
       WAQI_API_TOKEN: ${WAQI_API_TOKEN:-}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
       NEXUS_BUCKET: ${NEXUS_BUCKET:-nexus-lakehouse}
+      OPENLINEAGE_URL: ${OPENLINEAGE_URL:-}
+      OPENLINEAGE_ENDPOINT: ${OPENLINEAGE_ENDPOINT:-/api/v1/lineage}
+      OPENLINEAGE_NAMESPACE: ${OPENLINEAGE_NAMESPACE:-nexus}
+      OPENLINEAGE_TIMEOUT_SECONDS: ${OPENLINEAGE_TIMEOUT_SECONDS:-5}
+      OPENLINEAGE_STRICT: ${OPENLINEAGE_STRICT:-false}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
       NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
@@ -166,9 +273,10 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      _PIP_ADDITIONAL_REQUIREMENTS: requests kafka-python PyYAML jsonschema psycopg[binary]
+      _PIP_ADDITIONAL_REQUIREMENTS: requests kafka-python PyYAML jsonschema psycopg[binary] great_expectations==1.16.1
       NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
       NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db:5432/nexus_governance}
+      NEXUS_GX_ENABLED: ${NEXUS_GX_ENABLED:-true}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       KAFKA_TOPIC_TRANSPORT_EVENTS: ${KAFKA_TOPIC_TRANSPORT_EVENTS:-transport-events}
       NEXUS_STREAM_SOURCE: ${NEXUS_STREAM_SOURCE:-transport}
@@ -185,6 +293,11 @@ services:
       WAQI_API_TOKEN: ${WAQI_API_TOKEN:-}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
       NEXUS_BUCKET: ${NEXUS_BUCKET:-nexus-lakehouse}
+      OPENLINEAGE_URL: ${OPENLINEAGE_URL:-}
+      OPENLINEAGE_ENDPOINT: ${OPENLINEAGE_ENDPOINT:-/api/v1/lineage}
+      OPENLINEAGE_NAMESPACE: ${OPENLINEAGE_NAMESPACE:-nexus}
+      OPENLINEAGE_TIMEOUT_SECONDS: ${OPENLINEAGE_TIMEOUT_SECONDS:-5}
+      OPENLINEAGE_STRICT: ${OPENLINEAGE_STRICT:-false}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
       NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
@@ -244,8 +357,171 @@ services:
       - ../../runtime:/app/runtime
       - ../../governance:/app/governance
 
+  openmetadata-postgresql:
+    profiles: ["metadata"]
+    image: docker.getcollate.io/openmetadata/postgresql:1.12.6
+    container_name: nexus-openmetadata-postgresql
+    command: "--work_mem=10MB"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    expose:
+      - "5432"
+    volumes:
+      - openmetadata-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U postgres -tAc 'select 1' -d openmetadata_db"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  openmetadata-elasticsearch:
+    profiles: ["metadata"]
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.0
+    container_name: nexus-openmetadata-elasticsearch
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: "-Xms1024m -Xmx1024m"
+      xpack.security.enabled: "false"
+    ports:
+      - "${OPENMETADATA_ELASTICSEARCH_PORT:-9201}:9200"
+    volumes:
+      - openmetadata-es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health?pretty | grep status | grep -qE 'green|yellow' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  openmetadata-migrate:
+    profiles: ["metadata"]
+    image: docker.getcollate.io/openmetadata/server:1.12.6
+    container_name: nexus-openmetadata-migrate
+    command: "./bootstrap/openmetadata-ops.sh migrate"
+    environment:
+      <<: *openmetadata-environment
+    depends_on:
+      openmetadata-elasticsearch:
+        condition: service_healthy
+      openmetadata-postgresql:
+        condition: service_healthy
+
+  openmetadata-server:
+    profiles: ["metadata"]
+    image: docker.getcollate.io/openmetadata/server:1.12.6
+    container_name: nexus-openmetadata-server
+    restart: always
+    environment:
+      <<: *openmetadata-environment
+    ports:
+      - "${OPENMETADATA_SERVER_PORT:-8585}:8585"
+      - "${OPENMETADATA_SERVER_ADMIN_PORT:-8586}:8586"
+    depends_on:
+      openmetadata-elasticsearch:
+        condition: service_healthy
+      openmetadata-postgresql:
+        condition: service_healthy
+      openmetadata-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8586/healthcheck"]
+
+  openmetadata-ingestion:
+    profiles: ["metadata"]
+    image: docker.getcollate.io/openmetadata/ingestion:1.12.6
+    container_name: nexus-openmetadata-ingestion
+    depends_on:
+      openmetadata-elasticsearch:
+        condition: service_started
+      openmetadata-postgresql:
+        condition: service_healthy
+      openmetadata-server:
+        condition: service_started
+    environment:
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__OPENMETADATA_AIRFLOW_APIS__DAG_GENERATED_CONFIGS: /opt/airflow/dag_generated_configs
+      DB_HOST: openmetadata-postgresql
+      DB_PORT: 5432
+      AIRFLOW_DB: airflow_db
+      DB_USER: airflow_user
+      DB_SCHEME: postgresql+psycopg2
+      DB_PASSWORD: airflow_pass
+      DB_PROPERTIES: ""
+    entrypoint: /bin/bash
+    command:
+      - /opt/airflow/ingestion_dependency.sh
+    ports:
+      - "${OPENMETADATA_INGESTION_PORT:-8090}:8080"
+    volumes:
+      - openmetadata-ingestion-dag-airflow:/opt/airflow/dag_generated_configs
+      - openmetadata-ingestion-dags:/opt/airflow/dags
+      - openmetadata-ingestion-tmp:/tmp
+
+  marquez-db:
+    profiles: ["metadata"]
+    image: postgres:14
+    container_name: nexus-marquez-db
+    environment:
+      POSTGRES_USER: ${MARQUEZ_DB_USER:-marquez}
+      POSTGRES_PASSWORD: ${MARQUEZ_DB_PASSWORD:-marquez}
+      POSTGRES_DB: ${MARQUEZ_DB_NAME:-marquez}
+    volumes:
+      - marquez-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  marquez:
+    profiles: ["metadata"]
+    image: marquezproject/marquez:${MARQUEZ_TAG:-0.51.1}
+    container_name: nexus-marquez
+    depends_on:
+      marquez-db:
+        condition: service_healthy
+    environment:
+      MARQUEZ_PORT: 5000
+      MARQUEZ_ADMIN_PORT: 5001
+      POSTGRES_HOST: marquez-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${MARQUEZ_DB_NAME:-marquez}
+      POSTGRES_USER: ${MARQUEZ_DB_USER:-marquez}
+      POSTGRES_PASSWORD: ${MARQUEZ_DB_PASSWORD:-marquez}
+      SEARCH_ENABLED: "false"
+    ports:
+      - "${MARQUEZ_PORT:-5000}:5000"
+      - "${MARQUEZ_ADMIN_PORT:-5001}:5001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:5001/healthcheck || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  marquez-web:
+    profiles: ["metadata"]
+    image: marquezproject/marquez-web:${MARQUEZ_TAG:-0.51.1}
+    container_name: nexus-marquez-web
+    depends_on:
+      marquez:
+        condition: service_started
+    environment:
+      MARQUEZ_HOST: marquez
+      MARQUEZ_PORT: 5000
+      WEB_PORT: 3000
+      REACT_APP_ADVANCED_SEARCH: "false"
+    ports:
+      - "${MARQUEZ_WEB_PORT:-3000}:3000"
+
 volumes:
   minio-data:
   airflow-db-data:
   governance-db-data:
   superset-home:
+  openmetadata-postgres-data:
+  openmetadata-es-data:
+  openmetadata-ingestion-dag-airflow:
+  openmetadata-ingestion-dags:
+  openmetadata-ingestion-tmp:
+  marquez-db-data:

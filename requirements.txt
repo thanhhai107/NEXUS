@@ -2,6 +2,7 @@ requests==2.32.3
 kafka-python==2.0.2
 PyYAML==6.0.1
 jsonschema==4.23.0
+great_expectations==1.16.1
 psycopg[binary]==3.2.3
 pytest==8.2.2
 fastapi==0.111.0

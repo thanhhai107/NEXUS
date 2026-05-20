@@ -32,6 +32,10 @@ from common.source_discovery import (
 from common.source_discovery import (
     sync_discovery as sync_source_discovery,
 )
+from common.source_coverage import (
+    COVERAGE_MAP_FILE as SOURCE_DISCOVERY_COVERAGE_MAP_FILE,
+    write_ingestion_coverage_map,
+)
 from governance.agents.governance_agent import review_batch
 from governance.audit import write_audit_event
 from governance.lineage import record_lineage
@@ -599,6 +603,16 @@ def sync_source_discovery_metadata(args: argparse.Namespace) -> None:
     print(json.dumps(result, indent=2))
 
 
+def build_source_discovery_coverage(args: argparse.Namespace) -> None:
+    result = write_ingestion_coverage_map(
+        output_path=args.output_path,
+        source_dir=args.source_dir,
+        domains_dir=args.domains_dir,
+        config_dir=args.config_dir,
+    )
+    print(json.dumps(result, indent=2))
+
+
 def integrate_source_discovery_schema(args: argparse.Namespace) -> None:
     result = integrate_schema_into_domain(
         schema_name=args.schema,
@@ -716,6 +730,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Schema name to export. Repeat for multiple schemas. Defaults to all schemas.",
     )
     source_discovery_sync_command.set_defaults(func=sync_source_discovery_metadata)
+
+    source_discovery_coverage_command = source_discovery_subcommands.add_parser(
+        "coverage",
+        help="Build the ingestion coverage map for all discovered sources and schemas",
+    )
+    source_discovery_coverage_command.add_argument(
+        "--source-dir",
+        type=Path,
+        default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
+    )
+    source_discovery_coverage_command.add_argument(
+        "--domains-dir",
+        type=Path,
+        default=PROJECT_ROOT / "domains",
+    )
+    source_discovery_coverage_command.add_argument(
+        "--config-dir",
+        type=Path,
+        default=PROJECT_ROOT / "config",
+    )
+    source_discovery_coverage_command.add_argument(
+        "--output-path",
+        type=Path,
+        default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR / SOURCE_DISCOVERY_COVERAGE_MAP_FILE,
+    )
+    source_discovery_coverage_command.set_defaults(func=build_source_discovery_coverage)
 
     source_discovery_integrate_command = source_discovery_subcommands.add_parser(
         "integrate",

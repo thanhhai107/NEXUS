@@ -145,7 +145,8 @@ def integrate_schema_into_domain(
     schemas_dir = domain_dir / "schemas"
     schemas_dir.mkdir(parents=True, exist_ok=True)
 
-    schema_rel_path = "/".join(["domains", domain, "schemas", f"{dataset}.schema.json"])
+    schema_rel_path = Path("domains") / domain / "schemas" / f"{dataset}.schema.json"
+    schema_rel_path_text = schema_rel_path.as_posix()
     schema_path = domains_dir / domain / "schemas" / f"{dataset}.schema.json"
     _write_json(schema_path, nexus_schema)
 
@@ -162,7 +163,7 @@ def integrate_schema_into_domain(
             "description": dataset_entry.get("description") or f"Imported from source discovery schema {schema_name}.",
             "source_type": dataset_entry.get("source_type") or "api_stream",
             "source_uri": dataset_entry.get("source_uri") or "https://example.com/replace-me",
-            "schema_path": str(schema_rel_path),
+            "schema_path": schema_rel_path_text,
             "source_discovery": {
                 "repository": SOURCE_REPOSITORY_URL,
                 "source_file": f"assets/source_discovery/{ALL_SCHEMAS_FILE}",
