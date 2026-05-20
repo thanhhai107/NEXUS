@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 from datetime import datetime
@@ -91,7 +91,7 @@ with DAG(
     raw_to_bronze = BashOperator(
         task_id="raw_to_bronze",
         bash_command=(
-            "spark-submit --master spark://spark:7077 /opt/airflow/processing/bronze/raw_to_bronze.py "
+            "bash /opt/airflow/infra/spark/spark-submit-wrapper.sh /opt/airflow/processing/bronze/raw_to_bronze.py "
             "--raw-path /opt/airflow/runtime/raw/us_accidents/*.jsonl "
             "--bronze-table nexus.bronze.us_accidents"
         ),
@@ -114,7 +114,7 @@ with DAG(
     bronze_to_silver = BashOperator(
         task_id="bronze_to_silver",
         bash_command=(
-            "spark-submit --master spark://spark:7077 /opt/airflow/processing/silver/bronze_to_silver.py "
+            "bash /opt/airflow/infra/spark/spark-submit-wrapper.sh /opt/airflow/processing/silver/bronze_to_silver.py "
             "--bronze-table nexus.bronze.us_accidents "
             "--silver-table nexus.silver.us_accidents"
         ),
@@ -137,14 +137,15 @@ with DAG(
     silver_to_gold = BashOperator(
         task_id="silver_to_gold",
         bash_command=(
-            "spark-submit --master spark://spark:7077 /opt/airflow/processing/gold/silver_to_gold.py "
-            "--silver-table nexus.silver.us_accidents "
-            "--gold-table nexus.gold.us_accidents_summary "
-            "--group-by state "
-            "--metric-column distance_mi"
+            "DBT_PROFILES_DIR=${DBT_PROFILES_DIR:-/opt/airflow/transform/dbt}; "
+            "if [ -n \"${OPENLINEAGE_URL:-}\" ] && command -v dbt-ol >/dev/null 2>&1; then "
+            "DBT_RUNNER=dbt-ol; else DBT_RUNNER=dbt; fi; "
+            "$DBT_RUNNER run "
+            "--project-dir /opt/airflow/transform/dbt "
+            "--profiles-dir $DBT_PROFILES_DIR "
+            "--select us_accidents_summary"
         ),
     )
-
     record_gold_lineage = BashOperator(
         task_id="record_gold_lineage",
         bash_command=(

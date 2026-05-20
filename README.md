@@ -8,6 +8,19 @@ Trino, Superset, and Airflow.
 The generated source inventory is integrated in this repository under
 `assets/source_discovery/`.
 
+## Pipeline Overview
+
+Nexus implements the canonical lakehouse pipeline:
+
+1. **Data Sources** described by domain catalogs in `domains/<domain>/datasets.yml`.
+2. **Ingestion patterns**: batch CSV/API, downloaded CSV, REST API, simulated and real Kafka streaming. Airflow orchestrates schedules, retries, backfill and dependencies via DAGs in `orchestration/airflow/dags/`.
+3. **Streaming and failure handling**: the Kafka producer retries failed publishes and routes permanent failures to a Dead Letter Queue (Kafka topic `nexus.dlq` plus `runtime/dlq/`). DLQ captures **operational** failures; the Quarantine Zone captures **invalid data records**.
+4. **Source governance**: every dataset is exposed as a Source Registry entry (`python -m cli.nexus registry list`) and a Data Contract (`python -m cli.nexus contract show --dataset <name>`) that combines the JSON Schema, quality rules, freshness and ownership.
+5. **Validation gate**: `governance/quality/checks.py` runs schema, type, format and Great Expectations rules. Valid records flow to Bronze; invalid records go to Quarantine.
+6. **Quarantine Zone**: invalid records are written to `runtime/quarantine/` with the failure reason for triage.
+7. **Medallion architecture**: Bronze (`processing/bronze/raw_to_bronze.py`), Silver (`processing/silver/bronze_to_silver.py`), Gold (`transform/dbt/models/gold/`). dbt is the canonical Silver→Gold tool; the Spark `silver_to_gold.py` script remains for ad hoc backfills.
+8. **Metadata, governance, lineage**: OpenMetadata catalogs datasets, owners, schemas, quality results and contracts; OpenLineage events from Spark, dbt and audit hooks land in Marquez.
+9. **Serving layer**: Trino, FastAPI and Superset consume Gold tables.
 ## What Is Included
 
 - Batch CSV/API ingestion and simulated Kafka streaming ingestion.
@@ -72,6 +85,52 @@ Optional metadata stack URLs after starting the `metadata` profile:
 | Marquez UI | <http://localhost:3000> |
 | Marquez OpenLineage API | <http://localhost:5000/api/v1/lineage> |
 
+## Source Registry & Data Contracts
+
+The Source Registry exposes every dataset together with derived ingestion method
+and update frequency. Data Contracts bundle the schema, required columns,
+primary keys, freshness column and quality thresholds for one dataset.
+
+```powershell
+python -m cli.nexus registry list
+python -m cli.nexus registry show --dataset us_accidents
+python -m cli.nexus contract show --dataset openaq_measurements
+```
+
+The registry derives `ingestion_method` from `source_type` and
+`update_frequency` from `poll_seconds`/`freshness_hours`. Override either field
+on a dataset entry in `domains/<domain>/datasets.yml` when needed.
+
+## Dead Letter Queue
+
+The DLQ stores operational failures (Kafka publish/consume failures, job
+crashes, timeouts). Bad data records continue to flow to `runtime/quarantine/`.
+
+```powershell
+python -m cli.nexus dlq list
+python -m cli.nexus dlq replay --target stdout --category streaming_publish_failed
+python -m cli.nexus dlq replay --target kafka --topic transport-events
+```
+
+Local DLQ files live under `runtime/dlq/`; when
+`NEXUS_GOVERNANCE_STORAGE=postgres`, events stream into the governance Postgres
+table instead. Airflow exposes the same flow via the `nexus_dlq_replay` DAG.
+
+## Streaming Consumer & Reprocessing
+
+- `ingestion/streaming/consumer.py` reads Kafka events, lands them in `runtime/raw/<dataset>/`, and routes decode/operational failures to the DLQ.
+- `nexus_streaming_pipeline` runs producer → consumer → quality → lineage.
+- `nexus_reprocess_pipeline` replays raw landing files through Bronze, Silver and Gold for backfill/recovery (parameters: `dataset`, `raw_glob`, target tables).
+- `nexus_dlq_replay` re-emits DLQ events to a Kafka topic (or stdout for inspection).
+
+## OpenLineage Integration
+
+When `OPENLINEAGE_URL` is set, the Spark wrapper at
+`infra/spark/spark-submit-wrapper.sh` injects the OpenLineage Spark listener
+with the configured namespace and endpoint. dbt tasks fall back to `dbt-ol`
+automatically when both `OPENLINEAGE_URL` and `dbt-ol` are available, otherwise
+they run plain `dbt`. Audit-emitted lineage events from `cli.nexus lineage record`
+still land alongside Spark/dbt events in Marquez/OpenMetadata.
 ## Useful Commands
 
 ```powershell

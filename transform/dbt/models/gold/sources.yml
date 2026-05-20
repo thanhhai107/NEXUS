@@ -7,3 +7,7 @@ sources:
     tables:
       - name: us_accidents
         description: Cleaned Silver Transport accident dataset.
+      - name: transport_events
+        description: Cleaned Silver Transport streaming events.
+      - name: openaq_measurements
+        description: Cleaned Silver air quality measurements from OpenAQ.
