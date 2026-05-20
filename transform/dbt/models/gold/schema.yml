@@ -13,3 +13,24 @@ models:
       - name: accident_count
         tests:
           - not_null
+  - name: transport_events_hourly
+    description: Gold hourly rollup of transport streaming events by state and event type.
+    columns:
+      - name: event_hour
+        tests:
+          - not_null
+      - name: event_count
+        tests:
+          - not_null
+  - name: openaq_air_quality_hourly
+    description: Gold hourly rollup of OpenAQ air quality readings by location and parameter.
+    columns:
+      - name: observed_hour
+        tests:
+          - not_null
+      - name: parameter
+        tests:
+          - not_null
+      - name: reading_count
+        tests:
+          - not_null

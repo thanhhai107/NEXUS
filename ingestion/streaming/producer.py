@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import json
@@ -350,6 +350,36 @@ def event_stream(source: str, api_url: str | None, api_key: str | None, events: 
     return [sim_transport() for _ in range(events)]
 
 
+DEFAULT_MAX_RETRIES = int(os.getenv("NEXUS_PRODUCER_MAX_RETRIES", "3"))
+DEFAULT_RETRY_BACKOFF_SECONDS = float(os.getenv("NEXUS_PRODUCER_RETRY_BACKOFF", "0.5"))
+DLQ_TOPIC = os.getenv("NEXUS_DLQ_TOPIC", "nexus.dlq")
+
+
+def _publish_to_dlq(producer, event: dict[str, object], *, source: str, topic: str, error: Exception, attempts: int) -> None:
+    """Publish a permanent failure to the Kafka DLQ topic and the local DLQ store."""
+    from governance.dlq import record_dlq_event
+    dlq_payload = {
+        "original_topic": topic,
+        "source": source,
+        "error": f"{type(error).__name__}: {error}",
+        "attempts": attempts,
+        "event": event,
+    }
+    try:
+        producer.send(DLQ_TOPIC, dlq_payload)
+    except Exception as dlq_exc:  # noqa: BLE001 - DLQ best effort
+        print(f"Failed to publish to Kafka DLQ {DLQ_TOPIC}: {dlq_exc}")
+    record_dlq_event(
+        category="streaming_publish_failed",
+        payload=event,
+        source=source,
+        error=str(error),
+        error_type=type(error).__name__,
+        attempts=attempts,
+        topic=topic,
+    )
+
+
 def run_producer(
     source: str,
     topic: str,
@@ -358,7 +388,13 @@ def run_producer(
     delay_seconds: float,
     api_url: str | None = None,
     api_key: str | None = None,
-) -> None:
+    max_retries: int = DEFAULT_MAX_RETRIES,
+    retry_backoff_seconds: float = DEFAULT_RETRY_BACKOFF_SECONDS,
+) -> dict[str, int]:
+    """Produce events to Kafka with retry-then-DLQ semantics.
+
+    Returns a summary with `produced`, `dlq` and `attempted` counts.
+    """
     from kafka import KafkaProducer
 
     producer = KafkaProducer(
@@ -366,12 +402,30 @@ def run_producer(
         value_serializer=lambda value: json.dumps(value).encode("utf-8"),
     )
 
+    summary = {"attempted": 0, "produced": 0, "dlq": 0}
     for event in event_stream(source, api_url, api_key, events):
-        producer.send(topic, event)
-        print(f"Produced event_id={event['event_id']} source={source} topic={topic}")
+        summary["attempted"] += 1
+        last_error: Exception | None = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                future = producer.send(topic, event)
+                future.get(timeout=10)
+                summary["produced"] += 1
+                last_error = None
+                print(f"Produced event_id={event['event_id']} source={source} topic={topic} attempt={attempt}")
+                break
+            except Exception as exc:  # noqa: BLE001 - retry then DLQ
+                last_error = exc
+                wait = retry_backoff_seconds * (2 ** (attempt - 1))
+                print(f"Publish failed for event_id={event.get('event_id')} attempt={attempt} error={exc}; retrying in {wait:.2f}s")
+                time.sleep(wait)
+        if last_error is not None:
+            summary["dlq"] += 1
+            _publish_to_dlq(producer, event, source=source, topic=topic, error=last_error, attempts=max_retries)
         time.sleep(delay_seconds)
 
     producer.flush()
+    return summary
 
 
 def default_url(source: str) -> str | None:

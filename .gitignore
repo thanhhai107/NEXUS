@@ -26,6 +26,10 @@ runtime/raw/*
 runtime/downloads/*
 !runtime/raw/.gitkeep
 runtime/quarantine/*
+runtime/dlq/*
+!runtime/dlq/.gitkeep
+runtime/downloads/*
+!runtime/downloads/.gitkeep
 !runtime/quarantine/.gitkeep
 runtime/metrics/*
 !runtime/metrics/.gitkeep

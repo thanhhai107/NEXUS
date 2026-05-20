@@ -36,7 +36,10 @@ from common.source_coverage import (
     COVERAGE_MAP_FILE as SOURCE_DISCOVERY_COVERAGE_MAP_FILE,
     write_ingestion_coverage_map,
 )
+from common.source_registry import get_source, list_sources
+from common.data_contract import load_data_contract, list_data_contracts
 from governance.agents.governance_agent import review_batch
+from governance.dlq import list_dlq_events, replay_dlq_events
 from governance.audit import write_audit_event
 from governance.lineage import record_lineage
 from governance.quality.auto_fix import (
@@ -623,6 +626,75 @@ def integrate_source_discovery_schema(args: argparse.Namespace) -> None:
     print(json.dumps(result, indent=2))
 
 
+def list_registry(args: argparse.Namespace) -> None:
+    payload = [entry.to_dict() for entry in list_sources()]
+    if args.domain:
+        payload = [entry for entry in payload if entry.get("domain") == args.domain]
+    print(json.dumps(payload, indent=2))
+
+
+def show_registry(args: argparse.Namespace) -> None:
+    print(json.dumps(get_source(args.dataset).to_dict(), indent=2))
+
+
+def list_contracts(args: argparse.Namespace) -> None:
+    payload = [contract.to_dict() for contract in list_data_contracts()]
+    print(json.dumps(payload, indent=2))
+
+
+def show_contract(args: argparse.Namespace) -> None:
+    print(json.dumps(load_data_contract(args.dataset).to_dict(), indent=2))
+
+def list_dlq(args: argparse.Namespace) -> None:
+    events = list_dlq_events()
+    if args.category:
+        events = [event for event in events if event.get("category") == args.category]
+    if args.source:
+        events = [event for event in events if event.get("source") == args.source]
+    if args.dataset:
+        events = [event for event in events if event.get("dataset") == args.dataset]
+    print(json.dumps(events, indent=2))
+
+
+def replay_dlq(args: argparse.Namespace) -> None:
+    if args.target == "kafka":
+        from kafka import KafkaProducer
+        producer = KafkaProducer(
+            bootstrap_servers=args.bootstrap_servers,
+            value_serializer=lambda value: json.dumps(value).encode("utf-8"),
+        )
+
+        def handler(event: dict[str, Any]) -> bool:
+            payload = event.get("payload") or event.get("event") or {}
+            topic = args.topic or event.get("topic") or event.get("original_topic")
+            if not topic:
+                return False
+            future = producer.send(topic, payload)
+            future.get(timeout=10)
+            return True
+
+        try:
+            result = replay_dlq_events(
+                handler,
+                category=args.category,
+                source=args.source,
+                dataset=args.dataset,
+            )
+        finally:
+            producer.flush()
+    else:
+        def handler(event: dict[str, Any]) -> bool:
+            print(json.dumps(event, indent=2))
+            return True
+
+        result = replay_dlq_events(
+            handler,
+            category=args.category,
+            source=args.source,
+            dataset=args.dataset,
+        )
+    print(json.dumps(result, indent=2))
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="NEXUS operational CLI.")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -770,6 +842,39 @@ def build_parser() -> argparse.ArgumentParser:
         default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
     )
     source_discovery_integrate_command.set_defaults(func=integrate_source_discovery_schema)
+
+    registry = subcommands.add_parser("registry", help="Source registry commands")
+    registry_subcommands = registry.add_subparsers(dest="registry_command", required=True)
+    registry_list = registry_subcommands.add_parser("list", help="List registered sources")
+    registry_list.add_argument("--domain")
+    registry_list.set_defaults(func=list_registry)
+    registry_show = registry_subcommands.add_parser("show", help="Show one source registry entry")
+    registry_show.add_argument("--dataset", required=True)
+    registry_show.set_defaults(func=show_registry)
+
+    contract = subcommands.add_parser("contract", help="Data contract commands")
+    contract_subcommands = contract.add_subparsers(dest="contract_command", required=True)
+    contract_list = contract_subcommands.add_parser("list", help="List all data contracts")
+    contract_list.set_defaults(func=list_contracts)
+    contract_show = contract_subcommands.add_parser("show", help="Show one data contract")
+    contract_show.add_argument("--dataset", required=True)
+    contract_show.set_defaults(func=show_contract)
+
+    dlq = subcommands.add_parser("dlq", help="Dead Letter Queue commands")
+    dlq_subcommands = dlq.add_subparsers(dest="dlq_command", required=True)
+    dlq_list = dlq_subcommands.add_parser("list", help="List DLQ events from local store")
+    dlq_list.add_argument("--category")
+    dlq_list.add_argument("--source")
+    dlq_list.add_argument("--dataset")
+    dlq_list.set_defaults(func=list_dlq)
+    dlq_replay = dlq_subcommands.add_parser("replay", help="Replay DLQ events to Kafka or stdout")
+    dlq_replay.add_argument("--target", choices=["kafka", "stdout"], default="stdout")
+    dlq_replay.add_argument("--bootstrap-servers", default=os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092"))
+    dlq_replay.add_argument("--topic")
+    dlq_replay.add_argument("--category")
+    dlq_replay.add_argument("--source")
+    dlq_replay.add_argument("--dataset")
+    dlq_replay.set_defaults(func=replay_dlq)
 
     return parser
 
