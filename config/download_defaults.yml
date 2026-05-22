@@ -1,4 +1,6 @@
 default_mode: full_demo
+default_source_group: core_historical
+polling_source_group: realtime_polling
 output_dir: runtime/downloads
 
 spatial_scope:
@@ -50,26 +52,51 @@ modes:
     openweather_borough_limit: null
     ncei_station_limit: 3
     dft_page_limit: null
+  latest_update:
+    core_start: "2025-01-01"
+    core_end: current_date
+    transport_start: "2025-01-01"
+    transport_end: current_date
+    transport_start_year: 2025
+    transport_end_year: 2025
+    borough_limit: 33
+    londonair_site_limit: null
+    londonair_species:
+      - NO2
+      - PM10
+      - PM25
+      - O3
+    openaq_location_limit: 10
+    openaq_sensor_limit: 2
+    waqi_station_limit: 5
+    openweather_borough_limit: 5
+    ncei_station_limit: 3
+    dft_page_limit: 2
 
 sources:
-  default:
+  core_historical:
     - openmeteo
     - naptan
     - london_journeys
     - dft
     - ncei
-    - tfl_status
-    - tfl_arrivals
-    - waqi
-    - openweather
     - stats19
     - openaq
     - londonair
-  polling:
-    - tfl_status
-    - tfl_arrivals
+  latest_update:
+    - openmeteo
+    - naptan
+    - london_journeys
+    - dft
+    - ncei
+    - openaq
+    - londonair
+  realtime_snapshot:
     - waqi
     - openweather
+    - tfl_status
+  realtime_polling:
+    - tfl_arrivals
 
 rate_limits:
   default_delay_seconds: 0.1
@@ -110,6 +137,32 @@ openmeteo:
 
 londonair:
   base_url: https://api.erg.ic.ac.uk/AirQuality
+  endpoints:
+    monitoring_sites: /Information/MonitoringSites/GroupName=London/Json
+    site_species: /Information/MonitoringSiteSpecies/GroupName=London/Json
+    species_metadata: /Information/Species/SpeciesCode={SpeciesCode}/Json
+    local_authorities: /Information/MonitoringLocalAuthority/GroupName=London/Json
+    hourly_index: /Hourly/MonitoringIndex/GroupName=London/Json
+    daily_index: /Daily/MonitoringIndex/Latest/GroupName=London/Json
+    site_hourly_index: /Hourly/MonitoringIndex/SiteCode={SiteCode}/Json
+    wide_site_data: /Data/Wide/Site/SiteCode={SiteCode}/StartDate={StartDate}/EndDate={EndDate}/Json
+    health_advice: /Information/IndexHealthAdvice/Json
+    health_advice_by_index: /Information/IndexHealthAdvice/AirQualityIndex={AirQualityIndex}/Json
+    air_pollution_guide: /Information/AirPollutionGuide/Json
+    site_species_index_days: /Data/SiteSpeciesIndexDays/SiteCode={SiteCode}/SpeciesCode={SpeciesCode}/Period={Period}/Json
+  health_advice_indexes:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+  index_days_periods:
+    - Year
   fallback_site_codes:
     - BG1
     - BL0
@@ -136,13 +189,24 @@ londonair:
 
 openaq:
   base_url: https://api.openaq.org/v3
-  radius_meters: 40000
+  discovery_strategy: bbox
+  radius_meters: 25000
   page_limit: 1000
   measurement_endpoint: hours
+  include_parameters: true
+  include_sensor_details: true
 
 ncei:
   base_url: https://www.ncei.noaa.gov/cdo-web/api/v2
   dataset_id: GHCND
+  page_limit: 1000
+  units: metric
+  reference_endpoints:
+    - datasets
+    - datacategories
+    - datatypes
+    - locationcategories
+    - locations
   fallback_station_ids:
     - GHCND:UKE00105915
   datatypes:
@@ -158,7 +222,18 @@ waqi:
 openweather:
   base_url: https://api.openweathermap.org
   units: metric
+  lang: en
+  include_one_call: true
+  one_call_exclude: ""
+  include_weather_overview: true
+  include_day_summary: true
+  include_history: false
+  history_base_url: https://history.openweathermap.org
+  history_chunk_days: 7
+  include_current_weather_fallback: true
+  include_air_pollution_current: true
   include_air_pollution_forecast: true
+  write_air_pollution_index_scales: true
 
 tfl:
   base_url: https://api.tfl.gov.uk

@@ -33,6 +33,8 @@ runtime/downloads/*
 !runtime/quarantine/.gitkeep
 runtime/metrics/*
 !runtime/metrics/.gitkeep
+runtime/analysis/*
+!runtime/analysis/.gitkeep
 runtime/schemas/history/*
 !runtime/schemas/history/.gitkeep
 runtime/source_discovery/*
