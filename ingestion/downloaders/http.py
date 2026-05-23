@@ -119,6 +119,63 @@ def request_json(
             sleep_for_retry(run.context.config, attempt, status_code)
     raise SourceFailure(f"Request failed after {max_retries} retries: {masked}")
 
+
+def request_text(
+    run: SourceRun,
+    url: str,
+    *,
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    timeout: int | None = None,
+    delay_seconds: float | None = None,
+) -> str:
+    retry_cfg = run.context.config.get("retry", {})
+    max_retries = int(retry_cfg.get("max_retries", 5))
+    timeout_seconds = int(timeout or retry_cfg.get("timeout_seconds", 60))
+    masked = mask_url(url, params)
+    for attempt in range(max_retries + 1):
+        started = time.perf_counter()
+        status_code: int | None = None
+        try:
+            response = requests.get(url, params=params or {}, headers=headers or {}, timeout=timeout_seconds)
+            status_code = response.status_code
+            if status_code in RETRY_STATUS_CODES:
+                raise requests.HTTPError(f"HTTP {status_code}", response=response)
+            response.raise_for_status()
+            duration_ms = int((time.perf_counter() - started) * 1000)
+            run.log_request(
+                url=masked,
+                status_code=status_code,
+                record_count=1,
+                duration_ms=duration_ms,
+                retry_count=attempt,
+                bytes_downloaded=len(response.content),
+            )
+            sleep_after(run, delay_seconds)
+            return response.text
+        except Exception as exc:
+            duration_ms = int((time.perf_counter() - started) * 1000)
+            non_retryable_status = bool(
+                status_code is not None
+                and status_code >= 400
+                and status_code not in RETRY_STATUS_CODES
+            )
+            is_last = non_retryable_status or attempt >= max_retries
+            masked_error = mask_exception(exc, masked)
+            run.log_request(
+                url=masked,
+                status_code=status_code,
+                record_count=0,
+                duration_ms=duration_ms,
+                retry_count=attempt,
+                error=masked_error if is_last else f"retryable: {masked_error}",
+            )
+            if is_last:
+                raise SourceFailure(masked_error) from exc
+            sleep_for_retry(run.context.config, attempt, status_code)
+    raise SourceFailure(f"Request failed after {max_retries} retries: {masked}")
+
+
 def download_file(
     run: SourceRun,
     url: str,

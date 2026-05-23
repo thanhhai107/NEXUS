@@ -21,15 +21,24 @@ from ingestion.downloaders.utils import (
 def download_waqi_snapshot(run: SourceRun, context: DownloadContext) -> None:
     env = require_env(run, "WAQI_API_TOKEN")
     opts = source_options(context, "waqi")
-    base = opts.get("base_url", "https://api.waqi.info")
+    base = str(opts.get("base_url", "https://api.waqi.info")).rstrip("/")
+    map_path = str(opts.get("map_path", "/v2/map/bounds"))
     bbox = context.bbox
     token = env["WAQI_API_TOKEN"]
+    map_params = {
+        "latlng": f"{bbox['south']},{bbox['west']},{bbox['north']},{bbox['east']}",
+        "token": token,
+    }
+    networks = opts.get("networks")
+    if networks:
+        map_params["networks"] = networks
 
     payload = request_json(
         run,
-        f"{base}/map/bounds/",
-        params={"latlng": f"{bbox['south']},{bbox['west']},{bbox['north']},{bbox['east']}", "token": token},
+        f"{base}/{map_path.strip('/')}",
+        params=map_params,
     )
+    ensure_waqi_ok(payload, "map/bounds")
     stations = extract_records(payload)
     station_limit = context.mode.get("waqi_station_limit")
     stations = limit_items(stations, int(station_limit) if station_limit is not None else None)
@@ -43,11 +52,23 @@ def download_waqi_snapshot(run: SourceRun, context: DownloadContext) -> None:
         chunk_id = f"uid={uid}:poll={poll_time['stamp']}"
         try:
             feed = request_json(run, f"{base}/feed/@{uid}/", params={"token": token})
+            ensure_waqi_ok(feed, f"feed/@{uid}")
             rel = f"date={poll_time['date']}/hour={poll_time['hour']}/feed_uid={sanitize_segment(uid)}.json"
             run.write_json(rel, feed, record_count=1)
             run.mark_complete(chunk_id, {"record_count": 1})
         except Exception as exc:
             run.mark_failed(chunk_id, str(exc))
+
+
+def ensure_waqi_ok(payload: Any, endpoint: str) -> None:
+    if not isinstance(payload, dict):
+        raise SourceFailure(f"WAQI {endpoint} returned a non-object payload.")
+    status = payload.get("status")
+    if status == "ok":
+        return
+    message = payload.get("message") or payload.get("data") or "unknown WAQI error"
+    raise SourceFailure(f"WAQI {endpoint} returned status={status!r}: {message}")
+
 
 def download_openweather_snapshot(run: SourceRun, context: DownloadContext) -> None:
     env = require_env(run, "OPENWEATHER_API_KEY")

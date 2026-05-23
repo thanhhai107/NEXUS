@@ -218,6 +218,8 @@ ncei:
 
 waqi:
   base_url: https://api.waqi.info
+  map_path: /v2/map/bounds
+  networks: official
 
 openweather:
   base_url: https://api.openweathermap.org
@@ -260,16 +262,31 @@ dft_road_traffic:
   page_size: 500
 
 stats19:
-  max_bytes_per_file: 500000000
+  source_page_url: https://www.gov.uk/government/statistical-data-sets/road-safety-open-data
+  crawl_source_page: true
+  selected_groups:
+    - latest_provisional
+    - latest_final_year
+  selected_tables:
+    - collisions
+    - vehicles
+    - casualties
+  max_bytes_per_file: 3000000000
   files:
     collisions:
       env: STATS19_COLLISIONS_CSV_URL
+      group: last_5_years
+      period: last-5-years
       url: https://data.dft.gov.uk/road-accidents-safety-data/dft-road-casualty-statistics-collision-last-5-years.csv
     vehicles:
       env: STATS19_VEHICLES_CSV_URL
+      group: last_5_years
+      period: last-5-years
       url: https://data.dft.gov.uk/road-accidents-safety-data/dft-road-casualty-statistics-vehicle-last-5-years.csv
     casualties:
       env: STATS19_CASUALTIES_CSV_URL
+      group: last_5_years
+      period: last-5-years
       url: https://data.dft.gov.uk/road-accidents-safety-data/dft-road-casualty-statistics-casualty-last-5-years.csv
 
 naptan:

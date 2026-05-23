@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
+from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urljoin, urlparse
 
 from ingestion.downloaders.core import DownloadContext, SourceFailure, SourceRun
-from ingestion.downloaders.http import download_file, request_json
+from ingestion.downloaders.http import download_file, request_json, request_text
 from ingestion.downloaders.utils import (
     extract_records,
     sanitize_segment,
@@ -14,24 +17,183 @@ from ingestion.downloaders.utils import (
 )
 
 
+STATS19_TABLE_NAMES = {
+    "collision": "collisions",
+    "vehicle": "vehicles",
+    "casualty": "casualties",
+}
+
+STATS19_FILENAME_RE = re.compile(
+    r"^dft-road-casualty-statistics-(collision|vehicle|casualty)-(.+)\.csv$",
+    re.IGNORECASE,
+)
+
+
 def download_stats19(run: SourceRun, context: DownloadContext) -> None:
     opts = source_options(context, "stats19")
-    file_specs = opts.get("files", {})
     max_bytes = int(opts.get("max_bytes_per_file", 500_000_000))
     start_year = context.mode.get("transport_start_year")
     end_year = context.mode.get("transport_end_year")
-    for table_name, file_spec in file_specs.items():
+
+    if opts.get("crawl_source_page", True):
+        files = discover_stats19_files(run, opts)
+    else:
+        files = configured_stats19_files(opts)
+
+    if not files:
+        raise SourceFailure("No STATS19 CSV files discovered or configured.")
+
+    run.write_json("metadata/stats19_discovered_files.json", files, record_count=len(files))
+    selected_files = select_stats19_files(files, opts)
+    if not selected_files:
+        raise SourceFailure("No STATS19 CSV files matched selected_groups/selected_periods.")
+
+    for file_spec in selected_files:
+        table_name = str(file_spec["table"])
+        period = str(file_spec["period"])
+        group = str(file_spec["group"])
+        url = str(file_spec["url"])
+        chunk_id = f"stats19:{group}:{table_name}:{period}"
+        if run.should_skip(chunk_id):
+            continue
+        rel = (
+            f"group={sanitize_segment(group)}/table={sanitize_segment(table_name)}"
+            f"/period={sanitize_segment(period)}/stats19_{table_name}_{sanitize_segment(period)}.csv"
+        )
+        path, row_count = download_file(run, url, relative_path=rel, max_bytes=max_bytes, timeout=180)
+        run.mark_complete(
+            chunk_id,
+            {
+                "record_count": row_count,
+                "path": str(path),
+                "source_url": url,
+                "transport_year_range": f"{start_year}-{end_year}",
+            },
+        )
+
+
+def discover_stats19_files(run: SourceRun, opts: dict[str, Any]) -> list[dict[str, Any]]:
+    source_page_url = str(
+        opts.get("source_page_url")
+        or "https://www.gov.uk/government/statistical-data-sets/road-safety-open-data"
+    )
+    html = request_text(run, source_page_url, timeout=60)
+    anchors = GovukLinkParser(source_page_url).parse(html)
+    files: list[dict[str, Any]] = []
+    for anchor in anchors:
+        href = anchor["href"]
+        parsed = urlparse(href)
+        filename = parsed.path.rsplit("/", 1)[-1]
+        match = STATS19_FILENAME_RE.match(filename)
+        if not match:
+            continue
+        table_key, period = match.groups()
+        table = STATS19_TABLE_NAMES[table_key.lower()]
+        files.append(
+            {
+                "table": table,
+                "period": period.lower(),
+                "group": stats19_period_group(period.lower()),
+                "url": href,
+                "title": anchor["text"],
+                "source_page_url": source_page_url,
+            }
+        )
+
+    latest_final_year = max(
+        (int(file_spec["period"]) for file_spec in files if str(file_spec["period"]).isdigit()),
+        default=None,
+    )
+    for file_spec in files:
+        if latest_final_year is not None and file_spec["period"] == str(latest_final_year):
+            file_spec["group"] = "latest_final_year"
+
+    files.sort(key=lambda item: (str(item["group"]), str(item["period"]), str(item["table"])))
+    return files
+
+
+def configured_stats19_files(opts: dict[str, Any]) -> list[dict[str, Any]]:
+    files: list[dict[str, Any]] = []
+    for table_name, file_spec in opts.get("files", {}).items():
         env_name = file_spec.get("env")
         url = os.environ.get(env_name, "") if env_name else ""
         url = url or file_spec.get("url")
         if not url:
-            raise SourceFailure(f"No STATS19 URL configured for {table_name}")
-        chunk_id = f"stats19:{table_name}:{start_year}-{end_year}"
-        if run.should_skip(chunk_id):
             continue
-        rel = f"table={sanitize_segment(table_name)}/year_range={start_year}-{end_year}/stats19_{table_name}.csv"
-        path, row_count = download_file(run, url, relative_path=rel, max_bytes=max_bytes, timeout=180)
-        run.mark_complete(chunk_id, {"record_count": row_count, "path": str(path)})
+        files.append(
+            {
+                "table": table_name,
+                "period": file_spec.get("period", "configured"),
+                "group": file_spec.get("group", "configured"),
+                "url": url,
+                "title": file_spec.get("title", table_name),
+                "source_page_url": file_spec.get("source_page_url"),
+            }
+        )
+    return files
+
+
+def select_stats19_files(files: list[dict[str, Any]], opts: dict[str, Any]) -> list[dict[str, Any]]:
+    selected_groups = set(opts.get("selected_groups") or ["latest_provisional", "latest_final_year"])
+    selected_periods = {str(period).lower() for period in opts.get("selected_periods", [])}
+    selected_tables = set(opts.get("selected_tables") or STATS19_TABLE_NAMES.values())
+    selected: list[dict[str, Any]] = []
+    for file_spec in files:
+        group = str(file_spec.get("group", ""))
+        period = str(file_spec.get("period", "")).lower()
+        table = str(file_spec.get("table", ""))
+        if table not in selected_tables:
+            continue
+        if group in selected_groups or period in selected_periods:
+            selected.append(file_spec)
+    return selected
+
+
+def stats19_period_group(period: str) -> str:
+    if period.startswith("provisional-"):
+        return "latest_provisional"
+    if period == "1979-latest-published-year":
+        return "complete_dataset"
+    if period == "last-5-years":
+        return "last_5_years"
+    if period.isdigit():
+        return "individual_year"
+    return "other"
+
+
+class GovukLinkParser(HTMLParser):
+    def __init__(self, base_url: str) -> None:
+        super().__init__()
+        self.base_url = base_url
+        self.links: list[dict[str, str]] = []
+        self.current_href: str | None = None
+        self.current_text: list[str] = []
+
+    def parse(self, html: str) -> list[dict[str, str]]:
+        self.feed(html)
+        self.close()
+        return self.links
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "a":
+            return
+        href = dict(attrs).get("href")
+        if not href:
+            return
+        self.current_href = urljoin(self.base_url, href)
+        self.current_text = []
+
+    def handle_data(self, data: str) -> None:
+        if self.current_href:
+            self.current_text.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag != "a" or not self.current_href:
+            return
+        text = " ".join("".join(self.current_text).split())
+        self.links.append({"href": self.current_href, "text": text})
+        self.current_href = None
+        self.current_text = []
 
 def download_naptan(run: SourceRun, context: DownloadContext) -> None:
     opts = source_options(context, "naptan")
