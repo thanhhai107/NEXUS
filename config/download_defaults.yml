@@ -1,7 +1,7 @@
 default_mode: full_demo
 default_source_group: core_historical
 polling_source_group: realtime_polling
-output_dir: runtime/downloads
+output_dir: runtime/datasets
 
 spatial_scope:
   name: Greater London

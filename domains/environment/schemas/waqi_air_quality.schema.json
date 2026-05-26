@@ -10,28 +10,28 @@
   ],
   "properties": {
     "station_uid": {
-      "type": "integer"
+      "type": ["integer", "null"]
     },
     "station_name": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "aqi": {
-      "type": "integer"
+      "type": ["integer", "null"]
     },
     "observed_at": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "city": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "latitude": {
-      "type": "number"
+      "type": ["number", "null"]
     },
     "longitude": {
-      "type": "number"
+      "type": ["number", "null"]
     },
     "dominant_pollutant": {
-      "type": "string"
+      "type": ["string", "null"]
     }
   }
 }

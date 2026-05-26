@@ -489,6 +489,7 @@ class SourceRun:
                 if chunk.status in {CHUNK_SUCCESS, CHUNK_SKIPPED}
             ),
             raw_dir=str(self.raw_dir),
+            source_key=self.source_key,
             downstream_raw_path=manifest.downstream_raw_path,
         )
         payload = published.to_dict()

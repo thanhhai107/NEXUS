@@ -189,10 +189,11 @@ class PublishedManifest:
     publish_status: str
     chunks: tuple[ChunkResult, ...]
     raw_dir: str
+    source_key: str | None = None
     downstream_raw_path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "source_id": self.source_id,
             "dataset_name": self.dataset_name,
             "run_id": self.run_id,
@@ -201,5 +202,7 @@ class PublishedManifest:
             "publish_status": self.publish_status,
             "chunks": [chunk.to_dict() for chunk in self.chunks],
             "raw_dir": self.raw_dir,
+            "source_key": self.source_key,
             "downstream_raw_path": self.downstream_raw_path,
         }
+        return result

@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from common.config import DATASETS_DIR
 from ingestion.batch.common import read_csv_records, write_jsonl
 from ingestion.downloaders.core import DownloadContext
 from ingestion.downloaders.http import download_file
@@ -68,7 +69,7 @@ def ingest_csv_download(dataset: str, url: str, max_rows: int | None = None) -> 
 
     This handler is for datasets with source_type=csv_download in datasets.yml.
     """
-    downloads_dir = PROJECT_ROOT / "runtime" / "downloads"
+    downloads_dir = DATASETS_DIR
     downloads_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Downloading CSV from {url} ...")

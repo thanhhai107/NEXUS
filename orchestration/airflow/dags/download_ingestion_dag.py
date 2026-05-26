@@ -16,7 +16,9 @@ DEFAULT_SOURCES = [
     if source.strip()
 ]
 DEFAULT_MODE = os.getenv("NEXUS_DOWNLOAD_MODE", "small_demo")
-DOWNLOAD_ROOT = Path(os.getenv("NEXUS_DOWNLOAD_ROOT", "/opt/airflow/runtime/downloads"))
+from common.config import DATASETS_DIR
+
+DOWNLOAD_ROOT = Path(os.getenv("NEXUS_DOWNLOAD_ROOT", str(DATASETS_DIR)))
 RAW_ENVELOPE_REQUIRED = os.getenv("NEXUS_RAW_ENVELOPE_REQUIRED", "true").lower() == "true"
 
 

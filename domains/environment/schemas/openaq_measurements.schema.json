@@ -12,31 +12,31 @@
   ],
   "properties": {
     "location_id": {
-      "type": "integer"
+      "type": ["integer", "null"]
     },
     "location": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "parameter": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "value": {
-      "type": "number"
+      "type": ["number", "null"]
     },
     "unit": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "datetime": {
-      "type": "string"
+      "type": ["string", "null"]
     },
     "latitude": {
-      "type": "number"
+      "type": ["number", "null"]
     },
     "longitude": {
-      "type": "number"
+      "type": ["number", "null"]
     },
     "country": {
-      "type": "string"
+      "type": ["string", "null"]
     }
   }
 }

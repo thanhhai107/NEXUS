@@ -14,27 +14,27 @@ __pycache__/
 htmlcov/
 
 # Virtual environments
+env/
 .venv/
 venv/
-env/
 docs/
 
 # Runtime outputs
-runtime/logs/*
-!runtime/logs/.gitkeep
-runtime/raw/*
-runtime/downloads/*
-!runtime/raw/.gitkeep
-runtime/quarantine/*
+runtime/analysis/*
+!runtime/analysis/.gitkeep
+runtime/datasets/*
 runtime/dlq/*
 !runtime/dlq/.gitkeep
 runtime/downloads/*
 !runtime/downloads/.gitkeep
-!runtime/quarantine/.gitkeep
+runtime/logs/*
+!runtime/logs/.gitkeep
 runtime/metrics/*
 !runtime/metrics/.gitkeep
-runtime/analysis/*
-!runtime/analysis/.gitkeep
+runtime/quarantine/*
+!runtime/quarantine/.gitkeep
+runtime/raw/*
+!runtime/raw/.gitkeep
 runtime/schemas/history/*
 !runtime/schemas/history/.gitkeep
 runtime/source_discovery/*
