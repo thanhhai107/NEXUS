@@ -57,6 +57,53 @@ def get_effective_runtime_dir() -> tuple[Path, str]:
     return (RUNTIME_DIR, "local")
 
 
+# Polling configuration
+def load_polling_config(config_dir: Path = CONFIG_DIR) -> dict[str, Any]:
+    """Load polling configuration from download_defaults.yml.
+
+    Returns:
+        Dict with 'polling' key containing per-source polling config
+    """
+    config = load_yaml(config_dir / "download_defaults.yml")
+    return config.get("polling", {})
+
+
+def load_backfill_config(config_dir: Path = CONFIG_DIR) -> dict[str, Any]:
+    """Load backfill configuration from download_defaults.yml.
+
+    Returns:
+        Dict with backfill settings
+    """
+    config = load_yaml(config_dir / "download_defaults.yml")
+    return config.get("backfill", {})
+
+
+def get_polling_interval(source: str) -> int:
+    """Get polling interval in seconds for a source.
+
+    Args:
+        source: Source key (e.g., 'tfl_arrivals', 'waqi')
+
+    Returns:
+        Polling interval in seconds, or 0 if polling disabled
+    """
+    polling_config = load_polling_config()
+    source_config = polling_config.get(source, {})
+    return source_config.get("interval_seconds", 0)
+
+
+def is_polling_enabled(source: str) -> bool:
+    """Check if polling is enabled for a source.
+
+    Args:
+        source: Source key
+
+    Returns:
+        True if polling enabled and interval > 0
+    """
+    return get_polling_interval(source) > 0
+
+
 def load_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
