@@ -2,6 +2,8 @@
 
 import argparse
 
+from common.data_contract import load_data_contract
+from processing.common.idempotency import parse_key_list, write_idempotent_iceberg
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, current_timestamp, trim
 
@@ -14,7 +16,14 @@ def build_spark() -> SparkSession:
     )
 
 
-def run(bronze_table: str, silver_table: str) -> None:
+def run(
+    bronze_table: str,
+    silver_table: str,
+    *,
+    dataset: str | None = None,
+    dedup_keys: list[str] | None = None,
+    write_mode: str = "merge",
+) -> None:
     """Standardize Bronze records into a cleaner Silver table.
 
     Replace the sample flattening logic with dataset-specific normalization rules.
@@ -26,15 +35,35 @@ def run(bronze_table: str, silver_table: str) -> None:
         col(f"payload_struct.{field.name}").alias(field.name)
         for field in bronze_df.schema["payload_struct"].dataType.fields
     ]
+    metadata_columns = [
+        column for column in (
+            "_nexus_record_id",
+            "_nexus_event_time",
+            "_nexus_ingested_at",
+            "_nexus_run_id",
+            "_nexus_chunk_id",
+            "_nexus_source",
+            "_nexus_dataset",
+        )
+        if column in bronze_df.columns
+    ]
 
-    silver_df = bronze_df.select(*payload_columns, "_nexus_source", "_nexus_ingested_at")
+    silver_df = bronze_df.select(*payload_columns, *metadata_columns)
 
     for field in silver_df.schema.fields:
         if field.dataType.simpleString() == "string":
             silver_df = silver_df.withColumn(field.name, trim(col(field.name)))
 
-    silver_df = silver_df.dropDuplicates().withColumn("_nexus_silver_loaded_at", current_timestamp())
-    silver_df.writeTo(silver_table).using("iceberg").createOrReplace()
+    if dataset and not dedup_keys:
+        dedup_keys = list(load_data_contract(dataset).semantic_dedup_keys)
+    silver_df = silver_df.withColumn("_nexus_silver_loaded_at", current_timestamp())
+    write_idempotent_iceberg(
+        spark,
+        silver_df,
+        silver_table,
+        preferred_keys=dedup_keys or ["_nexus_record_id"],
+        mode=write_mode,
+    )
     spark.stop()
 
 
@@ -42,9 +71,18 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Clean Bronze data into Silver Iceberg.")
     parser.add_argument("--bronze-table", required=True)
     parser.add_argument("--silver-table", required=True)
+    parser.add_argument("--dataset", help="Dataset name used to load semantic dedup keys from the data contract.")
+    parser.add_argument("--dedup-keys", help="Comma-separated semantic dedup keys. Overrides --dataset.")
+    parser.add_argument("--write-mode", choices=["merge", "replace"], default="merge")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    run(bronze_table=args.bronze_table, silver_table=args.silver_table)
+    run(
+        bronze_table=args.bronze_table,
+        silver_table=args.silver_table,
+        dataset=args.dataset,
+        dedup_keys=parse_key_list(args.dedup_keys),
+        write_mode=args.write_mode,
+    )

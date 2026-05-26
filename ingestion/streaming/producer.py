@@ -9,7 +9,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-import requests
+from ingestion.downloaders.core import DownloadContext, SourceRun
+from ingestion.downloaders.http import download_file, request_json
+from ingestion.downloaders.utils import load_config, resolve_output_dir, run_id_now, sanitize_segment
 
 TOPICS = {
     "transport": "transport-events",
@@ -58,13 +60,40 @@ def sim_env() -> dict[str, object]:
 
 
 
-def api_json(url: str, api_key: str | None = None, header: str = "Authorization") -> Any:
+def streaming_source_run(source: str) -> SourceRun:
+    config = load_config()
+    context = DownloadContext(
+        config=config,
+        mode_name="streaming_api",
+        mode={},
+        output_dir=resolve_output_dir(config, None),
+        run_id=os.getenv("NEXUS_STREAM_RUN_ID") or run_id_now(),
+    )
+    return SourceRun(f"streaming_api_{sanitize_segment(source)}", context, source)
+
+
+def api_json(
+    source: str,
+    url: str,
+    api_key: str | None = None,
+    header: str = "Authorization",
+) -> Any:
     headers = {}
     if api_key:
         headers[header] = api_key if header == "X-API-Key" else f"Bearer {api_key}"
-    response = requests.get(url, headers=headers, timeout=20)
-    response.raise_for_status()
-    return response.json()
+    run = streaming_source_run(source)
+    chunk_id = f"streaming_api:{source}:poll"
+    if run.should_skip(chunk_id):
+        return {}
+    try:
+        payload = request_json(run, url, headers=headers, timeout=20)
+        run.mark_complete(chunk_id, {"record_count": len(list_records(payload)) or 1})
+        run.finish("success" if not run.failed_requests else "partial")
+        return payload
+    except Exception as exc:
+        run.mark_failed(chunk_id, str(exc))
+        run.finish("failed", str(exc))
+        raise
 
 
 def list_records(payload: Any) -> list[dict[str, Any]]:
@@ -290,8 +319,20 @@ def sg_events(payload: Any, limit: int) -> list[dict[str, object]]:
 
 
 def gtfs_event(url: str) -> dict[str, object]:
-    response = requests.get(url, timeout=20)
-    response.raise_for_status()
+    run = streaming_source_run("gtfs")
+    chunk_id = "streaming_api:gtfs:poll"
+    if run.should_skip(chunk_id):
+        size_bytes = 0
+    else:
+        path, _row_count = download_file(
+            run,
+            url,
+            relative_path=f"gtfs_realtime/feed_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.bin",
+            timeout=20,
+        )
+        size_bytes = path.stat().st_size
+        run.mark_complete(chunk_id, {"record_count": 1, "path": str(path), "byte_size": size_bytes})
+    run.finish("success" if not run.failed_requests else "partial")
     return {
         "event_id": str(uuid.uuid4()),
         "source": "gtfs-realtime",
@@ -299,7 +340,7 @@ def gtfs_event(url: str) -> dict[str, object]:
         "event_time": now_iso(),
         "feed_url": url,
         "feed_type": os.getenv("GTFS_REALTIME_TYPE", "unknown"),
-        "byte_size": len(response.content),
+        "byte_size": size_bytes,
     }
 
 
@@ -308,7 +349,7 @@ def api_events(source: str, api_url: str, api_key: str | None, limit: int) -> li
         return [gtfs_event(api_url)]
 
     header = "X-API-Key" if source == "openaq" else "Authorization"
-    payload = api_json(api_url, api_key, header=header)
+    payload = api_json(source, api_url, api_key, header=header)
 
     if source == "waqi":
         return [norm_waqi(payload)]

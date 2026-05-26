@@ -2,11 +2,11 @@
 
 The downloader keeps immutable runs under:
 
-    runtime/downloads/<source_id>/run_id=<run_id>/
+    runtime/datasets/<source_id>/run_id=<run_id>/
 
 This script creates a derived run, by default:
 
-    runtime/downloads/<source_id>/run_id=consolidated/
+    runtime/datasets/<source_id>/run_id=consolidated/
 
 It does not mutate input runs. Duplicate chunk paths are resolved to one file,
 then metadata is written so profiling/bronze ingestion can target the
@@ -28,9 +28,10 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
+from common.config import DATASETS_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DOWNLOADS_DIR = PROJECT_ROOT / "runtime" / "downloads"
+DEFAULT_DOWNLOADS_DIR = DATASETS_DIR
 DEFAULT_OUTPUT_RUN_ID = "consolidated"
 DEFAULT_STATUSES = {"success", "partial", "running"}
 RECORD_COUNT_FORMATS = {".csv", ".json", ".jsonl", ".geojson"}

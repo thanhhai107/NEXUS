@@ -12,6 +12,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "download_defaults.yml"
 DEFAULT_ENV_PATH = PROJECT_ROOT / ".env"
 
+from common.config import DATASETS_DIR
+
 
 BOROUGH_CENTROIDS: list[dict[str, Any]] = [
     {"name": "Barking and Dagenham", "latitude": 51.5607, "longitude": 0.1557},
@@ -99,7 +101,7 @@ def resolve_dynamic_config_value(value: Any) -> Any:
 def resolve_output_dir(config: dict[str, Any], output_dir: Path | None) -> Path:
     if output_dir:
         return output_dir
-    configured = Path(str(config.get("output_dir", "runtime/downloads")))
+    configured = Path(str(config.get("output_dir", str(DATASETS_DIR))))
     return configured if configured.is_absolute() else PROJECT_ROOT / configured
 
 def limit_items(items: list[Any], limit: int | None) -> list[Any]:

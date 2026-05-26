@@ -49,3 +49,6 @@ def test_data_contract_loads_schema_and_quality_rules():
     assert contract.source.ingestion_method.startswith("stream")
     assert contract.schema is not None
     assert isinstance(contract.quality_thresholds, dict)
+    assert contract.semantic_dedup_keys == ("location_id", "parameter", "datetime")
+    assert contract.late_data_policy["event_time_field"] == "datetime"
+    assert contract.late_data_policy["watermark"] == "2 hours"

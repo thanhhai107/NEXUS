@@ -25,6 +25,8 @@ class DataContract:
     schema: Mapping[str, Any] | None
     quality_thresholds: Mapping[str, Any]
     auto_fix: Mapping[str, Any]
+    semantic_dedup_keys: tuple[str, ...]
+    late_data_policy: Mapping[str, Any]
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -38,6 +40,8 @@ class DataContract:
             "schema_path": self.source.schema_path,
             "quality_thresholds": dict(self.quality_thresholds),
             "auto_fix": dict(self.auto_fix),
+            "semantic_dedup_keys": list(self.semantic_dedup_keys),
+            "late_data_policy": dict(self.late_data_policy),
             "ingestion_method": self.source.ingestion_method,
             "update_frequency": self.source.update_frequency,
             "extra": dict(self.extra),
@@ -59,6 +63,34 @@ def _read_schema_file(schema_path: str | None) -> dict[str, Any] | None:
         return None
 
 
+def derive_semantic_dedup_keys(
+    dataset: Mapping[str, Any],
+    primary_keys: tuple[str, ...],
+) -> tuple[str, ...]:
+    configured = dataset.get("semantic_dedup_keys")
+    if configured:
+        return tuple(str(key) for key in configured)
+    if primary_keys:
+        return primary_keys
+    return ("_nexus_record_id",)
+
+
+def derive_late_data_policy(
+    dataset: Mapping[str, Any],
+    freshness_column: str | None,
+) -> dict[str, Any]:
+    configured = dict(dataset.get("late_data_policy") or {})
+    source_type = str(dataset.get("source_type") or "").lower()
+    default_watermark = "2 hours" if source_type in {"api_stream", "gtfs_realtime", "kafka_topic"} else "24 hours"
+    return {
+        "event_time_field": configured.get("event_time_field") or freshness_column or "_nexus_event_time",
+        "watermark": configured.get("watermark") or default_watermark,
+        "allowed_lateness": configured.get("allowed_lateness") or configured.get("watermark") or default_watermark,
+        "late_record_action": configured.get("late_record_action") or "retain_for_reprocess",
+        "aggregation_window": configured.get("aggregation_window") or "1 hour",
+    }
+
+
 def load_data_contract(dataset_name: str) -> DataContract:
     catalog = load_dataset_catalog().get("datasets", {})
     if dataset_name not in catalog:
@@ -75,6 +107,8 @@ def load_data_contract(dataset_name: str) -> DataContract:
     freshness_column = rules.get("freshness_column")
     max_age_hours = int(dataset.get("freshness_hours") or 24)
     auto_fix = dict(rules.get("auto_fix") or {})
+    semantic_dedup_keys = derive_semantic_dedup_keys(dataset, primary_keys)
+    late_data_policy = derive_late_data_policy(dataset, freshness_column)
 
     return DataContract(
         dataset=dataset_name,
@@ -86,6 +120,8 @@ def load_data_contract(dataset_name: str) -> DataContract:
         schema=schema,
         quality_thresholds=thresholds,
         auto_fix=auto_fix,
+        semantic_dedup_keys=semantic_dedup_keys,
+        late_data_policy=late_data_policy,
         extra={
             "target": dict(dataset.get("target") or {}),
             "topic": dataset.get("topic"),
@@ -105,6 +141,8 @@ __all__ = [
     "DataContract",
     "derive_ingestion_method",
     "derive_update_frequency",
+    "derive_late_data_policy",
+    "derive_semantic_dedup_keys",
     "list_data_contracts",
     "load_data_contract",
 ]

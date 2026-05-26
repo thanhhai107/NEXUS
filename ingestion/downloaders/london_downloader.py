@@ -19,6 +19,13 @@ if __package__ in {None, ""}:
 from dotenv import load_dotenv
 
 from ingestion.downloaders.core import DownloadContext, SourceRun, SourceSpec
+from ingestion.downloaders.raw_adapter import published_run_to_raw_envelope
+from ingestion.downloaders.validation import (
+    route_parser_failures_to_dlq,
+    route_run_failures_to_dlq,
+    route_source_failure_to_dlq,
+    validate_raw_envelope_file,
+)
 from ingestion.downloaders.sources.londonair import download_londonair
 from ingestion.downloaders.sources.ncei import download_ncei
 from ingestion.downloaders.sources.openmeteo import download_openmeteo
@@ -93,21 +100,80 @@ def resolve_source_keys(
 
 
 def run_source(spec: SourceSpec, context: DownloadContext) -> dict[str, Any]:
-    run = SourceRun(spec.source_id, context, spec.key)
+    run = SourceRun(spec.source_id, context, spec.key, dataset_name=spec.dataset_name)
+    required_chunks = spec.policies.get("required_chunks") if spec.policies else None
+    if required_chunks:
+        run.expect_chunks(str(chunk_id) for chunk_id in required_chunks)
     print(f"[{spec.key}] start source_id={spec.source_id} run_id={context.run_id}")
     try:
         spec.func(run, context)
     except Exception as exc:
         profile = run.finish("failed", str(exc))
+        route_source_failure_to_dlq(
+            source_id=run.source_id,
+            dataset=run.dataset_name,
+            run_id=run.run_id,
+            error=exc,
+        )
+        route_run_failures_to_dlq(run)
         print(f"[{spec.key}] failed: {exc}")
         return profile
     status = "partial" if run.failed_requests else "success"
     profile = run.finish(status)
+    if status == "partial":
+        routed = route_run_failures_to_dlq(run)
+        if routed:
+            print(f"[{spec.key}] dlq: routed_failed_chunks={routed}")
+    maybe_publish_raw_envelope(run, context)
     print(
         f"[{spec.key}] {status}: rows={profile['row_count']} "
         f"files={profile['file_count']} size_mb={profile['size_mb']}"
     )
     return profile
+
+
+def maybe_publish_raw_envelope(run: SourceRun, context: DownloadContext) -> dict[str, Any] | None:
+    publish_policy = dict((context.config.get("resilient_runtime") or {}).get("publish_policy") or {})
+    if not bool(publish_policy.get("raw_envelope_enabled", False)):
+        return None
+    if not run.published_manifest_path.exists():
+        return None
+    try:
+        result = published_run_to_raw_envelope(run.published_manifest_path)
+    except Exception as exc:
+        route_source_failure_to_dlq(
+            source_id=run.source_id,
+            dataset=run.dataset_name,
+            run_id=run.run_id,
+            error=exc,
+        )
+        raise
+
+    parser_failures = route_parser_failures_to_dlq(
+        result.get("parser_failure_details") or [],
+        dataset=run.dataset_name,
+        source=run.source_id,
+        run_id=run.run_id,
+    )
+    validation_policy = dict((context.config.get("resilient_runtime") or {}).get("validation_policy") or {})
+    validation_result = validate_raw_envelope_file(
+        dataset=run.dataset_name,
+        raw_path=result["raw_path"],
+        run_id=run.run_id,
+        source=run.source_id,
+        schema_validation_enabled=bool(validation_policy.get("schema_validation_enabled", False)),
+        quarantine_invalid_records=bool(validation_policy.get("quarantine_invalid_records", True)),
+    )
+    print(
+        f"[{run.source_key}] raw envelope: path={result['raw_path']} "
+        f"records={result['record_count']} "
+        f"parser_failures={result['parser_failures']} "
+        f"dlq_parser_failures={parser_failures} "
+        f"schema_invalid={validation_result['schema_invalid_records']}"
+    )
+    result["validation"] = validation_result
+    result["dlq_parser_failures"] = parser_failures
+    return result
 
 
 def run_once(

@@ -46,7 +46,8 @@ with DAG(
             "bash /opt/airflow/infra/spark/spark-submit-wrapper.sh "
             "/opt/airflow/processing/silver/bronze_to_silver.py "
             "--bronze-table {{ params.bronze_table }} "
-            "--silver-table {{ params.silver_table }}"
+            "--silver-table {{ params.silver_table }} "
+            "--dataset {{ params.dataset }}"
         ),
     )
 

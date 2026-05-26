@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 
 load_dotenv(PROJECT_ROOT / ".env", override=True)
 
-from common.config import load_dataset_catalog, load_quality_config
+from common.config import load_dataset_catalog, load_quality_config, DATASETS_DIR
 from common.source_discovery import (
     DEFAULT_OUTPUT_DIR as SOURCE_DISCOVERY_DEFAULT_OUTPUT_DIR,
 )
@@ -127,7 +127,7 @@ def resolve_records(
                 f"Dataset {dataset} is csv_download but no valid source_uri found. "
                 f"Check .env for the required URL variable."
             )
-        downloads_dir = PROJECT_ROOT / "runtime" / "downloads"
+        downloads_dir = DATASETS_DIR
         downloads_dir.mkdir(parents=True, exist_ok=True)
         csv_path = download_csv(url)
         try:
