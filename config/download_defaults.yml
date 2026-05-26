@@ -1,7 +1,11 @@
 default_mode: full_demo
 default_source_group: core_historical
 polling_source_group: realtime_polling
-output_dir: runtime/datasets
+output_dir: runtime/datasets  # Relative path (overridden by NEXUS_RUNTIME_DIR on VM)
+
+# Override runtime directory for GCP VM
+# Set this to /data when running on VM, leave empty for local development
+runtime_dir: ""
 
 polling:
   # Per-source polling configuration
@@ -210,6 +214,8 @@ retry:
   backoff_base_seconds: 1.0
   backoff_max_seconds: 60.0
   timeout_seconds: 60
+
+keep_datasets: true  # Lưu raw files gốc vào datasets directory
 
 resilient_runtime:
   retry_policy:

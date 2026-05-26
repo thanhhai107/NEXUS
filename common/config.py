@@ -11,14 +11,36 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = PROJECT_ROOT / "config"
 DOMAINS_DIR = PROJECT_ROOT / "domains"
 
-# Runtime directory: supports NEXUS_RUNTIME_DIR env var (for GCP VM: /data)
-# Falls back to PROJECT_ROOT / "runtime" for local development
-_RUNTIME_DIR = os.getenv("NEXUS_RUNTIME_DIR")
-if _RUNTIME_DIR:
-    RUNTIME_DIR = Path(_RUNTIME_DIR).resolve()
-else:
-    RUNTIME_DIR = PROJECT_ROOT / "runtime"
 
+def load_yaml(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8") as file:
+        return yaml.safe_load(file) or {}
+
+
+# Runtime directory resolution order:
+# 1. NEXUS_RUNTIME_DIR environment variable (highest priority)
+# 2. runtime_dir in download_defaults.yml
+# 3. PROJECT_ROOT / "runtime" (default)
+def _resolve_runtime_dir() -> Path:
+    # Check environment variable first
+    env_runtime = os.getenv("NEXUS_RUNTIME_DIR")
+    if env_runtime:
+        return Path(env_runtime).resolve()
+
+    # Check config file
+    config_yaml = load_yaml(CONFIG_DIR / "download_defaults.yml")
+    config_runtime = config_yaml.get("runtime_dir", "")
+    if config_runtime:
+        config_path = Path(config_runtime).resolve()
+        # If absolute path, use it; if relative, resolve from PROJECT_ROOT
+        return config_path if config_path.is_absolute() else PROJECT_ROOT / config_path
+
+    # Default: PROJECT_ROOT / "runtime"
+    return PROJECT_ROOT / "runtime"
+
+RUNTIME_DIR = _resolve_runtime_dir()
 LOGS_DIR = RUNTIME_DIR / "logs"
 
 # Subdirectories within RUNTIME_DIR
@@ -55,6 +77,29 @@ def get_effective_runtime_dir() -> tuple[Path, str]:
     if is_gcp_vm() or os.getenv("NEXUS_FORCE_GCP"):
         return (RUNTIME_DIR, "gcp")
     return (RUNTIME_DIR, "local")
+
+
+def get_config_runtime_dir() -> str:
+    """Get runtime_dir from config file (for documentation/UI purposes).
+
+    Returns:
+        The runtime_dir value from download_defaults.yml, or empty string if not set
+    """
+    config_yaml = load_yaml(CONFIG_DIR / "download_defaults.yml")
+    return config_yaml.get("runtime_dir", "")
+
+
+def set_config_runtime_dir(value: str) -> None:
+    """Set runtime_dir in config file.
+
+    Args:
+        value: New runtime_dir value (e.g., '/data' for GCP VM)
+    """
+    config_path = CONFIG_DIR / "download_defaults.yml"
+    config_yaml = load_yaml(config_path)
+    config_yaml["runtime_dir"] = value
+    with config_path.open("w", encoding="utf-8") as f:
+        yaml.dump(config_yaml, f, default_flow_style=False, sort_keys=False)
 
 
 # Polling configuration
@@ -102,13 +147,6 @@ def is_polling_enabled(source: str) -> bool:
         True if polling enabled and interval > 0
     """
     return get_polling_interval(source) > 0
-
-
-def load_yaml(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {}
-    with path.open("r", encoding="utf-8") as file:
-        return yaml.safe_load(file) or {}
 
 
 def load_dataset_catalog(domains_dir: Path = DOMAINS_DIR) -> dict[str, Any]:
