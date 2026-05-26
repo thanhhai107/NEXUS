@@ -101,8 +101,8 @@ def resolve_dynamic_config_value(value: Any) -> Any:
 def resolve_output_dir(config: dict[str, Any], output_dir: Path | None) -> Path:
     if output_dir:
         return output_dir
-    configured = Path(str(config.get("output_dir", str(DATASETS_DIR))))
-    return configured if configured.is_absolute() else PROJECT_ROOT / configured
+    # Always use DATASETS_DIR from config (which reads from RUNTIME_DIR)
+    return DATASETS_DIR
 
 def limit_items(items: list[Any], limit: int | None) -> list[Any]:
     if limit is None:
