@@ -114,6 +114,36 @@ retry:
   backoff_max_seconds: 60.0
   timeout_seconds: 60
 
+resilient_runtime:
+  retry_policy:
+    max_attempts: 6
+    retryable_status_codes:
+      - 429
+      - 500
+      - 502
+      - 503
+      - 504
+    backoff_base_seconds: 1.0
+    backoff_max_seconds: 60.0
+    jitter_seconds: 0.5
+  timeout_policy:
+    connect_timeout_seconds: 10
+    read_timeout_seconds: 60
+    total_timeout_seconds: null
+  rate_limit_policy:
+    min_delay_on_429_seconds: 2.0
+    max_concurrency: 1
+  coverage_policy:
+    min_success_ratio: 1.0
+    allow_publish_with_warnings: false
+    required_chunks: []
+  publish_policy:
+    require_published_manifest: true
+    raw_envelope_enabled: true
+  validation_policy:
+    schema_validation_enabled: false
+    quarantine_invalid_records: true
+
 openmeteo:
   air_quality_url: https://air-quality-api.open-meteo.com/v1/air-quality
   weather_url: https://archive-api.open-meteo.com/v1/archive

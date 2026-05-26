@@ -116,7 +116,8 @@ with DAG(
         bash_command=(
             "bash /opt/airflow/infra/spark/spark-submit-wrapper.sh /opt/airflow/processing/silver/bronze_to_silver.py "
             "--bronze-table nexus.bronze.us_accidents "
-            "--silver-table nexus.silver.us_accidents"
+            "--silver-table nexus.silver.us_accidents "
+            "--dataset us_accidents"
         ),
     )
 

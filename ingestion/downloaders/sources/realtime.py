@@ -33,17 +33,25 @@ def download_waqi_snapshot(run: SourceRun, context: DownloadContext) -> None:
     if networks:
         map_params["networks"] = networks
 
-    payload = request_json(
-        run,
-        f"{base}/{map_path.strip('/')}",
-        params=map_params,
-    )
-    ensure_waqi_ok(payload, "map/bounds")
-    stations = extract_records(payload)
-    station_limit = context.mode.get("waqi_station_limit")
-    stations = limit_items(stations, int(station_limit) if station_limit is not None else None)
     poll_time = poll_time_slug(context)
-    run.write_jsonl(f"date={poll_time['date']}/hour={poll_time['hour']}/stations.jsonl", stations)
+    map_chunk_id = f"waqi:map_bounds:poll={poll_time['stamp']}"
+    stations: list[dict[str, Any]] = []
+    if not run.should_skip(map_chunk_id):
+        try:
+            payload = request_json(
+                run,
+                f"{base}/{map_path.strip('/')}",
+                params=map_params,
+            )
+            ensure_waqi_ok(payload, "map/bounds")
+            stations = extract_records(payload)
+            station_limit = context.mode.get("waqi_station_limit")
+            stations = limit_items(stations, int(station_limit) if station_limit is not None else None)
+            run.write_jsonl(f"date={poll_time['date']}/hour={poll_time['hour']}/stations.jsonl", stations)
+            run.mark_complete(map_chunk_id, {"record_count": len(stations)})
+        except Exception as exc:
+            run.mark_failed(map_chunk_id, str(exc))
+            raise
 
     for station in stations:
         uid = station.get("uid")
@@ -292,6 +300,9 @@ def download_tfl_status(run: SourceRun, context: DownloadContext) -> None:
     successes = 0
     for name, url in endpoints.items():
         chunk_id = f"tfl:{name}:poll={poll_time['stamp']}"
+        if run.should_skip(chunk_id):
+            successes += 1
+            continue
         try:
             payload = request_json(run, url, params=params)
             rel = f"date={poll_time['date']}/hour={poll_time['hour']}/{name}_{poll_time['stamp']}.json"
@@ -315,6 +326,9 @@ def download_tfl_arrivals(run: SourceRun, context: DownloadContext) -> None:
     successes = 0
     for stop_id in stop_ids:
         chunk_id = f"tfl_arrivals:stop={stop_id}:poll={poll_time['stamp']}"
+        if run.should_skip(chunk_id):
+            successes += 1
+            continue
         try:
             payload = request_json(run, f"{base}/StopPoint/{stop_id}/Arrivals", params=params)
             records = extract_records(payload)

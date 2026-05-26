@@ -1,29 +1,20 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import csv
-import json
-import re
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Mapping
 
 from common.config import RUNTIME_DIR
+from ingestion.canonical.envelope import EnvelopeContext, clean_field_name, normalize_record
+from ingestion.canonical.writer import default_raw_path, write_raw_envelopes
 
 LOCAL_RAW_DIR = RUNTIME_DIR / "raw"
 
 
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
 def clean_col_name(name: str) -> str:
-    """Convert source column names into stable snake_case names for Bronze."""
-    normalized = re.sub(r"[^a-zA-Z0-9]+", "_", name.strip().lower())
-    return normalized.strip("_")
+    """Backward-compatible alias for canonical field normalization."""
 
-
-def normalize_record(record: Mapping[str, object]) -> dict[str, object]:
-    return {clean_col_name(str(key)): value for key, value in record.items()}
+    return clean_field_name(name)
 
 
 def raw_dataset_dir(dataset: str) -> Path:
@@ -32,21 +23,37 @@ def raw_dataset_dir(dataset: str) -> Path:
     return path
 
 
-def write_jsonl(dataset: str, records: Iterable[Mapping[str, object]], source: str) -> Path:
-    """Write raw ingested records locally before they are uploaded to object storage."""
-    output_dir = raw_dataset_dir(dataset)
-    output_path = output_dir / f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
+def write_jsonl(
+    dataset: str,
+    records: Iterable[Mapping[str, object]],
+    source: str,
+    *,
+    ingestion_type: str = "batch",
+    source_key: str | None = None,
+    run_id: str | None = None,
+    chunk_id: str | None = None,
+) -> Path:
+    """Write records into the canonical raw envelope contract.
 
-    with output_path.open("w", encoding="utf-8", newline="\n") as file:
-        for record in records:
-            envelope = {
-                "_nexus_ingested_at": utc_now_iso(),
-                "_nexus_source": source,
-                "payload": normalize_record(record),
-            }
-            file.write(json.dumps(envelope, ensure_ascii=False) + "\n")
+    The function preserves the existing batch/streaming call shape while moving
+    envelope creation into ``ingestion.canonical``.
+    """
 
-    return output_path
+    context = EnvelopeContext(
+        dataset_id=dataset,
+        source_id=source,
+        source_key=source_key,
+        ingestion_type=ingestion_type,
+        run_id=run_id,
+        chunk_id=chunk_id,
+        source_path=source,
+    )
+    return write_raw_envelopes(
+        records,
+        context,
+        output_path=default_raw_path(dataset, LOCAL_RAW_DIR),
+        normalize_payload=True,
+    )
 
 
 def read_csv_records(path: Path) -> list[dict[str, str]]:

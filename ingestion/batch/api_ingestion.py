@@ -4,13 +4,15 @@ import argparse
 import sys
 from pathlib import Path
 from typing import Any
-
-import requests
+from urllib.parse import urlparse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from ingestion.batch.common import write_jsonl
+from ingestion.downloaders.core import DownloadContext, SourceFailure, SourceRun
+from ingestion.downloaders.http import request_json
+from ingestion.downloaders.utils import load_config, resolve_output_dir, run_id_now, sanitize_segment
 
 
 def extract_records(payload: Any) -> list[dict[str, Any]]:
@@ -68,39 +70,79 @@ def ingest_api_records(
         else:
             headers["Authorization"] = f"Bearer {api_key}"
 
-    # First try a simple single request (works for most APIs)
-    if page_size:
-        params["page[size]"] = str(page_size)
-    response = requests.get(url, headers=headers, params=params, timeout=30)
-    response.raise_for_status()
-    payload = response.json()
-    all_records = extract_records(payload)
+    run = batch_api_source_run(url)
+    all_records: list[dict[str, Any]] = []
+    status = "success"
 
-    # If the response has pagination links, follow them
-    if isinstance(payload, dict):
-        next_url = (
-            payload.get("next_page_url")
-            or (payload.get("links", {}) if isinstance(payload.get("links"), dict) else {}).get("next")
-        )
+    try:
+        # First try a simple single request (works for most APIs).
+        if page_size:
+            params["page[size]"] = str(page_size)
+        payload = fetch_api_page(run, url, headers=headers, params=params, page=1)
+        all_records.extend(extract_records(payload))
+
+        # If the response has pagination links, follow them.
+        next_url = next_page_url(payload)
         page = 1
         while next_url and page < max_pages:
             page += 1
-            response = requests.get(next_url, headers=headers, timeout=30)
-            response.raise_for_status()
-            payload = response.json()
+            payload = fetch_api_page(run, next_url, headers=headers, params=None, page=page)
             records = extract_records(payload)
             if not records:
                 break
             all_records.extend(records)
-            if isinstance(payload, dict):
-                next_url = (
-                    payload.get("next_page_url")
-                    or (payload.get("links", {}) if isinstance(payload.get("links"), dict) else {}).get("next")
-                )
-            else:
-                next_url = None
+            next_url = next_page_url(payload)
+    except Exception:
+        status = "failed"
+        raise
+    finally:
+        if run.failed_requests and status == "success":
+            status = "partial"
+        run.finish(status)
 
     return all_records
+
+
+def batch_api_source_run(url: str) -> SourceRun:
+    config = load_config()
+    parsed = urlparse(url)
+    source_id = f"batch_api_{sanitize_segment(parsed.netloc or parsed.path or 'api')}"
+    context = DownloadContext(
+        config=config,
+        mode_name="batch_api",
+        mode={},
+        output_dir=resolve_output_dir(config, None),
+        run_id=run_id_now(),
+    )
+    return SourceRun(source_id, context, "batch_api")
+
+
+def fetch_api_page(
+    run: SourceRun,
+    url: str,
+    *,
+    headers: dict[str, str],
+    params: dict[str, Any] | None,
+    page: int,
+) -> Any:
+    chunk_id = f"api:page={page:04d}"
+    if run.should_skip(chunk_id):
+        return {}
+    try:
+        payload = request_json(run, url, headers=headers, params=params or {})
+        run.mark_complete(chunk_id, {"record_count": len(extract_records(payload))})
+        return payload
+    except Exception as exc:
+        run.mark_failed(chunk_id, str(exc))
+        raise SourceFailure(str(exc)) from exc
+
+
+def next_page_url(payload: Any) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    links = payload.get("links", {}) if isinstance(payload.get("links"), dict) else {}
+    value = payload.get("next_page_url") or links.get("next")
+    return str(value) if value else None
 
 
 def ingest_api(dataset: str, url: str, api_key: str | None = None, auth_style: str = "bearer") -> str:
