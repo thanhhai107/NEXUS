@@ -1,0 +1,78 @@
+default_semantic:
+  metadata_capture:
+    catalog: OpenMetadata
+    field_metadata_required:
+      - source_system
+      - source_field
+      - canonical_field
+      - business_term
+      - business_definition
+      - unit
+      - timezone
+      - time_role
+      - crs
+      - data_grain
+      - aggregation_level
+      - owner
+      - lineage
+  standards:
+    glossary:
+      system: Business Glossary
+      mapping_required: true
+    unit:
+      mapping_seed: transform/dbt/seeds/unit_mapping.csv
+      canonicalization_layer: dbt staging_or_gold
+      validation_engine: Great Expectations
+    time:
+      storage_timezone: UTC
+      timezone_standard: IANA
+      timestamp_format: ISO 8601
+      roles:
+        - event_time
+        - ingestion_time
+        - processing_time
+    spatial:
+      storage_crs: EPSG:4326
+      render_crs: EPSG:3857
+      processing_tools:
+        - GeoPandas
+        - PostGIS
+    semantic_model:
+      grain_required: true
+      aggregation_level_required: true
+      metric_definition_required: true
+    entity_resolution:
+      canonical_id_field: canonical_entity_id
+      crosswalk_table: governance.entity_crosswalk
+      methods:
+        - exact
+        - rule_based
+        - fuzzy
+        - probabilistic
+        - splink
+        - llm_assisted_review
+  issue_catalog:
+    same_name_different_meaning:
+      handling_level: Full
+      output: field_context_mapping
+    different_name_same_meaning:
+      handling_level: Full
+      output: glossary_alias_mapping
+    different_unit:
+      handling_level: Full
+      output: unit_mapping_seed_and_gx_checks
+    different_timestamp_timezone_grain:
+      handling_level: Full
+      output: utc_timestamp_policy_and_time_role_mapping
+    different_crs:
+      handling_level: Full
+      output: crs_policy_and_geometry_columns
+    grain_mismatch:
+      handling_level: Full
+      output: semantic_grain_declaration
+    definition_mismatch:
+      handling_level: Full
+      output: versioned_glossary_and_metric_definition
+    entity_resolution:
+      handling_level: Partial
+      output: canonical_entity_id_and_crosswalk_table

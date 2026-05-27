@@ -1,0 +1,192 @@
+datasets:
+  transport_events:
+    glossary:
+      dataset_term: Transport Incident Event
+      field_terms:
+        event_id: Source Event Identifier
+        event_time: Incident Event Time
+        event_type: Incident Type
+        severity: Incident Severity
+        state: Administrative Area
+    field_mappings:
+      - source_field: event_time
+        canonical_field: event_time
+        issue: different_timestamp_timezone_grain
+        time_role: event_time
+      - source_field: state
+        canonical_field: administrative_area
+        issue: same_name_different_meaning
+    standards:
+      time:
+        event_time_field: event_time
+        ingestion_time_field: _nexus_ingested_at
+        processing_time_field: _nexus_silver_loaded_at
+        source_timezone: UTC
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+      spatial:
+        latitude_field: latitude
+        longitude_field: longitude
+        source_crs: EPSG:4326
+        storage_crs: EPSG:4326
+        render_crs: EPSG:3857
+    grain:
+      entity_grain:
+        - event_id
+      time_grain: event_timestamp
+      spatial_grain: point_or_administrative_area
+      aggregation_level: raw_event
+      compatible_gold_grains:
+        - hour_state_event_type
+    entity_matching:
+      entity_type: transport_incident
+      source_id_fields:
+        - event_id
+      candidate_fields:
+        - event_type
+        - event_time
+        - latitude
+        - longitude
+      canonical_entity_id_field: canonical_entity_id
+      methods:
+        - exact
+        - rule_based
+        - fuzzy
+        - probabilistic
+        - splink
+        - llm_assisted_review
+  us_accidents:
+    glossary:
+      dataset_term: Road Accident Event
+      field_terms:
+        ID: Accident Identifier
+        Start_Time: Accident Start Event Time
+        Start_Lat: Accident Latitude
+        Start_Lng: Accident Longitude
+        Distance(mi): Affected Road Distance
+    standards:
+      units:
+        dimension_type: distance
+        value_field: distance_mi
+        canonical_unit: km
+        converted_value_field: distance_km
+        implicit_source_unit: mi
+        expected_range:
+          min: 0
+          max: 1000
+      time:
+        event_time_field: start_time
+        ingestion_time_field: _nexus_ingested_at
+        source_timezone: America/Los_Angeles
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+      spatial:
+        latitude_field: start_lat
+        longitude_field: start_lng
+        source_crs: EPSG:4326
+        storage_crs: EPSG:4326
+        render_crs: EPSG:3857
+    grain:
+      entity_grain:
+        - id
+      time_grain: accident_start_timestamp
+      spatial_grain: accident_point
+      aggregation_level: raw_event
+      compatible_gold_grains:
+        - state_severity
+  nyc_tlc_trips:
+    glossary:
+      dataset_term: Taxi Trip
+      field_terms:
+        VendorID: Taxi Vendor
+        tpep_pickup_datetime: Trip Pickup Event Time
+        tpep_dropoff_datetime: Trip Dropoff Event Time
+        trip_distance: Trip Distance
+    standards:
+      units:
+        dimension_type: distance
+        value_field: trip_distance
+        canonical_unit: km
+        converted_value_field: trip_distance_km
+        implicit_source_unit: mi
+        expected_range:
+          min: 0
+          max: 1000
+      time:
+        event_time_field: tpep_pickup_datetime
+        ingestion_time_field: _nexus_ingested_at
+        source_timezone: America/New_York
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+    grain:
+      entity_grain:
+        - VendorID
+        - tpep_pickup_datetime
+        - tpep_dropoff_datetime
+        - PULocationID
+        - DOLocationID
+      time_grain: trip_event
+      spatial_grain: taxi_zone_pair
+      aggregation_level: raw_trip
+  naptan_stops:
+    glossary:
+      dataset_term: Public Transport Stop
+      field_terms:
+        atcocode: Stop Identifier
+        commonname: Stop Name
+        latitude: Stop Latitude
+        longitude: Stop Longitude
+    standards:
+      spatial:
+        latitude_field: latitude
+        longitude_field: longitude
+        source_crs: EPSG:4326
+        storage_crs: EPSG:4326
+        render_crs: EPSG:3857
+    grain:
+      entity_grain:
+        - atcocode
+      time_grain: slowly_changing_reference
+      spatial_grain: stop_point
+      aggregation_level: reference_entity
+    entity_matching:
+      entity_type: transit_stop
+      source_id_fields:
+        - atcocode
+      candidate_fields:
+        - commonname
+        - latitude
+        - longitude
+      canonical_entity_id_field: canonical_entity_id
+      methods:
+        - exact
+        - rule_based
+        - fuzzy
+        - probabilistic
+        - splink
+        - llm_assisted_review
+  london_journeys:
+    glossary:
+      dataset_term: Public Transport Journey Count
+      field_terms:
+        period_beginning: Reporting Period Start
+        reporting_period: Reporting Period Type
+    standards:
+      time:
+        event_time_field: period_beginning
+        source_timezone: Europe/London
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+    grain:
+      entity_grain:
+        - period_beginning
+        - reporting_period
+      time_grain: reporting_period
+      spatial_grain: greater_london
+      aggregation_level: aggregate_period
+    definitions:
+      journey_count: Aggregate public-transport journeys by reporting period; do not join to event-level trips without allocation.

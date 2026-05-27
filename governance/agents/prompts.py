@@ -20,6 +20,7 @@ Evaluate:
 - schema changes
 - quarantine count
 - audit status
+- semantic metadata coverage for glossary, units, time roles, CRS, grain, definitions, and entity matching
 
 Return only valid JSON with these fields:
 dataset_name, batch_id, decision, confidence, reason, recommended_action,

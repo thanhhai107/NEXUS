@@ -38,6 +38,7 @@ from common.source_coverage import (
 )
 from common.source_registry import get_source, list_sources
 from common.data_contract import load_data_contract, list_data_contracts
+from common.semantic import load_semantic_contract, list_semantic_contracts
 from governance.agents.governance_agent import review_batch
 from governance.dlq import list_dlq_events, replay_dlq_events
 from governance.audit import write_audit_event
@@ -645,6 +646,15 @@ def list_contracts(args: argparse.Namespace) -> None:
 def show_contract(args: argparse.Namespace) -> None:
     print(json.dumps(load_data_contract(args.dataset).to_dict(), indent=2))
 
+def list_semantics(args: argparse.Namespace) -> None:
+    payload = [contract.to_dict() for contract in list_semantic_contracts()]
+    if args.domain:
+        payload = [contract for contract in payload if contract.get("domain") == args.domain]
+    print(json.dumps(payload, indent=2))
+
+def show_semantic(args: argparse.Namespace) -> None:
+    print(json.dumps(load_semantic_contract(args.dataset).to_dict(), indent=2))
+
 def list_dlq(args: argparse.Namespace) -> None:
     events = list_dlq_events()
     if args.category:
@@ -859,6 +869,15 @@ def build_parser() -> argparse.ArgumentParser:
     contract_show = contract_subcommands.add_parser("show", help="Show one data contract")
     contract_show.add_argument("--dataset", required=True)
     contract_show.set_defaults(func=show_contract)
+
+    semantic = subcommands.add_parser("semantic", help="Semantic contract commands")
+    semantic_subcommands = semantic.add_subparsers(dest="semantic_command", required=True)
+    semantic_list = semantic_subcommands.add_parser("list", help="List semantic contracts")
+    semantic_list.add_argument("--domain")
+    semantic_list.set_defaults(func=list_semantics)
+    semantic_show = semantic_subcommands.add_parser("show", help="Show one semantic contract")
+    semantic_show.add_argument("--dataset", required=True)
+    semantic_show.set_defaults(func=show_semantic)
 
     dlq = subcommands.add_parser("dlq", help="Dead Letter Queue commands")
     dlq_subcommands = dlq.add_subparsers(dest="dlq_command", required=True)

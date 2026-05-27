@@ -1,0 +1,26 @@
+version: 2
+
+seeds:
+  - name: unit_mapping
+    description: Canonical unit conversion mapping for environment and transport semantic standardization.
+    columns:
+      - name: dimension_type
+        description: Measurement dimension such as temperature speed distance or concentration.
+        tests:
+          - not_null
+      - name: source_unit
+        description: Unit string observed in source data.
+        tests:
+          - not_null
+      - name: source_unit_normalized
+        description: Normalized lookup key used before conversion.
+        tests:
+          - not_null
+      - name: canonical_unit
+        description: Unit exposed to semantic models and metrics.
+        tests:
+          - not_null
+      - name: conversion_supported
+        description: Whether scale_factor and offset are sufficient for deterministic conversion.
+        tests:
+          - not_null

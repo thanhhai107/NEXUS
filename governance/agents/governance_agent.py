@@ -7,6 +7,7 @@ from typing import Any
 
 import requests
 
+from common.semantic import load_semantic_contract
 from governance.agents.decision_schema import AgentDecision
 from governance.agents.prompts import build_prompt
 from governance.agents.tools import (
@@ -35,6 +36,7 @@ def _collect_evidence(dataset_name: str, batch_id: str) -> dict[str, Any]:
     audit_events = load_latest_audit_events(dataset_name)
     lineage = load_lineage_events(dataset_name)
     history = load_quality_history(dataset_name)
+    semantic_contract = load_semantic_contract(dataset_name).to_dict()
     readiness_history = [
         float(event["readiness_score"])
         for event in history
@@ -51,6 +53,7 @@ def _collect_evidence(dataset_name: str, batch_id: str) -> dict[str, Any]:
         "lineage_events": lineage,
         "quality_history": history,
         "quality_anomalies": detect_anomalies(readiness_history),
+        "semantic_contract": semantic_contract,
     }
 
 
@@ -172,6 +175,8 @@ def _compact_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
     quarantine = evidence["quarantine_summary"]
     schema = evidence["schema_history"]
     auto_fix = details.get("auto_fix") or {}
+    semantic = evidence.get("semantic_contract") or {}
+    semantic_rules = semantic.get("dataset_rules") or {}
     return {
         "audit_status": quality.get("status"),
         "readiness_score": details.get("readiness_score"),
@@ -187,6 +192,10 @@ def _compact_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
         "schema_breaking_changes": schema.get("breaking_changes", False),
         "quarantine_count": quarantine.get("quarantine_count", 0),
         "lineage_event_count": len(evidence.get("lineage_events") or []),
+        "semantic_rules_present": bool(semantic_rules),
+        "semantic_glossary": semantic_rules.get("glossary") or {},
+        "semantic_grain": semantic_rules.get("grain") or {},
+        "semantic_standards": semantic_rules.get("standards") or {},
     }
 
 
