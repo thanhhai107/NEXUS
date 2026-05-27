@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -188,6 +189,8 @@ def run_once(
     resume_latest: bool = False,
     overwrite: bool = False,
     poll_time: datetime | None = None,
+    parallel: bool = False,
+    max_workers: int = 4,
 ) -> list[dict[str, Any]]:
     load_dotenv(DEFAULT_ENV_PATH, override=True)
     config = load_config(config_path)
@@ -216,7 +219,66 @@ def run_once(
         poll_time=poll_time,
     )
     specs = [SOURCE_REGISTRY[normalize_source_key(source)] for source in selected]
-    return [run_source(spec, context) for spec in specs]
+
+    if parallel and len(specs) > 1:
+        return _run_parallel(specs, context, max_workers)
+    else:
+        return [run_source(spec, context) for spec in specs]
+
+
+def _run_parallel(
+    specs: list[SourceSpec],
+    context: DownloadContext,
+    max_workers: int,
+) -> list[dict[str, Any]]:
+    """Run sources in parallel using ThreadPoolExecutor.
+
+    Args:
+        specs: List of source specs to run
+        context: Download context
+        max_workers: Maximum number of concurrent workers
+
+    Returns:
+        List of profiles from all sources
+    """
+    results: list[dict[str, Any]] = []
+    start_time = datetime.now(timezone.utc)
+
+    print(f"[parallel] starting {len(specs)} sources with {max_workers} workers at {start_time.isoformat()}")
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_spec = {
+            executor.submit(run_source, spec, context): spec
+            for spec in specs
+        }
+
+        # Collect results as they complete
+        for future in as_completed(future_to_spec):
+            spec = future_to_spec[future]
+            try:
+                profile = future.result()
+                results.append(profile)
+            except Exception as exc:
+                print(f"[{spec.key}] parallel execution failed: {exc}")
+                results.append({
+                    "source_id": spec.source_id,
+                    "source_key": spec.key,
+                    "status": "failed",
+                    "error": str(exc),
+                    "row_count": 0,
+                    "file_count": 0,
+                    "size_mb": 0.0,
+                })
+
+    elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
+    total_rows = sum(r.get("row_count", 0) for r in results)
+    total_size = sum(r.get("size_mb", 0) for r in results)
+    failed = sum(1 for r in results if r.get("status") == "failed")
+
+    print(f"[parallel] completed in {elapsed:.1f}s - total: rows={total_rows} size_mb={total_size:.2f} failed={failed}")
+
+    return results
 
 
 def run_polling(
@@ -318,6 +380,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--poll", action="store_true", help="Run repeated snapshots for realtime sources.")
     parser.add_argument("--duration-days", type=float, default=7, help="Polling duration when --poll is set.")
     parser.add_argument("--interval-minutes", type=float, default=15, help="Polling interval when --poll is set.")
+    parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help="Run sources in parallel instead of sequentially. Use with --max-workers to control concurrency.",
+    )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=4,
+        help="Maximum number of concurrent workers when --parallel is set. Default: 4",
+    )
     return parser
 
 
@@ -357,6 +430,8 @@ def main(argv: list[str] | None = None) -> int:
                 resume=not args.no_resume,
                 resume_latest=args.resume_latest,
                 overwrite=args.overwrite,
+                parallel=args.parallel,
+                max_workers=args.max_workers,
             )
     except KeyboardInterrupt:
         print("Interrupted.")
