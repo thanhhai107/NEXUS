@@ -6,9 +6,8 @@ from pathlib import Path
 import pytest
 import requests
 
-from ingestion.downloaders.core import DownloadContext, SourceFailure, SourceRun
-from ingestion.downloaders.http import request_json
-from ingestion.downloaders.london_downloader import maybe_publish_raw_envelope
+from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
+from ingestion.base.http import request_json
 from ingestion.downloaders.raw_adapter import published_run_to_raw_envelope
 
 

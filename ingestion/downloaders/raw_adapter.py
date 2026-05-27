@@ -5,11 +5,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from common.config import RUNTIME_DIR
+from common.config import RUNTIME_DIR, SILVER_DIR
 from ingestion.canonical.envelope import EnvelopeContext, build_raw_envelope
 from ingestion.canonical.parser import iter_artifact_records, resolve_artifact_path
-
-RAW_OUTPUT_DIR = RUNTIME_DIR / "raw"
 
 
 def published_run_to_raw_envelope(
@@ -31,7 +29,7 @@ def published_run_to_raw_envelope(
     source_key = manifest.get("source_key")
     run_id = str(manifest["run_id"])
     published_at = str(manifest.get("published_at") or "")
-    output_root = output_dir or RAW_OUTPUT_DIR
+    output_root = output_dir or SILVER_DIR
     output_path = output_root / dataset_id / f"{source_id}_{run_id}.jsonl"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = output_path.with_suffix(output_path.suffix + ".part")

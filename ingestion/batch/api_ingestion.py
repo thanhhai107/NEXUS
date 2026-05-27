@@ -10,9 +10,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from ingestion.batch.common import write_jsonl
-from ingestion.downloaders.core import DownloadContext, SourceFailure, SourceRun
-from ingestion.downloaders.http import request_json
-from ingestion.downloaders.utils import load_config, resolve_output_dir, run_id_now, sanitize_segment
+from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
+from ingestion.base.http import request_json
+from ingestion.base.utils import load_config, resolve_output_dir, run_id_now, sanitize_segment
 
 
 def extract_records(payload: Any) -> list[dict[str, Any]]:

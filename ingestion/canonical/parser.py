@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from common.config import PROJECT_ROOT
-from ingestion.downloaders.utils import extract_records
+from ingestion.base.utils import extract_records
 
 
 def resolve_artifact_path(path: str | Path) -> Path:

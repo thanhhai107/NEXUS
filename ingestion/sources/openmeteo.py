@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from ingestion.downloaders.core import DownloadContext, SourceRun
-from ingestion.downloaders.http import request_json
-from ingestion.downloaders.utils import (
+from ingestion.base.core import DownloadContext, SourceRun
+from ingestion.base.http import request_json
+from ingestion.base.utils import (
     estimate_record_count,
     sanitize_segment,
     selected_boroughs,

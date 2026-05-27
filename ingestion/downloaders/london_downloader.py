@@ -19,7 +19,15 @@ if __package__ in {None, ""}:
 
 from dotenv import load_dotenv
 
-from ingestion.downloaders.core import DownloadContext, SourceRun, SourceSpec
+from ingestion.base.core import DownloadContext, SourceRun, SourceSpec
+from ingestion.base.utils import (
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_ENV_PATH,
+    load_config,
+    resolve_mode,
+    resolve_output_dir,
+    run_id_now,
+)
 from ingestion.downloaders.raw_adapter import published_run_to_raw_envelope
 from ingestion.downloaders.schema_inference import InferredSchema
 from ingestion.downloaders.validation import (
@@ -28,30 +36,17 @@ from ingestion.downloaders.validation import (
     route_source_failure_to_dlq,
     validate_raw_envelope_file,
 )
-from ingestion.downloaders.sources.londonair import download_londonair
-from ingestion.downloaders.sources.ncei import download_ncei
-from ingestion.downloaders.sources.openmeteo import download_openmeteo
-from ingestion.downloaders.sources.openaq import download_openaq
-from ingestion.downloaders.sources.realtime import (
-    download_openweather_snapshot,
-    download_tfl_arrivals,
-    download_tfl_status,
-    download_waqi_snapshot,
-)
-from ingestion.downloaders.sources.transport import (
-    download_dft_road_traffic,
-    download_london_journeys,
-    download_naptan,
-    download_stats19,
-)
-from ingestion.downloaders.utils import (
-    DEFAULT_CONFIG_PATH,
-    DEFAULT_ENV_PATH,
-    load_config,
-    resolve_mode,
-    resolve_output_dir,
-    run_id_now,
-)
+from ingestion.sources.londonair import download_londonair
+from ingestion.sources.ncei import download_ncei
+from ingestion.sources.openmeteo import download_openmeteo
+from ingestion.sources.openaq import download_openaq
+from ingestion.sources.waqi import download_waqi
+from ingestion.sources.openweather import download_openweather
+from ingestion.sources.tfl import download_tfl
+from ingestion.sources.stats19 import download_stats19
+from ingestion.sources.naptan import download_naptan
+from ingestion.sources.dft import download_dft
+from ingestion.sources.london_journeys import download_london_journeys
 
 
 def find_latest_run_id(output_dir: Path, source_keys: list[str]) -> str | None:
@@ -543,7 +538,7 @@ SOURCE_REGISTRY: dict[str, SourceSpec] = {
         key="waqi",
         source_id="waqi_air_quality",
         description="WAQI London station snapshot/feed",
-        func=download_waqi_snapshot,
+        func=download_waqi,
         required_env=("WAQI_API_TOKEN",),
         realtime=True,
     ),
@@ -551,7 +546,7 @@ SOURCE_REGISTRY: dict[str, SourceSpec] = {
         key="openweather",
         source_id="openweather_current",
         description="OpenWeather current weather and air-pollution snapshot",
-        func=download_openweather_snapshot,
+        func=download_openweather,
         required_env=("OPENWEATHER_API_KEY",),
         realtime=True,
     ),
@@ -577,21 +572,13 @@ SOURCE_REGISTRY: dict[str, SourceSpec] = {
         key="dft",
         source_id="dft_road_traffic",
         description="DfT road traffic London count points and traffic counts",
-        func=download_dft_road_traffic,
+        func=download_dft,
     ),
-    "tfl_status": SourceSpec(
-        key="tfl_status",
-        source_id="tfl_transport_status",
-        description="TfL line status, routes, and disruptions snapshot",
-        func=download_tfl_status,
-        required_env=("TFL_API_KEY",),
-        realtime=True,
-    ),
-    "tfl_arrivals": SourceSpec(
-        key="tfl_arrivals",
-        source_id="tfl_arrivals",
-        description="TfL arrivals snapshot for selected stops",
-        func=download_tfl_arrivals,
+    "tfl": SourceSpec(
+        key="tfl",
+        source_id="tfl_transport",
+        description="TfL line status, routes, disruptions, and arrivals",
+        func=download_tfl,
         required_env=("TFL_API_KEY",),
         realtime=True,
     ),

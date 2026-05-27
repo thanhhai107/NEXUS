@@ -1,15 +1,19 @@
+"""
+OpenWeather Source Adapter.
+
+Downloads weather and air pollution data from OpenWeather API.
+"""
+
 from __future__ import annotations
 
 import os
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
-from ingestion.downloaders.core import DownloadContext, SourceFailure, SourceRun
-from ingestion.downloaders.http import request_json, require_env
-from ingestion.downloaders.utils import (
+from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
+from ingestion.base.http import request_json, require_env
+from ingestion.base.utils import (
     estimate_record_count,
-    extract_records,
-    limit_items,
     month_ranges,
     poll_time_slug,
     sanitize_segment,
@@ -18,67 +22,8 @@ from ingestion.downloaders.utils import (
 )
 
 
-def download_waqi_snapshot(run: SourceRun, context: DownloadContext) -> None:
-    env = require_env(run, "WAQI_API_TOKEN")
-    opts = source_options(context, "waqi")
-    base = str(opts.get("base_url", "https://api.waqi.info")).rstrip("/")
-    map_path = str(opts.get("map_path", "/v2/map/bounds"))
-    bbox = context.bbox
-    token = env["WAQI_API_TOKEN"]
-    map_params = {
-        "latlng": f"{bbox['south']},{bbox['west']},{bbox['north']},{bbox['east']}",
-        "token": token,
-    }
-    networks = opts.get("networks")
-    if networks:
-        map_params["networks"] = networks
-
-    poll_time = poll_time_slug(context)
-    map_chunk_id = f"waqi:map_bounds:poll={poll_time['stamp']}"
-    stations: list[dict[str, Any]] = []
-    if not run.should_skip(map_chunk_id):
-        try:
-            payload = request_json(
-                run,
-                f"{base}/{map_path.strip('/')}",
-                params=map_params,
-            )
-            ensure_waqi_ok(payload, "map/bounds")
-            stations = extract_records(payload)
-            station_limit = context.mode.get("waqi_station_limit")
-            stations = limit_items(stations, int(station_limit) if station_limit is not None else None)
-            run.write_jsonl(f"date={poll_time['date']}/hour={poll_time['hour']}/stations.jsonl", stations)
-            run.mark_complete(map_chunk_id, {"record_count": len(stations)})
-        except Exception as exc:
-            run.mark_failed(map_chunk_id, str(exc))
-            raise
-
-    for station in stations:
-        uid = station.get("uid")
-        if uid is None:
-            continue
-        chunk_id = f"uid={uid}:poll={poll_time['stamp']}"
-        try:
-            feed = request_json(run, f"{base}/feed/@{uid}/", params={"token": token})
-            ensure_waqi_ok(feed, f"feed/@{uid}")
-            rel = f"date={poll_time['date']}/hour={poll_time['hour']}/feed_uid={sanitize_segment(uid)}.json"
-            run.write_json(rel, feed, record_count=1)
-            run.mark_complete(chunk_id, {"record_count": 1})
-        except Exception as exc:
-            run.mark_failed(chunk_id, str(exc))
-
-
-def ensure_waqi_ok(payload: Any, endpoint: str) -> None:
-    if not isinstance(payload, dict):
-        raise SourceFailure(f"WAQI {endpoint} returned a non-object payload.")
-    status = payload.get("status")
-    if status == "ok":
-        return
-    message = payload.get("message") or payload.get("data") or "unknown WAQI error"
-    raise SourceFailure(f"WAQI {endpoint} returned status={status!r}: {message}")
-
-
-def download_openweather_snapshot(run: SourceRun, context: DownloadContext) -> None:
+def download_openweather(run: SourceRun, context: DownloadContext) -> None:
+    """Download OpenWeather data for configured boroughs."""
     env = require_env(run, "OPENWEATHER_API_KEY")
     opts = source_options(context, "openweather")
     base = (os.environ.get("OPENWEATHER_API_URL") or opts.get("base_url", "https://api.openweathermap.org")).rstrip("/")
@@ -90,7 +35,7 @@ def download_openweather_snapshot(run: SourceRun, context: DownloadContext) -> N
     successes = 0
 
     if opts.get("write_air_pollution_index_scales", True):
-        run.write_json("metadata/air_pollution_index_scales.json", openweather_air_pollution_index_scales(), record_count=4)
+        run.write_json("metadata/air_pollution_index_scales.json", _air_pollution_index_scales(), record_count=4)
 
     for borough in selected_boroughs(context, limit_key="openweather_borough_limit"):
         borough_slug = sanitize_segment(borough["name"])
@@ -108,7 +53,7 @@ def download_openweather_snapshot(run: SourceRun, context: DownloadContext) -> N
             exclude = str(opts.get("one_call_exclude") or "").strip()
             if exclude:
                 one_call_params["exclude"] = exclude
-            successes += download_openweather_json_chunk(
+            successes += _download_openweather_chunk(
                 run,
                 f"{base}/data/3.0/onecall",
                 one_call_params,
@@ -120,7 +65,7 @@ def download_openweather_snapshot(run: SourceRun, context: DownloadContext) -> N
             )
 
         if opts.get("include_weather_overview", True):
-            successes += download_openweather_json_chunk(
+            successes += _download_openweather_chunk(
                 run,
                 f"{base}/data/3.0/onecall/overview",
                 localized_params,
@@ -132,7 +77,7 @@ def download_openweather_snapshot(run: SourceRun, context: DownloadContext) -> N
             )
 
         if opts.get("include_day_summary", True):
-            successes += download_openweather_json_chunk(
+            successes += _download_openweather_chunk(
                 run,
                 f"{base}/data/3.0/onecall/day_summary",
                 {**localized_params, "date": poll_time["date"]},
@@ -144,7 +89,7 @@ def download_openweather_snapshot(run: SourceRun, context: DownloadContext) -> N
             )
 
         if opts.get("include_current_weather_fallback", True):
-            successes += download_openweather_json_chunk(
+            successes += _download_openweather_chunk(
                 run,
                 f"{base}/data/2.5/weather",
                 localized_params,
@@ -156,7 +101,7 @@ def download_openweather_snapshot(run: SourceRun, context: DownloadContext) -> N
             )
 
         if opts.get("include_air_pollution_current", True):
-            successes += download_openweather_json_chunk(
+            successes += _download_openweather_chunk(
                 run,
                 f"{base}/data/2.5/air_pollution",
                 base_params,
@@ -168,7 +113,7 @@ def download_openweather_snapshot(run: SourceRun, context: DownloadContext) -> N
             )
 
         if opts.get("include_air_pollution_forecast", True):
-            successes += download_openweather_json_chunk(
+            successes += _download_openweather_chunk(
                 run,
                 f"{base}/data/2.5/air_pollution/forecast",
                 base_params,
@@ -181,15 +126,15 @@ def download_openweather_snapshot(run: SourceRun, context: DownloadContext) -> N
 
         if opts.get("include_history", False):
             chunk_days = int(opts.get("history_chunk_days", 7))
-            for start, end in openweather_history_ranges(context.mode["core_start"], context.mode["core_end"], chunk_days):
-                successes += download_openweather_json_chunk(
+            for start, end in _history_ranges(context.mode["core_start"], context.mode["core_end"], chunk_days):
+                successes += _download_openweather_chunk(
                     run,
                     f"{history_base}/data/2.5/history/city",
                     {
                         **localized_params,
                         "type": "hour",
-                        "start": unix_start(start),
-                        "end": unix_end(end),
+                        "start": _unix_start(start),
+                        "end": _unix_end(end),
                     },
                     chunk_id=f"openweather:history:{borough_slug}:{start.isoformat()}:{end.isoformat()}",
                     relative_path=(
@@ -202,7 +147,7 @@ def download_openweather_snapshot(run: SourceRun, context: DownloadContext) -> N
         raise SourceFailure("All OpenWeather requests failed.")
 
 
-def download_openweather_json_chunk(
+def _download_openweather_chunk(
     run: SourceRun,
     url: str,
     params: dict[str, Any],
@@ -210,6 +155,7 @@ def download_openweather_json_chunk(
     chunk_id: str,
     relative_path: str,
 ) -> int:
+    """Download a single OpenWeather API chunk."""
     if run.should_skip(chunk_id):
         return 0
     try:
@@ -223,7 +169,8 @@ def download_openweather_json_chunk(
         return 0
 
 
-def openweather_history_ranges(start_date: str, end_date: str, chunk_days: int) -> list[tuple[date, date]]:
+def _history_ranges(start_date: str, end_date: str, chunk_days: int) -> list[tuple[date, date]]:
+    """Generate date ranges for history queries."""
     ranges: list[tuple[date, date]] = []
     max_days = max(1, min(chunk_days, 7))
     for month_start, month_end in month_ranges(start_date, end_date):
@@ -235,15 +182,16 @@ def openweather_history_ranges(start_date: str, end_date: str, chunk_days: int) 
     return ranges
 
 
-def unix_start(value: date) -> int:
+def _unix_start(value: date) -> int:
     return int(datetime.combine(value, time.min, tzinfo=timezone.utc).timestamp())
 
 
-def unix_end(value: date) -> int:
+def _unix_end(value: date) -> int:
     return int(datetime.combine(value, time.max, tzinfo=timezone.utc).timestamp())
 
 
-def openweather_air_pollution_index_scales() -> dict[str, Any]:
+def _air_pollution_index_scales() -> dict[str, Any]:
+    """Return air pollution index scale reference data."""
     return {
         "source": "OpenWeather documentation",
         "units": "ug/m3 unless noted otherwise",
@@ -284,69 +232,3 @@ def openweather_air_pollution_index_scales() -> dict[str, Any]:
             {"aqi": ">300", "level": "Level 6", "category": "Severely polluted"},
         ],
     }
-
-def download_tfl_status(run: SourceRun, context: DownloadContext) -> None:
-    env = require_env(run, "TFL_API_KEY")
-    opts = source_options(context, "tfl")
-    base = opts.get("base_url", "https://api.tfl.gov.uk")
-    modes = ",".join(opts.get("selected_modes", ["tube", "dlr", "overground", "elizabeth-line"]))
-    params = tfl_auth_params(env["TFL_API_KEY"])
-    poll_time = poll_time_slug(context)
-    endpoints = {
-        "status": f"{base}/Line/Mode/{modes}/Status",
-        "routes": f"{base}/Line/Mode/{modes}/Route",
-        "disruptions": f"{base}/Line/Mode/{modes}/Disruption",
-    }
-    successes = 0
-    for name, url in endpoints.items():
-        chunk_id = f"tfl:{name}:poll={poll_time['stamp']}"
-        if run.should_skip(chunk_id):
-            successes += 1
-            continue
-        try:
-            payload = request_json(run, url, params=params)
-            rel = f"date={poll_time['date']}/hour={poll_time['hour']}/{name}_{poll_time['stamp']}.json"
-            run.write_json(rel, payload)
-            run.mark_complete(chunk_id, {"record_count": estimate_record_count(payload)})
-            successes += 1
-        except Exception as exc:
-            run.mark_failed(chunk_id, str(exc))
-    if successes == 0:
-        raise SourceFailure("All TfL status/route/disruption requests failed.")
-
-def download_tfl_arrivals(run: SourceRun, context: DownloadContext) -> None:
-    env = require_env(run, "TFL_API_KEY")
-    opts = source_options(context, "tfl")
-    base = opts.get("base_url", "https://api.tfl.gov.uk")
-    stop_ids = opts.get("selected_stop_ids") or []
-    if not stop_ids:
-        raise SourceFailure("No TfL selected_stop_ids configured.")
-    params = tfl_auth_params(env["TFL_API_KEY"])
-    poll_time = poll_time_slug(context)
-    successes = 0
-    for stop_id in stop_ids:
-        chunk_id = f"tfl_arrivals:stop={stop_id}:poll={poll_time['stamp']}"
-        if run.should_skip(chunk_id):
-            successes += 1
-            continue
-        try:
-            payload = request_json(run, f"{base}/StopPoint/{stop_id}/Arrivals", params=params)
-            records = extract_records(payload)
-            rel = (
-                f"date={poll_time['date']}/hour={poll_time['hour']}"
-                f"/stop_id={sanitize_segment(stop_id)}/arrivals_{poll_time['stamp']}.jsonl"
-            )
-            run.write_jsonl(rel, records)
-            run.mark_complete(chunk_id, {"record_count": len(records)})
-            successes += 1
-        except Exception as exc:
-            run.mark_failed(chunk_id, str(exc))
-    if successes == 0:
-        raise SourceFailure("All TfL arrivals requests failed.")
-
-def tfl_auth_params(api_key: str) -> dict[str, str]:
-    params = {"app_key": api_key}
-    app_id = os.environ.get("TFL_APP_ID")
-    if app_id:
-        params["app_id"] = app_id
-    return params

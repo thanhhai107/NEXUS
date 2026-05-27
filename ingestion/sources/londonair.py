@@ -6,9 +6,9 @@ from datetime import date
 from typing import Any, Iterable
 from urllib.parse import quote
 
-from ingestion.downloaders.core import DownloadContext, SourceFailure, SourceRun
-from ingestion.downloaders.http import request_json
-from ingestion.downloaders.utils import (
+from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
+from ingestion.base.http import request_json
+from ingestion.base.utils import (
     estimate_record_count,
     iter_dicts,
     limit_items,

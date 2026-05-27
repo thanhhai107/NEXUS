@@ -11,9 +11,9 @@ from typing import Any, Callable
 
 import requests
 
-from ingestion.downloaders.contracts import RateLimitPolicy, RetryPolicy, TimeoutPolicy
-from ingestion.downloaders.core import SourceFailure, SourceRun
-from ingestion.downloaders.utils import estimate_record_count
+from ingestion.base.contracts import RateLimitPolicy, RetryPolicy, TimeoutPolicy
+from ingestion.base.core import SourceFailure, SourceRun
+from ingestion.base.utils import estimate_record_count
 
 SENSITIVE_QUERY_KEYS = {
     "token",

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from ingestion.downloaders.utils import iter_timestamp_strings
+from ingestion.base.utils import iter_timestamp_strings
 
 RUNTIME_VERSION = "raw-envelope-v1"
 

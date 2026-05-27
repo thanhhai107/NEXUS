@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from ingestion.downloaders.core import DownloadContext, SourceFailure, SourceRun
-from ingestion.downloaders.http import request_json, require_env
-from ingestion.downloaders.utils import (
+from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
+from ingestion.base.http import request_json, require_env
+from ingestion.base.utils import (
     extract_records,
     limit_items,
     month_ranges,
