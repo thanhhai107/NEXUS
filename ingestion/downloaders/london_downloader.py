@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 
 from ingestion.downloaders.core import DownloadContext, SourceRun, SourceSpec
 from ingestion.downloaders.raw_adapter import published_run_to_raw_envelope
+from ingestion.downloaders.schema_inference import InferredSchema
 from ingestion.downloaders.validation import (
     route_parser_failures_to_dlq,
     route_run_failures_to_dlq,
@@ -126,11 +127,74 @@ def run_source(spec: SourceSpec, context: DownloadContext) -> dict[str, Any]:
         if routed:
             print(f"[{spec.key}] dlq: routed_failed_chunks={routed}")
     maybe_publish_raw_envelope(run, context)
+
+    # Run schema inference
+    inferred_schema = maybe_infer_schema(run, context)
+    if inferred_schema:
+        profile["schema_inferred"] = True
+        profile["inferred_fields"] = len(inferred_schema.fields)
+
     print(
         f"[{spec.key}] {status}: rows={profile['row_count']} "
         f"files={profile['file_count']} size_mb={profile['size_mb']}"
     )
     return profile
+
+
+def maybe_infer_schema(run: SourceRun, context: DownloadContext) -> InferredSchema | None:
+    """Infer schema from downloaded data if enabled.
+
+    Args:
+        run: SourceRun instance with downloaded data
+        context: Download context
+
+    Returns:
+        InferredSchema if inference ran successfully, None otherwise
+    """
+    # Check if schema inference is enabled
+    inference_config = context.config.get("schema_inference", {})
+    if not inference_config.get("enabled", False):
+        return None
+
+    # Find JSONL files in raw_dir
+    jsonl_files = list(run.raw_dir.glob("*.jsonl"))
+    if not jsonl_files:
+        return None
+
+    # Use the main JSONL file (or first one found)
+    main_file = jsonl_files[0]
+
+    try:
+        from ingestion.downloaders.schema_inference import SchemaInference
+
+        inference = SchemaInference(
+            sample_size=inference_config.get("sample_size", 10000)
+        )
+        schema = inference.infer_from_jsonl(
+            file_path=main_file,
+            source_id=run.source_id,
+            source_key=run.source_key,
+            run_id=run.run_id,
+        )
+
+        # Save schema to metadata directory
+        schema_path = run.metadata_dir / "inferred_schema.json"
+        schema.save(schema_path)
+
+        # Save summary
+        summary_path = run.metadata_dir / "inferred_schema_summary.json"
+        schema.save_summary(summary_path)
+
+        print(
+            f"[{run.source_key}] schema inferred: fields={len(schema.fields)} "
+            f"records={schema.record_count} path={schema_path}"
+        )
+
+        return schema
+
+    except Exception as exc:
+        print(f"[{run.source_key}] schema inference failed: {exc}")
+        return None
 
 
 def maybe_publish_raw_envelope(run: SourceRun, context: DownloadContext) -> dict[str, Any] | None:

@@ -1,8 +1,17 @@
 default_mode: full_demo
 default_source_group: core_historical
 polling_source_group: realtime_polling
+
 output_dir: runtime/datasets
 runtime_dir: /data
+
+# Schema inference configuration
+schema_inference:
+  enabled: true
+  sample_size: 10000
+  save_json_schema: true
+  save_summary: true
+
 polling:
   tfl_arrivals:
     enabled: true
