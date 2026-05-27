@@ -118,24 +118,28 @@ modes:
     ncei_station_limit: 1
     dft_page_limit: 2
   full_demo:
-    core_start: '2024-01-01'
-    core_end: '2024-12-31'
-    transport_start: '2020-01-01'
-    transport_end: '2024-12-31'
-    transport_start_year: 2020
-    transport_end_year: 2024
+    core_start: '2020-01-01'
+    core_end: '2025-12-31'
+    transport_start: '2015-01-01'
+    transport_end: '2025-12-31'
+    transport_start_year: 2015
+    transport_end_year: 2025
     borough_limit: null
     londonair_site_limit: null
     londonair_species:
+    - NO
     - NO2
+    - NOX
     - PM10
     - PM25
     - O3
+    - SO2
+    - CO
     openaq_location_limit: null
     openaq_sensor_limit: null
     waqi_station_limit: null
     openweather_borough_limit: null
-    ncei_station_limit: 3
+    ncei_station_limit: 20
     dft_page_limit: null
   latest_update:
     core_start: '2025-01-01'
@@ -180,6 +184,12 @@ sources:
   - openweather
   - tfl_status
   realtime_polling:
+  - tfl_arrivals
+  # Expanded realtime sources for big data platform
+  expanded_realtime:
+  - waqi
+  - openweather
+  - tfl_status
   - tfl_arrivals
 rate_limits:
   default_delay_seconds: 0.1
@@ -238,13 +248,31 @@ openmeteo:
   - carbon_monoxide
   - european_aqi
   - us_aqi
+  - ammonia
+  - aerosol_optical_depth
+  - dust
+  - uv_index
+  - pollen_grass
+  - pollen_birch
+  - pollen_olive
+  - grass_pollen
+  - birch_pollen
+  - olive_pollen
   weather_hourly:
   - temperature_2m
   - relative_humidity_2m
   - precipitation
   - rain
+  - snowfall
+  - cloud_cover
   - wind_speed_10m
   - wind_direction_10m
+  - surface_pressure
+  - shortwave_radiation
+  - direct_radiation
+  - diffuse_radiation
+  - sunshine_duration
+  - weather_code
 londonair:
   base_url: https://api.erg.ic.ac.uk/AirQuality
   endpoints:
@@ -304,6 +332,12 @@ openaq:
   measurement_endpoint: hours
   include_parameters: true
   include_sensor_details: true
+  # Mở rộng: tải measurements theo sensor/date-range
+  use_measurements_endpoint: true
+  measurements_limit: 10000
+  # Measurements theo date range cho historical data
+  measurements_date_start: '2020-01-01'
+  measurements_date_end: '2025-12-31'
 ncei:
   base_url: https://www.ncei.noaa.gov/cdo-web/api/v2
   dataset_id: GHCND
@@ -317,12 +351,36 @@ ncei:
   - locations
   fallback_station_ids:
   - GHCND:UKE00105915
+  - GHCND:UKM00003772
+  - GHCND:UK000003975
+  - GHCND:UK000003976
+  - GHCND:UK000003977
+  - GHCND:UK000003978
+  - GHCND:UK000003979
+  - GHCND:UK000003980
+  - GHCND:UK000003981
+  - GHCND:UK000003982
+  - GHCND:UK000003983
+  - GHCND:UK000003984
+  - GHCND:UK000003985
+  - GHCND:UK000003986
+  - GHCND:UK000003987
+  - GHCND:UK000003988
+  - GHCND:UK000003989
+  - GHCND:UK000003990
+  - GHCND:UK000003991
+  - GHCND:UK000003992
   datatypes:
   - TMAX
   - TMIN
   - TAVG
   - PRCP
   - AWND
+  - WDF5
+  - WSF5
+  - SNWD
+  - ACMC
+  - ACSC
 waqi:
   base_url: https://api.waqi.info
   map_path: /v2/map/bounds
@@ -355,11 +413,75 @@ tfl:
   - central
   - northern
   - piccadilly
+  - bakerloo
+  - circle
+  - district
+  - hammersmith-city
+  - jubilee
+  - metropolitan
+  - victoria
+  - waterloo-city
   - elizabeth
+  - london-overground
+  - dlr
+  - tram
+  # Major tube stations for arrivals monitoring
   selected_stop_ids:
-  - 940GZZLUOXC
-  - 940GZZLUKSX
-  - 940GZZLUVIC
+  # Central Line
+  - 940GZZLUOXC  # Oxford Circus
+  - 940GZZLUKSX  # Kings Cross
+  - 940GZZLUVIC  # Victoria
+  - 940GZZLUWLA  # White City
+  - 940GZZLUWYN  # Wembley Park
+  - 940GZZLUSHA  # Shepherd's Bush
+  - 940GZZLUBKF  # Bank
+  - 940GZZLUHGG  # Holborn
+  - 940GZZLUGPS  # Green Park
+  - 940GZZLUTCR  # Tottenham Court Road
+  # Northern Line
+  - 940GZZLUMMT  # Moorgate
+  - 940GZZLUEUS  # Euston
+  - 940GZZLUCGN  # Camden Town
+  - 940GZZLUHSL  # Hampstead
+  - 940GZZLUBLM  # Balham
+  - 940GZZLUCLP  # Clapham Common
+  - 940GZZLUWFP  # Waterloo
+  - 940GZZLUSJH  # St Johns Wood
+  # Victoria Line
+  - 940GZZLUPEC  # Peckham
+  - 940GZZLUWRI  # Walthamstow
+  - 940GZZLUBKG  # Brixton
+  - 940GZZLUHPK  # Highbury
+  - 940GZZLUFYG  # Seven Sisters
+  # Jubilee Line
+  - 940GZZLUSFS  # Southfields
+  - 940GZZLUWIM  # Wimbledon
+  - 940GZZLUWLA  # White City
+  - 940GZZLUCWR  # Canary Wharf
+  - 940GZZLUCGN  # Canning Town
+  # Piccadilly Line
+  - 940GZZLUHGR  # Heathrow
+  - 940GZZLUTWY  # Twyford
+  - 940GZZLUEAL  # Ealing Broadway
+  # Elizabeth Line
+  - 940GZZLUPAC  # Paddington
+  - 940GZZLUSHF  # Stratford
+  - 940GZZLURVL  # Romford
+  - 940GZZLUWRX  # Abbey Wood
+  - 940GZZLUSHA  # Shenfield
+  - 940GZZLUIPZ  # Ilford
+  # DLR
+  - 940GZZLUCWR  # Canary Wharf
+  - 940GZZLUBKZ  # Bank
+  - 940GZZLULVT  # Lewisham
+  - 940GZZLUSRR  # Stratford International
+  - 940GZZLUEGC  # Greenwich
+  # Overground
+  - 940GZZLUQDS  # Queens Road Peckham
+  - 940GZZLUHGG  # Highbury & Islington
+  - 940GZZLUWFT  # Willesden Junction
+  - 940GZZLUGRD  # Gospel Oak
+  - 940GZZLUEUS  # Euston
 dft_road_traffic:
   base_url: https://roadtraffic.dft.gov.uk/api
   region_id: 6
