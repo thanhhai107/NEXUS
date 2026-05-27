@@ -18,7 +18,7 @@ DEFAULT_SOURCES = [
 DEFAULT_MODE = os.getenv("NEXUS_DOWNLOAD_MODE", "small_demo")
 from common.config import BRONZE_DIR
 
-DOWNLOAD_ROOT = Path(os.getenv("NEXUS_DOWNLOAD_ROOT", str(DATASETS_DIR)))
+DOWNLOAD_ROOT = Path(os.getenv("NEXUS_DOWNLOAD_ROOT", str(BRONZE_DIR)))
 RAW_ENVELOPE_REQUIRED = os.getenv("NEXUS_RAW_ENVELOPE_REQUIRED", "true").lower() == "true"
 
 

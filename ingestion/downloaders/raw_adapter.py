@@ -9,6 +9,8 @@ from common.config import RUNTIME_DIR, SILVER_DIR
 from ingestion.canonical.envelope import EnvelopeContext, build_raw_envelope
 from ingestion.canonical.parser import iter_artifact_records, resolve_artifact_path
 
+RAW_OUTPUT_DIR = SILVER_DIR
+
 
 def published_run_to_raw_envelope(
     published_manifest_path: Path,
@@ -29,7 +31,7 @@ def published_run_to_raw_envelope(
     source_key = manifest.get("source_key")
     run_id = str(manifest["run_id"])
     published_at = str(manifest.get("published_at") or "")
-    output_root = output_dir or SILVER_DIR
+    output_root = output_dir or RAW_OUTPUT_DIR
     output_path = output_root / dataset_id / f"{source_id}_{run_id}.jsonl"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = output_path.with_suffix(output_path.suffix + ".part")
@@ -55,13 +57,12 @@ def published_run_to_raw_envelope(
                     )
                     try:
                         for record_index, record in enumerate(iter_artifact_records(artifact_path)):
-                            output.write(
-                                json.dumps(
-                                    build_raw_envelope(record, context, record_index=record_index),
-                                    ensure_ascii=False,
-                                )
-                                + "\n"
+                            envelope = (
+                                record
+                                if _is_raw_envelope(record)
+                                else build_raw_envelope(record, context, record_index=record_index)
                             )
+                            output.write(json.dumps(envelope, ensure_ascii=False) + "\n")
                             written_count += 1
                     except Exception as exc:  # noqa: BLE001 - report, do not route governance here
                         parser_failures.append(
@@ -98,6 +99,10 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"Expected object JSON manifest at {path}")
     return payload
+
+
+def _is_raw_envelope(record: dict[str, Any]) -> bool:
+    return record.get("_nexus_runtime_version") == "raw-envelope-v1" and isinstance(record.get("payload"), dict)
 
 
 def _stamp_downstream_path(published_manifest_path: Path, raw_path: Path) -> None:

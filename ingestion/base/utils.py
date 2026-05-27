@@ -53,16 +53,28 @@ BOROUGH_CENTROIDS: list[dict[str, Any]] = [
 
 
 def source_options(context: Any, source: str) -> dict[str, Any]:
-    """Get source-specific options from context mode config.
+    """Get source-specific options from global config plus mode overrides.
     
     Args:
         context: DownloadContext instance
         source: Source name (e.g., 'londonair', 'openaq')
     
     Returns:
-        Dictionary of source options from mode config
+        Dictionary of source options with mode-level overrides applied.
     """
-    return context.mode.get(f"{source}_options", {})
+    config_options = {}
+    if hasattr(context, "config") and isinstance(context.config, dict):
+        source_config = context.config.get(source, {})
+        if isinstance(source_config, dict):
+            config_options = dict(source_config)
+
+    mode_options = {}
+    if hasattr(context, "mode") and isinstance(context.mode, dict):
+        source_mode_options = context.mode.get(f"{source}_options", {})
+        if isinstance(source_mode_options, dict):
+            mode_options = dict(source_mode_options)
+
+    return {**config_options, **mode_options}
 
 
 def selected_boroughs(

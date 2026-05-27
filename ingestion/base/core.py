@@ -385,6 +385,8 @@ class SourceRun:
         manifest_dict = self.write_run_manifest(manifest=manifest)
         if status in {"success", "partial"} and self._can_publish(manifest):
             self.write_published_manifest(manifest)
+            manifest = self._build_run_manifest(status=status, error=error)
+            manifest_dict = self.write_run_manifest(manifest=manifest)
         elif status == "failed":
             manifest_dict["publish_status"] = PUBLISH_UNPUBLISHED
         

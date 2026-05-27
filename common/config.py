@@ -26,6 +26,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = PROJECT_ROOT / "config"
 DOMAINS_DIR = PROJECT_ROOT / "domains"
 
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(PROJECT_ROOT / ".env", override=False)
+except ImportError:
+    pass
+
 
 def load_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():

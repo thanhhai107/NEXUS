@@ -13,14 +13,20 @@ schema_inference:
   save_summary: true
 
 polling:
-  tfl_arrivals:
+  tfl:
     enabled: true
+    interval_seconds: 60
+    timeout_minutes: 10
+    pool: default_pool
+    backfill_on_restart: true
+  tfl_arrivals:
+    enabled: false
     interval_seconds: 60
     timeout_minutes: 5
     pool: default_pool
     backfill_on_restart: true
   tfl_status:
-    enabled: true
+    enabled: false
     interval_seconds: 60
     timeout_minutes: 5
     pool: default_pool
@@ -182,15 +188,14 @@ sources:
   realtime_snapshot:
   - waqi
   - openweather
-  - tfl_status
+  - tfl
   realtime_polling:
-  - tfl_arrivals
+  - tfl
   # Expanded realtime sources for big data platform
   expanded_realtime:
   - waqi
   - openweather
-  - tfl_status
-  - tfl_arrivals
+  - tfl
 rate_limits:
   default_delay_seconds: 0.1
   openaq_delay_seconds: 0.125

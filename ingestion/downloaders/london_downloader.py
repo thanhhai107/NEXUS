@@ -224,8 +224,9 @@ def maybe_publish_raw_envelope(run: SourceRun, context: DownloadContext) -> dict
         schema_validation_enabled=bool(validation_policy.get("schema_validation_enabled", False)),
         quarantine_invalid_records=bool(validation_policy.get("quarantine_invalid_records", True)),
     )
+    raw_path_for_log = str(result["raw_path"]).encode("ascii", "replace").decode("ascii")
     print(
-        f"[{run.source_key}] raw envelope: path={result['raw_path']} "
+        f"[{run.source_key}] raw envelope: path={raw_path_for_log} "
         f"records={result['record_count']} "
         f"parser_failures={result['parser_failures']} "
         f"dlq_parser_failures={parser_failures} "
@@ -410,8 +411,11 @@ def normalize_source_key(source: str) -> str:
         "stats19_collisions": "stats19",
         "naptan_stops": "naptan",
         "dft_road_traffic": "dft",
+        "tfl_arrivals": "tfl",
+        "tfl_line_status": "tfl",
         "tfl_status": "tfl",
         "tfl_transport_status": "tfl",
+        "tfl_transport": "tfl",
     }
     key = aliases.get(source, source)
     if key not in SOURCE_REGISTRY:

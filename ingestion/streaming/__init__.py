@@ -63,6 +63,7 @@ from ingestion.streaming.consumer import (
     decode_event,
     write_events_to_raw,
     # Main consumer
+    consume_to_raw,
     consume_events,
     consume_batch,
     ConsumerResult,
@@ -101,6 +102,7 @@ __all__ = [
     "create_kafka_consumer",
     "decode_event",
     "write_events_to_raw",
+    "consume_to_raw",
     "consume_events",
     "consume_batch",
     "ConsumerResult",

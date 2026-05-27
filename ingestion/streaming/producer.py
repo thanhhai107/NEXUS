@@ -81,6 +81,48 @@ def sim_event(source: str, count: int) -> list[dict[str, object]]:
     return [sim_transport() for _ in range(count)]
 
 
+def normalize_stream_source(source: str) -> str:
+    aliases = {
+        "tfl_arrivals": "tfl",
+        "tfl_line_status": "tfl",
+        "tfl_status": "tfl",
+        "tfl_transport_status": "tfl",
+    }
+    return aliases.get(source, source)
+
+
+def default_url(source: str) -> str | None:
+    """Return the configured API URL for a streaming source, if any."""
+    source_config = STREAM_TOPICS.get(normalize_stream_source(source))
+    return source_config.api_url if source_config else None
+
+
+def default_key(source: str) -> str | None:
+    """Return the configured API key for a streaming source, if any."""
+    source_config = STREAM_TOPICS.get(normalize_stream_source(source))
+    return source_config.api_key if source_config else None
+
+
+def event_stream(
+    source: str,
+    api_url: str | None = None,
+    api_key: str | None = None,
+    count: int = 25,
+) -> list[dict[str, object]]:
+    """Fetch a small event sample, falling back to simulated records.
+
+    This keeps the older CLI quality-check path working while the producer
+    runner handles Kafka publishing separately.
+    """
+    normalized_source = normalize_stream_source(source)
+    source_config = STREAM_TOPICS.get(normalized_source)
+    auth_header = source_config.auth_header if source_config else "Authorization"
+    resolved_url = api_url if api_url is not None else default_url(source)
+    resolved_key = api_key if api_key is not None else default_key(source)
+    records = fetch_api_events(normalized_source, resolved_url, resolved_key, auth_header, count) if resolved_url else []
+    return records or sim_event(normalized_source, count)
+
+
 # ============================================================================
 # API Event Fetchers
 # ============================================================================

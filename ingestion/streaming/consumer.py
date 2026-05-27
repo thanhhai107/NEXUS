@@ -217,6 +217,80 @@ class ConsumerResult:
 # Main Consumer Functions
 # ============================================================================
 
+def consume_to_raw(
+    topic: str,
+    dataset: str,
+    bootstrap_servers: str = DEFAULT_BOOTSTRAP,
+    group_id: str = DEFAULT_GROUP_ID,
+    max_messages: int = 100,
+) -> dict[str, Any]:
+    """Backward-compatible kafka-python consumer path used by older CLI/tests."""
+    try:
+        from kafka import KafkaConsumer
+    except ImportError:
+        raise ImportError(
+            "kafka-python is required for consume_to_raw. "
+            "Install with: pip install kafka-python"
+        )
+
+    consumer = KafkaConsumer(
+        topic,
+        bootstrap_servers=bootstrap_servers,
+        group_id=group_id,
+        auto_offset_reset="earliest",
+        enable_auto_commit=False,
+    )
+    records: list[dict[str, Any]] = []
+    consumed = 0
+    dlq = 0
+
+    try:
+        for message in consumer:
+            if consumed >= max_messages:
+                break
+            consumed += 1
+            try:
+                event = decode_event(message.value)
+                if not isinstance(event, dict):
+                    raise ValueError(f"Event is not a dict: {type(event)}")
+                records.append(event)
+            except Exception as exc:
+                dlq += 1
+                _route_to_dlq(
+                    raw_payload=message.value,
+                    source=topic,
+                    dataset=dataset,
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                    topic=topic,
+                )
+    finally:
+        try:
+            consumer.commit()
+        except Exception:
+            pass
+        consumer.close()
+
+    raw_path = None
+    if records:
+        from ingestion.batch.common import write_jsonl
+
+        raw_path = write_jsonl(
+            dataset,
+            records,
+            source=f"kafka://{topic}",
+            ingestion_type="streaming",
+            source_key=topic,
+        )
+
+    return {
+        "consumed": consumed,
+        "landed": len(records),
+        "dlq": dlq,
+        "raw_path": str(raw_path) if raw_path else None,
+    }
+
+
 def consume_events(
     topic: str,
     dataset: str,
@@ -326,7 +400,7 @@ def _publish_streaming_to_silver(raw_path: Path, dataset: str) -> str | None:
         from datetime import datetime, timezone
         import hashlib
         
-        run_path = raw_path.parents[2]  # bronze/{dataset}/run_id={run_id}
+        run_path = raw_path.parents[1]  # bronze/{dataset}/run_id={run_id}
         run_id = run_path.name.replace("run_id=", "")
         
         # Generate checksum for the raw file
@@ -349,7 +423,7 @@ def _publish_streaming_to_silver(raw_path: Path, dataset: str) -> str | None:
                 "required": True,
                 "paths": [str(raw_path)],
                 "checksums": {str(raw_path): checksum},
-                "record_count": raw_path.stat().st_size  # Approximate
+                "record_count": _count_jsonl_records(raw_path)
             }],
             "raw_dir": str(run_path / "raw"),
             "source_key": dataset,
@@ -370,6 +444,11 @@ def _publish_streaming_to_silver(raw_path: Path, dataset: str) -> str | None:
     except Exception as exc:
         print(f"  silver conversion failed: {exc}")
         return None
+
+
+def _count_jsonl_records(path: Path) -> int:
+    with path.open("r", encoding="utf-8") as file:
+        return sum(1 for line in file if line.strip())
 
 
 def _route_to_dlq(
