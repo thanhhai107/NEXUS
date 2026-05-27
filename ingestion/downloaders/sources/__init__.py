@@ -10,7 +10,7 @@ from ingestion.sources.openaq import download_openaq
 from ingestion.sources.openmeteo import download_openmeteo
 from ingestion.sources.waqi import download_waqi
 from ingestion.sources.openweather import download_openweather
-from ingestion.sources.tfl import download_tfl
+from ingestion.sources.tfl import download_tfl, download_tfl_arrivals, download_tfl_line_status
 from ingestion.sources.stats19 import download_stats19
 from ingestion.sources.naptan import download_naptan
 from ingestion.sources.dft import download_dft
@@ -24,6 +24,8 @@ __all__ = [
     "download_waqi",
     "download_openweather",
     "download_tfl",
+    "download_tfl_arrivals",
+    "download_tfl_line_status",
     "download_stats19",
     "download_naptan",
     "download_dft",

@@ -42,7 +42,7 @@ from ingestion.sources.openmeteo import download_openmeteo
 from ingestion.sources.openaq import download_openaq
 from ingestion.sources.waqi import download_waqi
 from ingestion.sources.openweather import download_openweather
-from ingestion.sources.tfl import download_tfl
+from ingestion.sources.tfl import download_tfl, download_tfl_arrivals, download_tfl_line_status
 from ingestion.sources.stats19 import download_stats19
 from ingestion.sources.naptan import download_naptan
 from ingestion.sources.dft import download_dft
@@ -411,10 +411,8 @@ def normalize_source_key(source: str) -> str:
         "stats19_collisions": "stats19",
         "naptan_stops": "naptan",
         "dft_road_traffic": "dft",
-        "tfl_arrivals": "tfl",
-        "tfl_line_status": "tfl",
-        "tfl_status": "tfl",
-        "tfl_transport_status": "tfl",
+        "tfl_status": "tfl_line_status",
+        "tfl_transport_status": "tfl_line_status",
         "tfl_transport": "tfl",
     }
     key = aliases.get(source, source)
@@ -602,6 +600,26 @@ SOURCE_REGISTRY: dict[str, SourceSpec] = {
         dataset_name="tfl_transport",
         description="TfL line status, routes, disruptions, and arrivals",
         func=download_tfl,
+        required_env=("TFL_API_KEY",),
+        realtime=True,
+    ),
+    "tfl_line_status": SourceSpec(
+        source_key="tfl_line_status",
+        source_id="tfl_line_status",
+        source_name="TfL Line Status",
+        dataset_name="tfl_line_status",
+        description="TfL line status, routes, and disruptions realtime snapshot",
+        func=download_tfl_line_status,
+        required_env=("TFL_API_KEY",),
+        realtime=True,
+    ),
+    "tfl_arrivals": SourceSpec(
+        source_key="tfl_arrivals",
+        source_id="tfl_arrivals",
+        source_name="TfL Arrivals",
+        dataset_name="tfl_arrivals",
+        description="TfL stop arrivals realtime snapshot",
+        func=download_tfl_arrivals,
         required_env=("TFL_API_KEY",),
         realtime=True,
     ),

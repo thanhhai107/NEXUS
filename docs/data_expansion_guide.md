@@ -8,6 +8,7 @@
 5. [Config mẫu cho từng nguồn](#5-config-mẫu-cho-từng-nguồn)
 6. [Volume ước tính](#6-volume-ước-tính)
 7. [Thứ tự triển khai đề xuất](#7-thứ-tự-triển-khai-đề-xuất)
+8. [Nguồn tích hợp thêm cho giai đoạn mở rộng](#8-nguồn-tích-hợp-thêm-cho-giai-đoạn-mở-rộng)
 
 ---
 
@@ -1115,6 +1116,133 @@ $env:PYTHONPATH = "."; .\venv\Scripts\python.exe `
     ├── Document volume metrics
     └── Prepare demo scripts
 ```
+
+---
+
+## 8. Nguồn tích hợp thêm cho giai đoạn mở rộng
+
+Phần này là hướng mở rộng sau khi các source hiện có đã tải ổn định vào runtime local hoặc VM (`/data`). Các nguồn dưới đây đã được thêm cấu hình định hướng trong `config/download_defaults.yml`, nhưng chưa nên đưa vào source group chạy tự động cho tới khi có adapter ingestion tương ứng. Cách đi hợp lý là giữ Bronze raw đầy đủ trước, sau đó chuẩn hóa Silver theo từng output.
+
+### 8.1 `tfl_live_traffic_disruptions`
+
+**Mức ưu tiên:** Cao cho transport realtime. Nguồn này bổ sung road events mà TfL đang cập nhật từ traffic control centre, phù hợp để join với DfT road traffic, STATS19 và thời tiết/air quality.
+
+**Cách tích hợp phù hợp nhất:** bắt đầu bằng TIMS legacy XML feed vì không cần auth và cấu trúc ổn định cho polling 5 phút. Unified API `/Road/all/Disruption` nên để optional path dùng `TFL_API_KEY` khi cần JSON hoặc enrich metadata.
+
+**Bronze:** lưu nguyên XML theo partition `date/hour/poll_time`, manifest phải ghi `source_url`, `poll_time`, `etag/last_modified` nếu có, và hash để dedupe.
+
+**Silver đề xuất:**
+- `tfl_traffic_disruptions`: một record cho mỗi disruption, gồm id, category, status, severity, start/end time, location text, comments, current update, last modified.
+- `tfl_traffic_disruption_geometries`: tách point/line/polygon từ `CauseArea`, giữ cả British National Grid và WGS84 nếu feed cung cấp.
+
+```yaml
+tfl_live_traffic_disruptions:
+  velocity: streaming
+  ingestion_mode: polling_xml
+  poll_interval_sec: 300
+  source_url: "https://tfl.gov.uk/tfl/syndication/feeds/tims_feed.xml"
+  api_url: "https://api.tfl.gov.uk/Road/all/Disruption"
+  expected_format: xml
+  silver_outputs:
+    - tfl_traffic_disruptions
+    - tfl_traffic_disruption_geometries
+```
+
+### 8.2 `tfl_bikepoint_occupancy`
+
+**Mức ưu tiên:** Cao cho active mobility realtime. Nguồn này tạo time-series occupancy cho Santander Cycles, giúp demo velocity rõ hơn TfL line status vì mỗi poll sinh nhiều station snapshots.
+
+**Cách tích hợp phù hợp nhất:** dùng XML feed `livecyclehireupdates.xml` trước vì public/no auth. Unified API `/BikePoint` giữ làm fallback hoặc enrich station metadata.
+
+**Bronze:** lưu raw XML mỗi 5 phút. Cần giữ snapshot time từ feed nếu có; nếu không có thì dùng `poll_time`/`ingested_at`.
+
+**Silver đề xuất:**
+- `tfl_bikepoint_occupancy`: station snapshot với `nb_bikes`, `nb_empty_docks`, `nb_docks`, `nb_spaces`, `capacity`, trạng thái `installed/locked/temporary`.
+- `tfl_bikepoint_station_reference`: thông tin station tương đối ổn định như id, name, lat, lon, capacity.
+
+```yaml
+tfl_bikepoint_occupancy:
+  velocity: streaming
+  ingestion_mode: polling_xml
+  poll_interval_sec: 300
+  source_url: "https://www.tfl.gov.uk/tfl/syndication/feeds/cycle-hire/livecyclehireupdates.xml"
+  api_url: "https://api.tfl.gov.uk/BikePoint"
+  silver_outputs:
+    - tfl_bikepoint_occupancy
+    - tfl_bikepoint_station_reference
+```
+
+### 8.3 `ea_hydrology_rainfall_river`
+
+**Mức ưu tiên:** Trung bình-cao cho environment. Nguồn này bổ sung hydrology, rainfall và flood context, rất hợp để phân tích tác động mưa lớn lên traffic disruption, accident risk và air quality.
+
+**Cách tích hợp phù hợp nhất:** tách thành hai nhánh. Flood Monitoring API dùng micro-batch `readings?latest` mỗi 15 phút cho near realtime. Hydrology API dùng batch/micro-batch để discover stations quanh London và tải readings theo khoảng ngày.
+
+**Bronze:** lưu JSON response nguyên bản, giữ `meta` vì có licence, publisher, version, limit và documentation.
+
+**Silver đề xuất:**
+- `ea_hydrology_stations`
+- `ea_rainfall_readings`
+- `ea_river_level_readings`
+- `ea_river_flow_readings`
+- `ea_flood_alerts`
+
+```yaml
+ea_hydrology_rainfall_river:
+  velocity: micro_batch
+  apis:
+    flood_monitoring:
+      base_url: "https://environment.data.gov.uk/flood-monitoring"
+      latest_readings: "/data/readings?latest"
+      poll_interval_sec: 900
+    hydrology:
+      base_url: "https://environment.data.gov.uk/hydrology"
+      station_endpoint: "/id/stations"
+      readings_endpoint: "/data/readings"
+  observed_properties:
+    - rainfall
+    - waterLevel
+    - waterFlow
+```
+
+### 8.4 `defra_noise_mapping`
+
+**Mức ưu tiên:** Trung bình cho demo, cao cho variety. Đây là nguồn geospatial/modelled, không phải sensor realtime, nên nên đưa vào batch enrichment thay vì realtime polling.
+
+**Cách tích hợp phù hợp nhất:** bước đầu tải qua UI “Download data by area of interest” để inspect layer/format cho London. Sau khi chắc format, mới tự động hóa WCS theo bbox London. Adapter cần hỗ trợ geospatial/raster, CRS `EPSG:27700`, clipping/reprojection và chuyển sang grid hoặc borough aggregate.
+
+**Bronze:** lưu file geospatial/raster nguyên bản kèm metadata WCS/GetCapabilities.
+
+**Silver đề xuất:**
+- `defra_road_noise_grid`
+- `defra_rail_noise_grid`
+- `noise_by_borough`
+- `noise_exposure_joined_with_transport`
+
+```yaml
+defra_noise_mapping:
+  velocity: batch
+  source_type: geospatial_modelled_noise
+  datasets:
+    road_noise_all_metrics:
+      wcs: "https://environment.data.gov.uk/spatialdata/road-noise-all-metrics-england-round-4/wcs"
+    rail_noise_all_metrics:
+      wcs: "https://environment.data.gov.uk/spatialdata/rail-noise-all-metrics-england-round-4/wcs"
+  geography:
+    target_area: london
+    crs: "EPSG:27700"
+```
+
+### 8.5 Đánh giá tích hợp
+
+| Source | Hợp lý | Chưa hợp lý / cần làm trước |
+|--------|--------|------------------------------|
+| `tfl_live_traffic_disruptions` | Rất hợp với realtime transport, poll 5 phút, raw XML dễ lưu Bronze | Cần parser XML và schema Silver riêng cho geometry |
+| `tfl_bikepoint_occupancy` | Rất hợp để tạo time-series dày, public feed không auth | Cần dedupe snapshot và tách station reference khỏi occupancy |
+| `ea_hydrology_rainfall_river` | Bổ sung environment micro-batch, metadata tốt, không cần API key | Cần strategy station discovery quanh London trước khi tải historical lớn |
+| `defra_noise_mapping` | Tăng variety geospatial và liên kết transport-environment | Chưa nên chạy tự động nếu pipeline chưa có raster/WCS handling |
+
+Thứ tự implement khuyến nghị: `tfl_bikepoint_occupancy` trước, sau đó `tfl_live_traffic_disruptions`, tiếp theo `ea_hydrology_rainfall_river`, cuối cùng mới đến `defra_noise_mapping`.
 
 ---
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from ingestion.base.core import DownloadContext, SourceRun
@@ -18,7 +19,7 @@ from ingestion.base.utils import (
 def download_openaq(run: SourceRun, context: DownloadContext) -> None:
     env = require_env(run, "OPENAQ_API_KEY")
     opts = source_options(context, "openaq")
-    base = str(opts.get("base_url", "https://api.openaq.org/v3")).rstrip("/")
+    base = openaq_base_url(os.environ.get("OPENAQ_API_URL") or opts.get("base_url"))
     headers = {"X-API-Key": env["OPENAQ_API_KEY"]}
     page_limit = min(int(opts.get("page_limit", 1000)), 1000)
 
@@ -61,6 +62,20 @@ def download_openaq(run: SourceRun, context: DownloadContext) -> None:
                 end_date=end,
                 page_limit=page_limit,
             )
+
+
+def openaq_base_url(configured_url: Any = None) -> str:
+    """Normalize OpenAQ host/base/endpoint config to the v3 API base."""
+    base = str(configured_url or "https://api.openaq.org/v3").strip().rstrip("/")
+    for suffix in ("/measurements", "/locations", "/sensors", "/parameters", "/hours"):
+        if base.endswith(suffix):
+            base = base[: -len(suffix)]
+            break
+    if base.endswith("/v3"):
+        return base
+    if base.endswith("/v2"):
+        return f"{base[:-3]}/v3"
+    return f"{base}/v3"
 
 
 def download_openaq_parameters(

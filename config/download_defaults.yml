@@ -14,13 +14,19 @@ schema_inference:
 
 polling:
   tfl:
-    enabled: true
-    interval_seconds: 60
+    enabled: false
+    interval_seconds: 300
     timeout_minutes: 10
     pool: default_pool
     backfill_on_restart: true
+  tfl_line_status:
+    enabled: true
+    interval_seconds: 300
+    timeout_minutes: 5
+    pool: default_pool
+    backfill_on_restart: true
   tfl_arrivals:
-    enabled: false
+    enabled: true
     interval_seconds: 60
     timeout_minutes: 5
     pool: default_pool
@@ -188,22 +194,36 @@ sources:
   realtime_snapshot:
   - waqi
   - openweather
-  - tfl
+  - tfl_line_status
+  - tfl_arrivals
   realtime_polling:
-  - tfl
+  - tfl_line_status
+  - tfl_arrivals
   # Expanded realtime sources for big data platform
   expanded_realtime:
   - waqi
   - openweather
-  - tfl
+  - tfl_line_status
+  - tfl_arrivals
+  # Expanded historical sources for one-off/backfill demo loads
+  expanded_historical:
+  - londonair
+  - openmeteo
+  - openaq
+  - ncei
+  - dft
+  - stats19
 rate_limits:
   default_delay_seconds: 0.1
-  openaq_delay_seconds: 0.125
+  openaq_delay_seconds: 0.2
   londonair_delay_seconds: 0.2
+  openmeteo_delay_seconds: 1.0
   ncei_delay_seconds: 0.25
   waqi_delay_seconds: 1.0
   openweather_delay_seconds: 0.2
   tfl_delay_seconds: 0.2
+  tfl_line_status_delay_seconds: 0.2
+  tfl_arrivals_delay_seconds: 0.2
   dft_delay_seconds: 0.1
 retry:
   max_retries: 5
@@ -321,6 +341,8 @@ londonair:
   - WM0
 openaq:
   base_url: https://api.openaq.org/v3
+  api_key_env: OPENAQ_API_KEY
+  env_base_url: OPENAQ_API_URL
   discovery_strategy: bbox
   radius_meters: 25000
   page_limit: 1000
@@ -477,6 +499,193 @@ tfl:
   - 940GZZLUWFT  # Willesden Junction
   - 940GZZLUGRD  # Gospel Oak
   - 940GZZLUEUS  # Euston
+tfl_line_status:
+  inherits: tfl
+  domain: transport
+  subdomain: public_transport_status
+  velocity: streaming
+  ingestion_mode: polling_json
+  poll_interval_sec: 300
+  kafka_topic: nexus.raw.transport.tfl.line_status
+  expected_format: json
+  silver_outputs:
+  - tfl_line_status
+  - tfl_line_routes
+  - tfl_line_disruptions
+tfl_arrivals:
+  inherits: tfl
+  domain: transport
+  subdomain: public_transport_arrivals
+  velocity: streaming
+  ingestion_mode: polling_json
+  poll_interval_sec: 60
+  kafka_topic: nexus.raw.transport.tfl.arrivals
+  key_fields:
+  - stop_id
+  expected_format: json
+  silver_outputs:
+  - tfl_arrivals
+  - tfl_arrival_predictions
+tfl_live_traffic_disruptions:
+  implemented: false
+  adapter_status: planned
+  enabled: true
+  domain: transport
+  subdomain: road_events
+  velocity: streaming
+  ingestion_mode: polling_xml
+  poll_interval_sec: 300
+  source_url: https://tfl.gov.uk/tfl/syndication/feeds/tims_feed.xml
+  api_url: https://api.tfl.gov.uk/Road/all/Disruption
+  auth:
+    legacy_xml: none
+    unified_api: optional_app_key
+    app_key_env: TFL_API_KEY
+  docs:
+    api_docs: https://tfl.gov.uk/info-for/open-data-users/api-documentation
+    tims_spec: https://tfl.gov.uk/cdn/static/cms/documents/tims-feed-technical-specification.pdf
+    swagger: https://api.tfl.gov.uk/swagger/docs/v1
+  kafka_topic: nexus.raw.transport.tfl.traffic_disruptions
+  key_fields:
+  - disruption_id
+  expected_format: xml
+  bronze:
+    store_raw_xml: true
+    write_manifest: true
+  silver_outputs:
+  - tfl_traffic_disruptions
+  - tfl_traffic_disruption_geometries
+tfl_bikepoint_occupancy:
+  implemented: false
+  adapter_status: planned
+  enabled: true
+  domain: transport
+  subdomain: active_mobility
+  velocity: streaming
+  ingestion_mode: polling_xml
+  poll_interval_sec: 300
+  source_url: https://www.tfl.gov.uk/tfl/syndication/feeds/cycle-hire/livecyclehireupdates.xml
+  api_url: https://api.tfl.gov.uk/BikePoint
+  auth:
+    legacy_xml: none
+    unified_api: optional_app_key
+    app_key_env: TFL_API_KEY
+  docs:
+    dataset: https://data.london.gov.uk/dataset/cycle-hire-availability-expzx/
+    api_docs: https://tfl.gov.uk/info-for/open-data-users/api-documentation
+    swagger: https://api.tfl.gov.uk/swagger/docs/v1
+  kafka_topic: nexus.raw.transport.tfl.bikepoint_occupancy
+  key_fields:
+  - bikepoint_id
+  expected_format: xml
+  bronze:
+    store_raw_xml: true
+    write_manifest: true
+  silver_schema:
+  - bikepoint_id
+  - name
+  - lat
+  - lon
+  - nb_bikes
+  - nb_empty_docks
+  - nb_docks
+  - nb_spaces
+  - capacity
+  - installed
+  - locked
+  - temporary
+  - snapshot_time
+  - ingested_at
+  - source_file
+  - run_id
+  silver_outputs:
+  - tfl_bikepoint_occupancy
+  - tfl_bikepoint_station_reference
+ea_hydrology_rainfall_river:
+  implemented: false
+  adapter_status: planned
+  enabled: true
+  domain: environment
+  subdomain: hydrology
+  velocity: micro_batch
+  apis:
+    flood_monitoring:
+      base_url: https://environment.data.gov.uk/flood-monitoring
+      docs: https://environment.data.gov.uk/flood-monitoring/doc/reference
+      latest_readings: /data/readings?latest
+      poll_interval_sec: 900
+    hydrology:
+      base_url: https://environment.data.gov.uk/hydrology
+      docs: https://environment.data.gov.uk/hydrology/doc/reference
+      station_endpoint: /id/stations
+      readings_endpoint: /data/readings
+  geography:
+    center_lat: 51.5074
+    center_lon: -0.1278
+    radius_km: 50
+  observed_properties:
+  - rainfall
+  - waterLevel
+  - waterFlow
+  formats:
+  - json
+  - csv
+  bronze:
+    store_raw_json: true
+    write_manifest: true
+  silver_outputs:
+  - ea_hydrology_stations
+  - ea_rainfall_readings
+  - ea_river_level_readings
+  - ea_river_flow_readings
+  - ea_flood_alerts
+defra_noise_mapping:
+  implemented: false
+  adapter_status: planned
+  enabled: true
+  domain: environment
+  subdomain: noise_pollution
+  cross_domain_links:
+  - transport.road_traffic
+  - transport.rail_network
+  velocity: batch
+  source_type: geospatial_modelled_noise
+  year_represented: 2021
+  round: 4
+  datasets:
+    road_noise_all_metrics:
+      page: https://ckan.publishing.service.gov.uk/dataset/road-noise-all-metrics-england-round-4
+      dsp_page: https://environment.data.gov.uk/dataset/562c9d56-7c2d-4d42-83bb-578d6e97a517
+      wcs: https://environment.data.gov.uk/spatialdata/road-noise-all-metrics-england-round-4/wcs
+    rail_noise_all_metrics:
+      page: https://ckan.publishing.service.gov.uk/dataset/rail-noise-all-metrics-england-round-4
+      wcs: https://environment.data.gov.uk/spatialdata/rail-noise-all-metrics-england-round-4/wcs
+  metrics:
+    road:
+    - Lden
+    - LAeq16h
+    - Lday
+    - Leve
+    - Lnight
+    rail:
+    - Lden
+    - LAeq16h
+    - Lday
+    - Leve
+    - Lnight
+    - LAeq6h
+    - LAeq18h
+  geography:
+    target_area: london
+    crs: "EPSG:27700"
+  bronze:
+    store_raw_geospatial: true
+    write_manifest: true
+  silver_outputs:
+  - defra_road_noise_grid
+  - defra_rail_noise_grid
+  - noise_by_borough
+  - noise_exposure_joined_with_transport
 dft_road_traffic:
   base_url: https://roadtraffic.dft.gov.uk/api
   region_id: 6

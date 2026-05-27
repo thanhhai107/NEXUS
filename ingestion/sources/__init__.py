@@ -13,7 +13,7 @@ from ingestion.sources.openmeteo import download_openmeteo
 # Real-time
 from ingestion.sources.waqi import download_waqi
 from ingestion.sources.openweather import download_openweather
-from ingestion.sources.tfl import download_tfl
+from ingestion.sources.tfl import download_tfl, download_tfl_arrivals, download_tfl_line_status
 
 # Transport
 from ingestion.sources.stats19 import download_stats19
@@ -33,6 +33,8 @@ __all__ = [
     "download_waqi",
     "download_openweather",
     "download_tfl",
+    "download_tfl_arrivals",
+    "download_tfl_line_status",
     # Transport
     "download_stats19",
     "download_naptan",

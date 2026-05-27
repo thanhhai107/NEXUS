@@ -21,15 +21,45 @@ from ingestion.base.utils import (
 
 
 def download_tfl(run: SourceRun, context: DownloadContext) -> None:
-    """Download TfL line status and arrivals data."""
+    """Download the combined TfL realtime snapshot."""
+    base, params, poll_time = _tfl_request_context(run, context, "tfl")
+
+    _download_tfl_status(run, base, params, poll_time, "tfl")
+    _download_tfl_arrivals(run, base, params, poll_time, "tfl")
+
+
+def download_tfl_line_status(run: SourceRun, context: DownloadContext) -> None:
+    """Download TfL line status, routes, and disruptions only."""
+    base, params, poll_time = _tfl_request_context(run, context, "tfl_line_status")
+
+    _download_tfl_status(run, base, params, poll_time, "tfl_line_status")
+
+
+def download_tfl_arrivals(run: SourceRun, context: DownloadContext) -> None:
+    """Download TfL stop arrivals only."""
+    base, params, poll_time = _tfl_request_context(run, context, "tfl_arrivals")
+
+    _download_tfl_arrivals(run, base, params, poll_time, "tfl_arrivals")
+
+
+def _tfl_request_context(
+    run: SourceRun,
+    context: DownloadContext,
+    option_source: str,
+) -> tuple[str, dict[str, str], dict[str, str]]:
     env = require_env(run, "TFL_API_KEY")
-    opts = source_options(context, "tfl")
-    base = opts.get("base_url", "https://api.tfl.gov.uk")
+    opts = _tfl_options(context, option_source)
+    base = str(opts.get("base_url", "https://api.tfl.gov.uk")).rstrip("/")
     params = _tfl_auth_params(env["TFL_API_KEY"])
     poll_time = poll_time_slug(context)
+    return base, params, poll_time
 
-    _download_tfl_status(run, base, params, poll_time)
-    _download_tfl_arrivals(run, base, params, poll_time)
+
+def _tfl_options(context: DownloadContext, option_source: str) -> dict[str, Any]:
+    base_options = source_options(context, "tfl")
+    if option_source == "tfl":
+        return base_options
+    return {**base_options, **source_options(context, option_source)}
 
 
 def _tfl_auth_params(api_key: str) -> dict[str, str]:
@@ -41,9 +71,15 @@ def _tfl_auth_params(api_key: str) -> dict[str, str]:
     return params
 
 
-def _download_tfl_status(run: SourceRun, base: str, params: dict[str, str], poll_time: dict[str, str]) -> None:
+def _download_tfl_status(
+    run: SourceRun,
+    base: str,
+    params: dict[str, str],
+    poll_time: dict[str, str],
+    option_source: str,
+) -> None:
     """Download TfL line status, routes, and disruptions."""
-    opts = source_options(run.context, "tfl")
+    opts = _tfl_options(run.context, option_source)
     modes = ",".join(opts.get("selected_modes", ["tube", "dlr", "overground", "elizabeth-line"]))
     endpoints = {
         "status": f"{base}/Line/Mode/{modes}/Status",
@@ -70,9 +106,15 @@ def _download_tfl_status(run: SourceRun, base: str, params: dict[str, str], poll
         raise SourceFailure("All TfL status/route/disruption requests failed.")
 
 
-def _download_tfl_arrivals(run: SourceRun, base: str, params: dict[str, str], poll_time: dict[str, str]) -> None:
+def _download_tfl_arrivals(
+    run: SourceRun,
+    base: str,
+    params: dict[str, str],
+    poll_time: dict[str, str],
+    option_source: str,
+) -> None:
     """Download TfL stop arrivals."""
-    opts = source_options(run.context, "tfl")
+    opts = _tfl_options(run.context, option_source)
     stop_ids = opts.get("selected_stop_ids") or []
     if not stop_ids:
         return
