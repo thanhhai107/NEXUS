@@ -21,7 +21,7 @@ def iter_artifact_records(path: str | Path) -> Iterable[dict[str, Any]]:
         yield from _iter_jsonl(artifact_path)
         return
     if suffix in {".json", ".geojson"}:
-        payload = _read_json_object(artifact_path)
+        payload = _read_json_payload(artifact_path)
         yield from extract_records(payload)
         return
     if suffix == ".csv":
@@ -41,9 +41,6 @@ def _iter_jsonl(path: Path) -> Iterable[dict[str, Any]]:
                 yield payload
 
 
-def _read_json_object(path: Path) -> dict[str, Any]:
+def _read_json_payload(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as file:
-        payload = json.load(file)
-    if not isinstance(payload, dict):
-        raise ValueError(f"Expected object JSON at {path}")
-    return payload
+        return json.load(file)

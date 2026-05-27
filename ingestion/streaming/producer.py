@@ -21,6 +21,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from ingestion.base.core import DownloadContext, SourceRun
 from ingestion.base.http import download_file, request_json
@@ -83,8 +84,6 @@ def sim_event(source: str, count: int) -> list[dict[str, object]]:
 
 def normalize_stream_source(source: str) -> str:
     aliases = {
-        "tfl_arrivals": "tfl",
-        "tfl_line_status": "tfl",
         "tfl_status": "tfl",
         "tfl_transport_status": "tfl",
     }
@@ -139,18 +138,32 @@ def fetch_api_events(
         return []
 
     headers = {}
+    resolved_url = api_url
     if api_key:
-        if auth_header == "X-API-Key":
+        if auth_header == "query-app_key":
+            resolved_url = _append_query_param(resolved_url, "app_key", api_key)
+        elif auth_header == "X-API-Key":
             headers[auth_header] = api_key
         else:
             headers[auth_header] = f"Bearer {api_key}"
 
     try:
-        payload = request_json.__wrapped__(None, api_url, headers=headers, timeout=20) if hasattr(request_json, '__wrapped__') else _raw_request(api_url, headers)
+        payload = (
+            request_json.__wrapped__(None, resolved_url, headers=headers, timeout=20)
+            if hasattr(request_json, '__wrapped__')
+            else _raw_request(resolved_url, headers)
+        )
     except Exception:
         return []
 
     return _normalize_payload(source, payload, limit)
+
+
+def _append_query_param(url: str, key: str, value: str) -> str:
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query[key] = value
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 def _raw_request(url: str, headers: dict[str, str]) -> Any:
@@ -173,11 +186,13 @@ def _normalize_payload(source: str, payload: Any, limit: int) -> list[dict[str, 
         return _normalize_openmeteo(payload)[:limit]
     if source == "openweather":
         return [_normalize_openweather(payload)][:limit]
-    if source == "tfl":
+    if source in {"tfl", "tfl_line_status"}:
         events = []
         for record in records[:limit]:
             events.extend(_normalize_tfl(record))
         return events[:limit]
+    if source == "tfl_arrivals":
+        return [_normalize_tfl_arrival(record) for record in records[:limit]]
 
     return [_normalize_generic(record) for record in records[:limit]]
 
@@ -290,8 +305,35 @@ def _normalize_tfl(record: dict[str, Any]) -> list[dict[str, object]]:
             "line_name": record.get("name"),
             "status": status.get("statusSeverityDescription"),
             "severity": status.get("statusSeverity"),
+            "reason": status.get("reason"),
         })
     return events
+
+
+def _normalize_tfl_arrival(record: dict[str, Any]) -> dict[str, object]:
+    event_id = ":".join(
+        str(record.get(field) or "")
+        for field in ("vehicleId", "lineId", "expectedArrival")
+    ).strip(":")
+    return {
+        "event_id": event_id or str(record.get("id") or uuid.uuid4()),
+        "source": "tfl_arrivals",
+        "event_type": "arrival_prediction",
+        "event_time": str(record.get("expectedArrival") or now_iso()),
+        "prediction_time": now_iso(),
+        "stop_id": record.get("naptanId"),
+        "station_name": record.get("stationName"),
+        "platform_name": record.get("platformName"),
+        "line_id": record.get("lineId"),
+        "line_name": record.get("lineName"),
+        "vehicle_id": record.get("vehicleId"),
+        "destination_name": record.get("destinationName"),
+        "expected_arrival": record.get("expectedArrival"),
+        "time_to_station": record.get("timeToStation"),
+        "current_location": record.get("currentLocation"),
+        "direction": record.get("direction"),
+        "mode_name": record.get("modeName"),
+    }
 
 
 def _normalize_generic(record: dict[str, Any]) -> dict[str, object]:

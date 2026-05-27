@@ -39,6 +39,8 @@ from ingestion.downloaders.validation import (
 from ingestion.sources.londonair import download_londonair
 from ingestion.sources.ncei import download_ncei
 from ingestion.sources.openmeteo import download_openmeteo
+from ingestion.sources.openmeteo_historical_weather import download_openmeteo_historical_weather
+from ingestion.sources.ukair import download_ukair_air_quality_archive
 from ingestion.sources.openaq import download_openaq
 from ingestion.sources.waqi import download_waqi
 from ingestion.sources.openweather import download_openweather
@@ -256,11 +258,17 @@ def run_once(
     config = load_config(config_path)
     resolved_mode_name, mode = resolve_mode(config, mode_name)
     resolved_output_dir = resolve_output_dir(config, output_dir)
+    source_groups = config.get("sources", {})
+    if not isinstance(source_groups, dict):
+        source_groups = {}
+    default_group = source_group or (
+        resolved_mode_name if resolved_mode_name in source_groups else str(config.get("default_source_group") or "core_historical")
+    )
     selected = resolve_source_keys(
         config,
         source_keys=source_keys,
         source_group=source_group,
-        default_group=str(config.get("default_source_group") or "core_historical"),
+        default_group=default_group,
     )
     resolved_run_id = run_id
     if not resolved_run_id and resume and resume_latest:
@@ -403,6 +411,10 @@ def run_polling(
 def normalize_source_key(source: str) -> str:
     aliases = {
         "openmeteo_air_quality": "openmeteo",
+        "openmeteo_historical_weather": "openmeteo_historical_weather",
+        "ukair_air_quality_archive": "ukair_air_quality_archive",
+        "ukair": "ukair_air_quality_archive",
+        "uk_air": "ukair_air_quality_archive",
         "londonair_monitoring": "londonair",
         "openaq_measurements": "openaq",
         "ncei_cdo_climate": "ncei",
@@ -515,6 +527,22 @@ SOURCE_REGISTRY: dict[str, SourceSpec] = {
         description="Open-Meteo historical air quality and weather for borough centroids",
         func=download_openmeteo,
     ),
+    "openmeteo_historical_weather": SourceSpec(
+        source_key="openmeteo_historical_weather",
+        source_id="openmeteo_historical_weather",
+        source_name="Open-Meteo Historical Weather",
+        dataset_name="openmeteo_historical_weather",
+        description="Open-Meteo historical weather CSV for generated bbox grid points",
+        func=download_openmeteo_historical_weather,
+    ),
+    "ukair_air_quality_archive": SourceSpec(
+        source_key="ukair_air_quality_archive",
+        source_id="ukair_air_quality_archive",
+        source_name="UK-AIR Air Quality Archive",
+        dataset_name="ukair_air_quality_archive",
+        description="UK-AIR archive CSV files discovered from site flat-file pages",
+        func=download_ukair_air_quality_archive,
+    ),
     "londonair": SourceSpec(
         source_key="londonair",
         source_id="londonair_monitoring",
@@ -600,7 +628,6 @@ SOURCE_REGISTRY: dict[str, SourceSpec] = {
         dataset_name="tfl_transport",
         description="TfL line status, routes, disruptions, and arrivals",
         func=download_tfl,
-        required_env=("TFL_API_KEY",),
         realtime=True,
     ),
     "tfl_line_status": SourceSpec(
@@ -610,7 +637,6 @@ SOURCE_REGISTRY: dict[str, SourceSpec] = {
         dataset_name="tfl_line_status",
         description="TfL line status, routes, and disruptions realtime snapshot",
         func=download_tfl_line_status,
-        required_env=("TFL_API_KEY",),
         realtime=True,
     ),
     "tfl_arrivals": SourceSpec(
@@ -620,7 +646,6 @@ SOURCE_REGISTRY: dict[str, SourceSpec] = {
         dataset_name="tfl_arrivals",
         description="TfL stop arrivals realtime snapshot",
         func=download_tfl_arrivals,
-        required_env=("TFL_API_KEY",),
         realtime=True,
     ),
 }

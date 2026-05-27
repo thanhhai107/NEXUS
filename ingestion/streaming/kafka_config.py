@@ -14,6 +14,13 @@ from typing import Any
 
 # Default NEXUS streaming topics (can be overridden via KAFKA_TOPIC_* env vars)
 KAFKA_TOPIC_PREFIX = "KAFKA_TOPIC_"
+TFL_LINE_IDS = (
+    "bakerloo,central,circle,district,hammersmith-city,jubilee,metropolitan,"
+    "northern,piccadilly,victoria,waterloo-city,dlr,elizabeth,liberty,lioness,"
+    "mildmay,suffragette,weaver,windrush"
+)
+TFL_DEFAULT_LINE_STATUS_URL = f"https://api.tfl.gov.uk/Line/{TFL_LINE_IDS}/Status"
+TFL_DEFAULT_ARRIVALS_STOP_ID = "940GZZLUKSX"
 
 def _get_topic_env(source_key: str) -> str:
     """Get topic from environment variable KAFKA_TOPIC_{SOURCE_KEY}."""
@@ -164,8 +171,29 @@ STREAM_TOPICS = {
     "tfl": StreamSourceConfig(
         source_key="tfl",
         topic=os.getenv("KAFKA_TOPIC_TRANSPORT_TFL", "transport-tfl"),
-        api_url=os.getenv("TFL_API_URL", "https://api.tfl.gov.uk/Line/Mode/tube,dlr,overground,elizabeth-line/Status"),
+        api_url=os.getenv("TFL_API_URL", TFL_DEFAULT_LINE_STATUS_URL),
         api_key=os.getenv("TFL_API_KEY"),
+        auth_header="query-app_key",
+        poll_interval_seconds=300.0,
+    ),
+    "tfl_line_status": StreamSourceConfig(
+        source_key="tfl_line_status",
+        topic=os.getenv("KAFKA_TOPIC_TFL_LINE_STATUS", "transport-tfl-line-status"),
+        api_url=os.getenv("TFL_LINE_STATUS_API_URL", TFL_DEFAULT_LINE_STATUS_URL),
+        api_key=os.getenv("TFL_API_KEY"),
+        auth_header="query-app_key",
+        poll_interval_seconds=300.0,
+    ),
+    "tfl_arrivals": StreamSourceConfig(
+        source_key="tfl_arrivals",
+        topic=os.getenv("KAFKA_TOPIC_TFL_ARRIVALS", "transport-tfl-arrivals"),
+        api_url=os.getenv(
+            "TFL_ARRIVALS_API_URL",
+            f"https://api.tfl.gov.uk/StopPoint/{TFL_DEFAULT_ARRIVALS_STOP_ID}/Arrivals",
+        ),
+        api_key=os.getenv("TFL_API_KEY"),
+        auth_header="query-app_key",
+        poll_interval_seconds=60.0,
     ),
     "gtfs": StreamSourceConfig(
         source_key="gtfs",

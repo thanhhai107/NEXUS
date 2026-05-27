@@ -352,6 +352,73 @@ The registry derives `ingestion_method` from `source_type` and
 `update_frequency` from `poll_seconds`/`freshness_hours`. Override either field
 on a dataset entry in `domains/<domain>/datasets.yml` when needed.
 
+## Data Source Catalog
+
+The current source set is split by how the pipeline should operate on it:
+
+- **Batch**: one-off or slow-changing files/snapshots. Good for backfill,
+  reference tables, and historical fact tables.
+- **Mini-batch**: API pulls over bounded windows, pages, sensors, stations, or
+  grid cells. Good for incremental Bronze loads and Silver normalization.
+- **Stream / polling**: frequent snapshots from live APIs. These land as raw
+  snapshots/events and need event-time, deduplication, and watermark handling in
+  later phases.
+- **Reference / fallback**: sample or synthetic datasets retained for local
+  demos, compatibility, or tests.
+
+### Implemented Sources
+
+These sources have downloader and/or producer code in this repository and can be
+selected with `python scripts/download_data.py --source <source_key>` unless the
+notes say they are producer-only.
+
+| Source key | Dataset / output | Domain | Mode | Access and raw format | Cadence | Meaning for downstream phases |
+| --- | --- | --- | --- | --- | --- | --- |
+| `stats19` | `stats19_collisions` plus raw `collisions`, `vehicles`, `casualties` files | Transport | Batch | GOV.UK / DfT CSV downloads discovered from the road-safety open-data page | Yearly or ad hoc backfill | Historical road-collision facts. Use as the main road-safety base for Silver collision/vehicle/casualty tables and Gold safety summaries. |
+| `naptan` | `naptan_stops` | Transport | Batch reference | DfT NaPTAN API CSV for ATCO area `490` | Slow-changing snapshot | Public-transport stop reference data. Join TfL arrivals and transport events by stop / NaPTAN identifiers. |
+| `london_journeys` | `london_journeys` | Transport | Batch aggregate | London Datastore CSV | Periodic snapshot | Aggregate passenger journeys by mode and period. Use for long-term demand context, not event-level movement. |
+| `dft` | `dft_road_traffic` | Transport | Mini-batch API | DfT Road Traffic REST API, paginated JSONL | Historical backfill by year | London count points and AADF traffic volumes. Join with road safety and noise/road exposure work. |
+| `tfl_line_status` | `tfl_line_status` | Transport | Stream / polling | TfL Unified API JSON (`/Line/{ids}/Status`, plus route/disruption endpoints), optional `TFL_API_KEY` | 300s | Operational status per TfL line, severity code, and disruption reason. Useful for real-time service health and disruption features. |
+| `tfl_arrivals` | `tfl_arrivals` | Transport | Stream / polling | TfL Unified API JSON (`/StopPoint/{stopId}/Arrivals`), optional `TFL_API_KEY` | 60s | Vehicle arrival predictions at selected stops. Deduplicate downstream on `vehicleId + lineId + expectedArrival`. |
+| `tfl` | `tfl_transport` raw combined snapshot | Transport | Stream / polling wrapper | TfL Unified API JSON for line status and arrivals | Mixed 60s/300s depending on caller | Convenience wrapper for combined TfL snapshots; prefer `tfl_line_status` and `tfl_arrivals` for explicit phase work. |
+| `openaq` | `openaq_measurements` | Environment | Mini-batch API | OpenAQ v3 API JSON/JSONL, requires `OPENAQ_API_KEY` | Sensor/date-window backfill | Air-quality locations, sensors, parameters, and hourly measurements. Strong source for pollutant time series and station metadata. |
+| `londonair` | `londonair_monitoring` | Environment | Hybrid mini-batch + polling | LondonAir JSON endpoints, no key | Metadata + hourly/daily latest + historical site windows | London-specific monitoring sites, species metadata, AQI indexes, health advice, and site time series. Good local authority/station context. |
+| `openmeteo` | `openmeteo_air_quality` | Environment | Batch / mini-batch API | Open-Meteo air-quality and archive APIs, JSON | Date-range backfill by borough centroid | Historical weather and air-quality features for each London borough centroid. Useful as exogenous features for transport and air-quality models. |
+| `openmeteo_historical_weather` | `openmeteo_historical_weather` | Environment | Batch / mini-batch API | Open-Meteo archive API CSV over generated bbox grid points | Date-range backfill by grid batch | High-coverage weather history over Greater London grid cells. Useful for spatial feature engineering before Silver/Gold joins. |
+| `ukair_air_quality_archive` | `ukair_air_quality_archive` | Environment | Batch archive | UK-AIR flat-file site pages, discovered CSV downloads | Annual/site archive | DEFRA UK-AIR historical site pollutant CSVs. Useful for long-range air-quality backfill and cross-checking LondonAir/OpenAQ coverage. |
+| `ncei` | `ncei_cdo_climate` | Environment | Mini-batch API | NOAA/NCEI CDO API JSON, requires `NCEI_API_TOKEN` | Monthly windows by station | Daily climate observations for selected London-area stations. Useful for weather/climate enrichment and validation. |
+| `waqi` | `waqi_air_quality` | Environment | Stream / polling | WAQI API JSON, requires `WAQI_API_TOKEN` | 300s | Live AQI station feed. Use for current air-quality snapshots and streaming quality checks. |
+| `openweather` | `openweather_current` | Environment | Stream / polling | OpenWeather API JSON, requires `OPENWEATHER_API_KEY` | 300s | Current weather, forecast, day summary, and air-pollution snapshots by borough centroid. Useful for live context features. |
+| `transport` | `transport_events` | Transport | Reference / producer-only fallback | Synthetic producer events unless `TRANSPORT_EVENTS_API_URL` is configured; no downloader source | Demo stream | Local streaming fallback for Kafka, DLQ, and quality checks when no real transport API is configured. |
+| `gtfs` | `gtfs_realtime_events` | Transport | Reference / producer-only | GTFS Realtime URL from `GTFS_REALTIME_URL` when configured | 30s target | Placeholder wrapper for a future GTFS Realtime feed. Not in default London download groups. |
+
+### New Sources Traced From The Uncommitted Worktree
+
+`git status` currently shows the following newly added or expanded source work:
+
+| Source | Evidence in files | Current status | Notes |
+| --- | --- | --- | --- |
+| `ukair_air_quality_archive` | `ingestion/sources/ukair.py`, downloader registry, `config/download_defaults.yml` | Implemented downloader | Discovers UK-AIR site CSV links and downloads archive files without reshaping. |
+| `openmeteo_historical_weather` | `ingestion/sources/openmeteo_historical_weather.py`, downloader registry, `config/download_defaults.yml` | Implemented downloader | Generates bbox grid points and downloads Open-Meteo archive CSV batches. |
+| `tfl_line_status` | `ingestion/sources/tfl.py`, streaming config, transport dataset/schema/quality/semantic files | Implemented downloader + producer config | TfL API key is optional; default line ids match current TfL line naming. |
+| `tfl_arrivals` | `ingestion/sources/tfl.py`, streaming config, transport dataset/schema/quality/semantic files | Implemented downloader + producer config | Default stops are verified live: King's Cross, Waterloo, and Trafalgar Square bus stop. |
+| `tfl_live_traffic_disruptions` | `config/download_defaults.yml` | Planned only | Config captures candidate TfL road-disruption endpoints; no adapter is wired into `SOURCE_REGISTRY` yet. |
+| `tfl_bikepoint_occupancy` | `config/download_defaults.yml` | Planned only | Candidate BikePoint/cycle-hire source; no downloader yet. |
+| `ea_hydrology_rainfall_river` | `config/download_defaults.yml` | Planned only | Candidate Environment Agency hydrology/rainfall source; no downloader yet. |
+| `defra_noise_mapping` | `config/download_defaults.yml` | Planned only | Candidate batch geospatial noise source; no downloader yet. |
+
+### Source Groups
+
+The default source groups in `config/download_defaults.yml` are:
+
+| Group | Sources | Intended use |
+| --- | --- | --- |
+| `core_historical` | `openmeteo`, `naptan`, `london_journeys`, `dft`, `ncei`, `stats19`, `openaq`, `londonair` | Main historical/reference lake bootstrap. |
+| `latest_update` | `openmeteo`, `naptan`, `london_journeys`, `dft`, `ncei`, `openaq`, `londonair` | Smaller refresh-oriented historical pull. |
+| `realtime_snapshot` | `waqi`, `openweather`, `tfl_line_status`, `tfl_arrivals` | One-shot current snapshot for live sources. |
+| `realtime_polling` | `tfl_line_status`, `tfl_arrivals` | Repeated TfL polling jobs. |
+| `expanded_historical` | `londonair`, `ukair_air_quality_archive`, `openmeteo`, `openmeteo_historical_weather`, `openaq`, `ncei`, `dft`, `stats19` | Wider batch/mini-batch backfill set for data expansion work. |
+
 ## Dead Letter Queue
 
 The DLQ stores operational failures (Kafka publish/consume failures, job
@@ -389,7 +456,10 @@ python ingestion/batch/csv_ingestion.py --dataset us_accidents --source assets/s
 python -m cli.nexus batch run --dataset us_accidents --batch-id latest
 python -m cli.nexus agent review --dataset us_accidents --batch-id latest
 python -m cli.nexus quality stream --source transport --sample-events 25
-python ingestion/streaming/producer.py --source tfl --events 5
+python scripts/download_data.py --source-group core_historical --mode small_demo
+python scripts/download_data.py --source tfl_line_status --source tfl_arrivals --mode small_demo
+python scripts/download_data.py --poll --source-group realtime_polling --duration-days 0.1 --interval-minutes 1
+python ingestion/streaming/producer.py --source tfl_arrivals --events 5
 python -m pytest
 ```
 
@@ -450,16 +520,20 @@ Streaming flow:
 3. Run streaming quality checks against sampled events.
 4. Record metadata and quarantine invalid samples.
 
-Supported streaming sources:
+Supported producer sources:
 
-| Source | Dataset |
-| --- | --- |
-| `transport` | `transport_events` |
-| `tfl` | `tfl_transport_status` |
-| `gtfs` | `gtfs_realtime_events` |
-| `singapore` | `sg_traffic` |
-| `openaq` | `openaq_measurements` |
-| `waqi` | `waqi_air_quality` |
+| Source | Dataset/topic target | Real API behavior |
+| --- | --- | --- |
+| `transport` | `transport_events` | Uses `TRANSPORT_EVENTS_API_URL` when configured; otherwise synthetic fallback. |
+| `tfl` | `transport-tfl` / line-status events | TfL line status JSON; optional `TFL_API_KEY`. |
+| `tfl_line_status` | `transport-tfl-line-status` | TfL line status JSON every 300s; optional `TFL_API_KEY`. |
+| `tfl_arrivals` | `transport-tfl-arrivals` | TfL StopPoint arrivals JSON every 60s; optional `TFL_API_KEY`. |
+| `gtfs` | `gtfs_realtime_events` | Requires `GTFS_REALTIME_URL`; otherwise no real events. |
+| `openaq` | `openaq_measurements` | Uses OpenAQ API when `OPENAQ_API_KEY` and URL are configured; otherwise simulated environment fallback. |
+| `waqi` | `waqi_air_quality` | Uses WAQI API when `WAQI_API_TOKEN`/URL are configured; otherwise simulated environment fallback. |
+| `londonair` | `environment-londonair` | Pulls LondonAir hourly monitoring index JSON. |
+| `openmeteo` | `environment-openmeteo` | Pulls current Open-Meteo air-quality JSON for London. |
+| `openweather` | `environment-openweather` | Pulls OpenWeather JSON when `OPENWEATHER_API_KEY` is configured. |
 
 ## Governance
 

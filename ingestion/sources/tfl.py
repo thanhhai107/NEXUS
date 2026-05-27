@@ -10,7 +10,7 @@ import os
 from typing import Any
 
 from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
-from ingestion.base.http import request_json, require_env
+from ingestion.base.http import request_json
 from ingestion.base.utils import (
     estimate_record_count,
     extract_records,
@@ -47,10 +47,9 @@ def _tfl_request_context(
     context: DownloadContext,
     option_source: str,
 ) -> tuple[str, dict[str, str], dict[str, str]]:
-    env = require_env(run, "TFL_API_KEY")
     opts = _tfl_options(context, option_source)
     base = str(opts.get("base_url", "https://api.tfl.gov.uk")).rstrip("/")
-    params = _tfl_auth_params(env["TFL_API_KEY"])
+    params = _tfl_auth_params(opts)
     poll_time = poll_time_slug(context)
     return base, params, poll_time
 
@@ -62,13 +61,34 @@ def _tfl_options(context: DownloadContext, option_source: str) -> dict[str, Any]
     return {**base_options, **source_options(context, option_source)}
 
 
-def _tfl_auth_params(api_key: str) -> dict[str, str]:
-    """Build TfL API authentication params."""
-    params = {"app_key": api_key}
+def _tfl_auth_params(opts: dict[str, Any]) -> dict[str, str]:
+    """Build optional TfL API authentication params."""
+    api_key_env = str(opts.get("api_key_env") or "TFL_API_KEY")
+    api_key = os.environ.get(api_key_env) or os.environ.get("TFL_API_KEY")
+    params: dict[str, str] = {}
+    if api_key:
+        params["app_key"] = api_key
     app_id = os.environ.get("TFL_APP_ID")
     if app_id:
         params["app_id"] = app_id
     return params
+
+
+def _tfl_line_endpoint_base(base: str, opts: dict[str, Any]) -> str:
+    line_ids = [
+        str(line_id).strip()
+        for line_id in (opts.get("selected_line_ids") or [])
+        if str(line_id).strip()
+    ]
+    if line_ids:
+        return f"{base}/Line/{','.join(line_ids)}"
+
+    modes = ",".join(
+        str(mode).strip()
+        for mode in opts.get("selected_modes", ["tube", "dlr", "overground", "elizabeth-line"])
+        if str(mode).strip()
+    )
+    return f"{base}/Line/Mode/{modes}"
 
 
 def _download_tfl_status(
@@ -80,16 +100,16 @@ def _download_tfl_status(
 ) -> None:
     """Download TfL line status, routes, and disruptions."""
     opts = _tfl_options(run.context, option_source)
-    modes = ",".join(opts.get("selected_modes", ["tube", "dlr", "overground", "elizabeth-line"]))
+    line_base = _tfl_line_endpoint_base(base, opts)
     endpoints = {
-        "status": f"{base}/Line/Mode/{modes}/Status",
-        "routes": f"{base}/Line/Mode/{modes}/Route",
-        "disruptions": f"{base}/Line/Mode/{modes}/Disruption",
+        "status": f"{line_base}/Status",
+        "routes": f"{line_base}/Route",
+        "disruptions": f"{line_base}/Disruption",
     }
     successes = 0
 
     for name, url in endpoints.items():
-        chunk_id = f"tfl:{name}:poll={poll_time['stamp']}"
+        chunk_id = f"{option_source}:{name}:poll={poll_time['stamp']}"
         if run.should_skip(chunk_id):
             successes += 1
             continue
@@ -121,7 +141,7 @@ def _download_tfl_arrivals(
 
     successes = 0
     for stop_id in stop_ids:
-        chunk_id = f"tfl_arrivals:stop={stop_id}:poll={poll_time['stamp']}"
+        chunk_id = f"{option_source}:arrivals:stop={stop_id}:poll={poll_time['stamp']}"
         if run.should_skip(chunk_id):
             successes += 1
             continue

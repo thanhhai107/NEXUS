@@ -133,6 +133,72 @@ datasets:
       bronze_table: nexus.bronze.tfl_transport_status
       silver_table: nexus.silver.tfl_transport_status
       gold_table: nexus.gold.tfl_transport_status_hourly
+  tfl_line_status:
+    domain: transport
+    description: TfL Unified API line status, routes, and disruptions polled every 5 minutes.
+    nexus_demo:
+      status: primary_realtime_stream
+      default_download: true
+      scope: greater_london
+      layers:
+      - realtime_polling
+      modes:
+      - small_demo
+      - full_demo
+    source_type: api_stream
+    source_uri: https://api.tfl.gov.uk/Line/{ids}/Status
+    docs_uri: https://api.tfl.gov.uk
+    api_key_env: TFL_API_KEY
+    auth: optional_app_key
+    topic: nexus.raw.transport.tfl.line_status
+    poll_seconds: 300
+    schema_path: domains/transport/schemas/tfl_line_status.schema.json
+    freshness_hours: 1
+    primary_keys:
+    - event_id
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/tfl_line_status/
+      bronze_table: nexus.bronze.tfl_line_status
+      silver_table: nexus.silver.tfl_line_status
+      gold_table: nexus.gold.tfl_line_status_hourly
+  tfl_arrivals:
+    domain: transport
+    description: TfL Unified API live arrival predictions for selected StopPoint IDs.
+    nexus_demo:
+      status: primary_realtime_stream
+      default_download: true
+      scope: greater_london
+      layers:
+      - realtime_polling
+      modes:
+      - small_demo
+      - full_demo
+    source_type: api_stream
+    source_uri: https://api.tfl.gov.uk/StopPoint/{stopId}/Arrivals
+    docs_uri: https://api.tfl.gov.uk
+    api_key_env: TFL_API_KEY
+    auth: optional_app_key
+    topic: nexus.raw.transport.tfl.arrivals
+    poll_seconds: 60
+    schema_path: domains/transport/schemas/tfl_arrivals.schema.json
+    freshness_hours: 1
+    primary_keys:
+    - vehicle_id
+    - line_id
+    - expected_arrival
+    semantic_dedup_keys:
+    - vehicle_id
+    - line_id
+    - expected_arrival
+    late_data_policy:
+      event_time_field: expected_arrival
+      watermark: 30 minutes
+      aggregation_window: 5 minutes
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/tfl_arrivals/
+      bronze_table: nexus.bronze.tfl_arrivals
+      silver_table: nexus.silver.tfl_arrivals
+      gold_table: nexus.gold.tfl_arrivals_hourly
   gtfs_realtime_events:
     domain: transport
     description: Industry-standard GTFS Realtime feed wrapper for vehicle positions,

@@ -243,6 +243,107 @@ datasets:
         - probabilistic
         - splink
         - llm_assisted_review
+  tfl_line_status:
+    glossary:
+      dataset_term: TfL Line Status Event
+      field_terms:
+        line_id: Line Identifier
+        line_name: Line Name
+        status: Line Status
+        severity: Status Severity Code
+        reason: Disruption Reason
+    field_mappings:
+      - source_field: event_time
+        canonical_field: event_time
+        issue: different_timestamp_timezone_grain
+        time_role: event_time
+      - source_field: line_id
+        canonical_field: transport_line_id
+        issue: different_name_same_meaning
+    standards:
+      time:
+        event_time_field: event_time
+        ingestion_time_field: _nexus_ingested_at
+        source_timezone: Europe/London
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+      spatial:
+        source_crs: EPSG:4326
+        storage_crs: EPSG:4326
+        render_crs: EPSG:3857
+    grain:
+      entity_grain:
+        - line_id
+        - status
+      time_grain: line_status_poll
+      spatial_grain: line
+      aggregation_level: realtime_snapshot
+    definitions:
+      status: Operational condition for a TfL public transport line at poll time.
+    entity_matching:
+      entity_type: transport_line
+      source_id_fields:
+        - line_id
+      candidate_fields:
+        - line_name
+        - status
+      canonical_entity_id_field: canonical_entity_id
+      methods:
+        - exact
+        - rule_based
+        - fuzzy
+  tfl_arrivals:
+    glossary:
+      dataset_term: TfL Arrival Prediction
+      field_terms:
+        stop_id: StopPoint Identifier
+        vehicle_id: Vehicle Identifier
+        line_id: Line Identifier
+        expected_arrival: Expected Arrival Time
+        time_to_station: Seconds To Arrival
+    field_mappings:
+      - source_field: expected_arrival
+        canonical_field: event_time
+        issue: different_name_same_meaning
+        time_role: event_time
+      - source_field: stop_id
+        canonical_field: stop_point_id
+        issue: different_name_same_meaning
+      - source_field: line_id
+        canonical_field: transport_line_id
+        issue: different_name_same_meaning
+    standards:
+      time:
+        event_time_field: expected_arrival
+        ingestion_time_field: prediction_time
+        source_timezone: UTC
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+    grain:
+      entity_grain:
+        - vehicle_id
+        - line_id
+        - expected_arrival
+      time_grain: arrival_prediction
+      spatial_grain: stop_point
+      aggregation_level: realtime_prediction
+    definitions:
+      time_to_station: Countdown in seconds from the poll time until predicted vehicle arrival.
+    entity_matching:
+      entity_type: public_transport_vehicle_arrival
+      source_id_fields:
+        - vehicle_id
+        - line_id
+        - expected_arrival
+      candidate_fields:
+        - station_name
+        - destination_name
+      canonical_entity_id_field: canonical_entity_id
+      methods:
+        - exact
+        - rule_based
   gtfs_realtime_events:
     glossary:
       dataset_term: GTFS Realtime Event

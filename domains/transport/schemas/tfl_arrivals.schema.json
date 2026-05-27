@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TfL Arrivals",
+  "type": "object",
+  "required": [
+    "event_id",
+    "source",
+    "event_type",
+    "event_time",
+    "line_id",
+    "vehicle_id",
+    "expected_arrival"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "source": {
+      "const": "tfl_arrivals"
+    },
+    "event_type": {
+      "const": "arrival_prediction"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "prediction_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "stop_id": {
+      "type": ["string", "null"]
+    },
+    "station_name": {
+      "type": ["string", "null"]
+    },
+    "platform_name": {
+      "type": ["string", "null"]
+    },
+    "line_id": {
+      "type": ["string", "null"]
+    },
+    "line_name": {
+      "type": ["string", "null"]
+    },
+    "vehicle_id": {
+      "type": ["string", "null"]
+    },
+    "destination_name": {
+      "type": ["string", "null"]
+    },
+    "expected_arrival": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "time_to_station": {
+      "type": ["integer", "null"]
+    },
+    "current_location": {
+      "type": ["string", "null"]
+    },
+    "direction": {
+      "type": ["string", "null"]
+    },
+    "mode_name": {
+      "type": ["string", "null"]
+    }
+  }
+}

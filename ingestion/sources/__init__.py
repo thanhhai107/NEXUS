@@ -9,6 +9,8 @@ Each module handles exactly one data source.
 from ingestion.sources.londonair import download_londonair
 from ingestion.sources.openaq import download_openaq
 from ingestion.sources.openmeteo import download_openmeteo
+from ingestion.sources.openmeteo_historical_weather import download_openmeteo_historical_weather
+from ingestion.sources.ukair import download_ukair_air_quality_archive
 
 # Real-time
 from ingestion.sources.waqi import download_waqi
@@ -29,6 +31,8 @@ __all__ = [
     "download_londonair",
     "download_openaq",
     "download_openmeteo",
+    "download_openmeteo_historical_weather",
+    "download_ukair_air_quality_archive",
     # Real-time
     "download_waqi",
     "download_openweather",

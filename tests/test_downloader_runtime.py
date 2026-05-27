@@ -8,6 +8,8 @@ import requests
 
 from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
 from ingestion.base.http import request_json
+from ingestion.canonical.parser import iter_artifact_records
+from ingestion.downloaders.london_downloader import maybe_publish_raw_envelope
 from ingestion.downloaders.raw_adapter import published_run_to_raw_envelope
 
 
@@ -156,6 +158,13 @@ def test_published_run_converts_to_raw_envelope_idempotently(tmp_path: Path) -> 
     assert rows[0]["_nexus_dataset"] == "demo_dataset"
     assert rows[0]["_nexus_chunk_id"] == "chunk-a"
     assert rows[0]["payload"] == {"id": "1"}
+
+
+def test_json_array_artifact_records_are_supported(tmp_path: Path) -> None:
+    path = tmp_path / "records.json"
+    path.write_text('[{"id": "1"}, {"id": "2"}]', encoding="utf-8")
+
+    assert list(iter_artifact_records(path)) == [{"id": "1"}, {"id": "2"}]
 
 
 def test_downloader_publish_routes_parser_failures_to_dlq(monkeypatch, tmp_path: Path) -> None:

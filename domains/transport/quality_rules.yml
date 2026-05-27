@@ -36,6 +36,25 @@ datasets:
     - event_type
     - event_time
     freshness_column: event_time
+  tfl_line_status:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    - line_id
+    - status
+    freshness_column: event_time
+  tfl_arrivals:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    - line_id
+    - vehicle_id
+    - expected_arrival
+    freshness_column: expected_arrival
   gtfs_realtime_events:
     required_columns:
     - event_id

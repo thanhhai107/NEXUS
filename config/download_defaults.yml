@@ -129,6 +129,29 @@ modes:
     openweather_borough_limit: 3
     ncei_station_limit: 1
     dft_page_limit: 2
+    openmeteo_historical_weather_options:
+      start_date: '2024-01-01'
+      end_date: '2024-01-31'
+      hourly:
+      - temperature_2m
+      - relative_humidity_2m
+      - precipitation
+      - rain
+      - cloud_cover
+      - pressure_msl
+      - wind_speed_10m
+      - wind_direction_10m
+      - pm2_5
+      - pm10
+      - nitrogen_dioxide
+      - ozone
+      - sulphur_dioxide
+      - carbon_monoxide
+    ukair_air_quality_archive_options:
+      site_limit: 3
+      year_start: 2025
+      year_end: 2025
+      max_files_per_site: 1
   full_demo:
     core_start: '2020-01-01'
     core_end: '2025-12-31'
@@ -147,6 +170,7 @@ modes:
     - O3
     - SO2
     - CO
+    - C6H6
     openaq_location_limit: null
     openaq_sensor_limit: null
     waqi_station_limit: null
@@ -174,6 +198,22 @@ modes:
     ncei_station_limit: 3
     dft_page_limit: 2
 sources:
+  small_demo:
+  - openmeteo
+  - openmeteo_historical_weather
+  - ukair_air_quality_archive
+  - londonair
+  - openaq
+  - ncei
+  - waqi
+  - openweather
+  - stats19
+  - naptan
+  - london_journeys
+  - dft
+  - tfl
+  - tfl_line_status
+  - tfl_arrivals
   core_historical:
   - openmeteo
   - naptan
@@ -208,7 +248,9 @@ sources:
   # Expanded historical sources for one-off/backfill demo loads
   expanded_historical:
   - londonair
+  - ukair_air_quality_archive
   - openmeteo
+  - openmeteo_historical_weather
   - openaq
   - ncei
   - dft
@@ -217,7 +259,9 @@ rate_limits:
   default_delay_seconds: 0.1
   openaq_delay_seconds: 0.2
   londonair_delay_seconds: 0.2
+  ukair_air_quality_archive_delay_seconds: 0.2
   openmeteo_delay_seconds: 1.0
+  openmeteo_historical_weather_delay_seconds: 1.0
   ncei_delay_seconds: 0.25
   waqi_delay_seconds: 1.0
   openweather_delay_seconds: 0.2
@@ -288,6 +332,127 @@ openmeteo:
   - surface_pressure
   - shortwave_radiation
   - uv_index
+openmeteo_historical_weather:
+  archive_url: https://archive-api.open-meteo.com/v1/archive
+  start_date: '2020-01-01'
+  end_date: '2025-05-31'
+  timezone: GMT
+  format: csv
+  timeformat: iso8601
+  cell_selection: nearest
+  grid_spacing_km: 10
+  max_locations_per_request: 50
+  max_bytes_per_file: 2000000000
+  weather_variables:
+  - temperature_2m
+  - relative_humidity_2m
+  - precipitation
+  - rain
+  - snowfall
+  - cloud_cover
+  - pressure_msl
+  - wind_speed_10m
+  - wind_direction_10m
+  - wind_gusts_10m
+  air_quality_variables:
+  - pm2_5
+  - pm10
+  - nitrogen_dioxide
+  - ozone
+  - sulphur_dioxide
+  - carbon_monoxide
+  - ammonia
+  - pollen_grass
+  - pollen_birch
+  - pollen_olive
+  - uv_index
+  - aerosol_height
+  hourly:
+  - temperature_2m
+  - soil_moisture_100_to_255cm
+  - soil_temperature_0_to_7cm
+  - soil_temperature_7_to_28cm
+  - soil_temperature_28_to_100cm
+  - soil_temperature_100_to_255cm
+  - soil_moisture_0_to_7cm
+  - soil_moisture_28_to_100cm
+  - soil_moisture_7_to_28cm
+  - wind_gusts_10m
+  - wind_direction_100m
+  - wind_direction_10m
+  - wind_speed_100m
+  - wind_speed_10m
+  - relative_humidity_2m
+  - dew_point_2m
+  - apparent_temperature
+  - precipitation
+  - rain
+  - snowfall
+  - snow_depth
+  - vapour_pressure_deficit
+  - et0_fao_evapotranspiration
+  - cloud_cover_high
+  - cloud_cover_mid
+  - cloud_cover
+  - surface_pressure
+  - pressure_msl
+  - weather_code
+  - cloud_cover_low
+  daily:
+  - weather_code
+  - temperature_2m_mean
+  - temperature_2m_max
+  - temperature_2m_min
+  - apparent_temperature_mean
+  - apparent_temperature_max
+  - apparent_temperature_min
+  - sunrise
+  - sunset
+  - daylight_duration
+  - sunshine_duration
+  - precipitation_sum
+  - rain_sum
+  - snowfall_sum
+  - precipitation_hours
+  - wind_speed_10m_max
+  - wind_gusts_10m_max
+  - wind_direction_10m_dominant
+  - shortwave_radiation_sum
+  - et0_fao_evapotranspiration
+  - cloud_cover_mean
+  - cloud_cover_max
+  - cloud_cover_min
+  - dew_point_2m_mean
+  - dew_point_2m_max
+  - dew_point_2m_min
+  - pressure_msl_min
+  - pressure_msl_max
+  - snowfall_water_equivalent_sum
+  - pressure_msl_mean
+  - relative_humidity_2m_min
+  - relative_humidity_2m_max
+  - relative_humidity_2m_mean
+  - et0_fao_evapotranspiration_sum
+  - surface_pressure_mean
+  - surface_pressure_max
+  - surface_pressure_min
+  - winddirection_10m_dominant
+  - wind_gusts_10m_mean
+  - wind_speed_10m_mean
+  - wind_gusts_10m_min
+  - wind_speed_10m_min
+  - soil_temperature_7_to_28cm_mean
+  - soil_temperature_28_to_100cm_mean
+  - soil_temperature_0_to_7cm_mean
+  - soil_moisture_7_to_28cm_mean
+  - soil_moisture_28_to_100cm_mean
+  - soil_moisture_0_to_7cm_mean
+  - wet_bulb_temperature_2m_max
+  - wet_bulb_temperature_2m_mean
+  - wet_bulb_temperature_2m_min
+  - vapour_pressure_deficit_max
+  - soil_moisture_0_to_100cm_mean
+  - soil_temperature_0_to_100cm_mean
 londonair:
   base_url: https://api.erg.ic.ac.uk/AirQuality
   endpoints:
@@ -339,6 +504,41 @@ londonair:
   - TH4
   - WA2
   - WM0
+ukair_air_quality_archive:
+  flat_files_url: https://uk-air.defra.gov.uk/data/flat_files
+  year_start: 2025
+  year_end: current_year
+  path_groups:
+  - site_data
+  - 15min_site_data
+  - site_pol_data
+  site_ids:
+  - BG1
+  - BL0
+  - BN1
+  - BX1
+  - CD1
+  - CR5
+  - EN1
+  - GR4
+  - GR7
+  - HG1
+  - HG4
+  - HR1
+  - HS4
+  - HV1
+  - KC1
+  - LW1
+  - MY1
+  - RB4
+  - TD5
+  - TH4
+  - WA2
+  - WM0
+  site_limit: null
+  pollutants: []
+  max_files_per_site: null
+  max_bytes_per_file: 500000000
 openaq:
   base_url: https://api.openaq.org/v3
   api_key_env: OPENAQ_API_KEY
@@ -419,6 +619,8 @@ openweather:
   write_air_pollution_index_scales: true
 tfl:
   base_url: https://api.tfl.gov.uk
+  api_key_env: TFL_API_KEY
+  auth: optional_app_key
   selected_modes:
   - tube
   - bus
@@ -427,78 +629,30 @@ tfl:
   - tram
   - elizabeth-line
   selected_line_ids:
-  - central
-  - northern
-  - piccadilly
   - bakerloo
+  - central
   - circle
   - district
   - hammersmith-city
   - jubilee
   - metropolitan
+  - northern
+  - piccadilly
   - victoria
   - waterloo-city
-  - elizabeth
-  - london-overground
   - dlr
-  - tram
-  # Major tube stations for arrivals monitoring
+  - elizabeth
+  - liberty
+  - lioness
+  - mildmay
+  - suffragette
+  - weaver
+  - windrush
+  # Verified high-traffic stop points for arrivals monitoring.
   selected_stop_ids:
-  # Central Line
-  - 940GZZLUOXC  # Oxford Circus
-  - 940GZZLUKSX  # Kings Cross
-  - 940GZZLUVIC  # Victoria
-  - 940GZZLUWLA  # White City
-  - 940GZZLUWYN  # Wembley Park
-  - 940GZZLUSHA  # Shepherd's Bush
-  - 940GZZLUBKF  # Bank
-  - 940GZZLUHGG  # Holborn
-  - 940GZZLUGPS  # Green Park
-  - 940GZZLUTCR  # Tottenham Court Road
-  # Northern Line
-  - 940GZZLUMMT  # Moorgate
-  - 940GZZLUEUS  # Euston
-  - 940GZZLUCGN  # Camden Town
-  - 940GZZLUHSL  # Hampstead
-  - 940GZZLUBLM  # Balham
-  - 940GZZLUCLP  # Clapham Common
-  - 940GZZLUWFP  # Waterloo
-  - 940GZZLUSJH  # St Johns Wood
-  # Victoria Line
-  - 940GZZLUPEC  # Peckham
-  - 940GZZLUWRI  # Walthamstow
-  - 940GZZLUBKG  # Brixton
-  - 940GZZLUHPK  # Highbury
-  - 940GZZLUFYG  # Seven Sisters
-  # Jubilee Line
-  - 940GZZLUSFS  # Southfields
-  - 940GZZLUWIM  # Wimbledon
-  - 940GZZLUWLA  # White City
-  - 940GZZLUCWR  # Canary Wharf
-  - 940GZZLUCGN  # Canning Town
-  # Piccadilly Line
-  - 940GZZLUHGR  # Heathrow
-  - 940GZZLUTWY  # Twyford
-  - 940GZZLUEAL  # Ealing Broadway
-  # Elizabeth Line
-  - 940GZZLUPAC  # Paddington
-  - 940GZZLUSHF  # Stratford
-  - 940GZZLURVL  # Romford
-  - 940GZZLUWRX  # Abbey Wood
-  - 940GZZLUSHA  # Shenfield
-  - 940GZZLUIPZ  # Ilford
-  # DLR
-  - 940GZZLUCWR  # Canary Wharf
-  - 940GZZLUBKZ  # Bank
-  - 940GZZLULVT  # Lewisham
-  - 940GZZLUSRR  # Stratford International
-  - 940GZZLUEGC  # Greenwich
-  # Overground
-  - 940GZZLUQDS  # Queens Road Peckham
-  - 940GZZLUHGG  # Highbury & Islington
-  - 940GZZLUWFT  # Willesden Junction
-  - 940GZZLUGRD  # Gospel Oak
-  - 940GZZLUEUS  # Euston
+  - 940GZZLUKSX  # King's Cross St Pancras Underground
+  - 940GZZLUWLO  # Waterloo Underground
+  - 490013766E   # Charing Cross / Trafalgar Square bus stop
 tfl_line_status:
   inherits: tfl
   domain: transport
@@ -521,7 +675,9 @@ tfl_arrivals:
   poll_interval_sec: 60
   kafka_topic: nexus.raw.transport.tfl.arrivals
   key_fields:
-  - stop_id
+  - vehicleId
+  - lineId
+  - expectedArrival
   expected_format: json
   silver_outputs:
   - tfl_arrivals
