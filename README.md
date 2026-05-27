@@ -237,6 +237,11 @@ Semantic contracts can be inspected from the CLI:
 ```powershell
 python -m cli.nexus semantic list --domain environment
 python -m cli.nexus semantic show --dataset openaq_measurements
+python -m cli.nexus semantic export --kind openmetadata --domain environment
+python -m cli.nexus semantic export --kind glossary --domain transport
+python -m cli.nexus semantic match-entities `
+  --dataset openaq_measurements `
+  --source assets/samples/openaq_measurements.csv
 ```
 
 The dbt seed `transform/dbt/seeds/unit_mapping.csv` is the canonical unit

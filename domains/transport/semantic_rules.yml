@@ -190,3 +190,211 @@ datasets:
       aggregation_level: aggregate_period
     definitions:
       journey_count: Aggregate public-transport journeys by reporting period; do not join to event-level trips without allocation.
+  tfl_transport_status:
+    glossary:
+      dataset_term: TfL Transport Status Event
+      field_terms:
+        line_id: Line Identifier
+        line_name: Line Name
+        status: Line Status
+        severity: Disruption Severity
+        reason: Disruption Reason
+    field_mappings:
+      - source_field: event_time
+        canonical_field: event_time
+        issue: different_timestamp_timezone_grain
+        time_role: event_time
+      - source_field: line_id
+        canonical_field: transport_line_id
+        issue: different_name_same_meaning
+    standards:
+      time:
+        event_time_field: event_time
+        ingestion_time_field: _nexus_ingested_at
+        source_timezone: Europe/London
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+      spatial:
+        source_crs: EPSG:4326
+        storage_crs: EPSG:4326
+        render_crs: EPSG:3857
+    grain:
+      entity_grain:
+        - line_id
+        - status
+      time_grain: line_status_event
+      spatial_grain: line
+      aggregation_level: realtime_snapshot
+    definitions:
+      status: TfL line status describes operational condition, not incident lifecycle.
+    entity_matching:
+      entity_type: transport_line
+      source_id_fields:
+        - line_id
+      candidate_fields:
+        - line_name
+        - status
+      canonical_entity_id_field: canonical_entity_id
+      methods:
+        - exact
+        - rule_based
+        - fuzzy
+        - probabilistic
+        - splink
+        - llm_assisted_review
+  gtfs_realtime_events:
+    glossary:
+      dataset_term: GTFS Realtime Event
+      field_terms:
+        event_id: Feed Event Identifier
+        event_time: Feed Poll Event Time
+        feed_url: Feed URL
+        byte_size: Feed Byte Size
+    field_mappings:
+      - source_field: event_time
+        canonical_field: event_time
+        issue: different_timestamp_timezone_grain
+        time_role: event_time
+    standards:
+      time:
+        event_time_field: event_time
+        ingestion_time_field: _nexus_ingested_at
+        source_timezone: UTC
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+    grain:
+      entity_grain:
+        - event_id
+      time_grain: feed_poll
+      spatial_grain: feed
+      aggregation_level: feed_snapshot
+  sg_traffic:
+    glossary:
+      dataset_term: Singapore Traffic Camera Snapshot
+      field_terms:
+        camera_id: Traffic Camera Identifier
+        image_url: Camera Image URL
+        event_time: Observation Event Time
+    field_mappings:
+      - source_field: camera_id
+        canonical_field: camera_id
+        issue: same_name_different_meaning
+      - source_field: event_time
+        canonical_field: event_time
+        issue: different_timestamp_timezone_grain
+        time_role: event_time
+    standards:
+      time:
+        event_time_field: event_time
+        ingestion_time_field: _nexus_ingested_at
+        source_timezone: Asia/Singapore
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+      spatial:
+        latitude_field: latitude
+        longitude_field: longitude
+        source_crs: EPSG:4326
+        storage_crs: EPSG:4326
+        render_crs: EPSG:3857
+    grain:
+      entity_grain:
+        - camera_id
+      time_grain: snapshot
+      spatial_grain: camera_location
+      aggregation_level: realtime_snapshot
+  stats19_collisions:
+    glossary:
+      dataset_term: Road Collision Record
+      field_terms:
+        accident_index: Accident Identifier
+        accident_severity: Accident Severity
+        latitude: Collision Latitude
+        longitude: Collision Longitude
+        date: Accident Event Date
+    field_mappings:
+      - source_field: accident_index
+        canonical_field: accident_id
+        issue: different_name_same_meaning
+      - source_field: date
+        canonical_field: event_date
+        issue: different_timestamp_timezone_grain
+        time_role: event_time
+    standards:
+      units:
+        dimension_type: speed
+        canonical_unit: km/h
+        value_field: speed_limit
+        converted_value_field: speed_limit_kmh
+        implicit_source_unit: mph
+        expected_range:
+          min: 0
+          max: 140
+      time:
+        event_time_field: date
+        ingestion_time_field: _nexus_ingested_at
+        source_timezone: Europe/London
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+      spatial:
+        latitude_field: latitude
+        longitude_field: longitude
+        source_crs: EPSG:4326
+        storage_crs: EPSG:4326
+        render_crs: EPSG:3857
+    grain:
+      entity_grain:
+        - accident_index
+      time_grain: accident_day
+      spatial_grain: collision_point
+      aggregation_level: raw_event
+  dft_road_traffic:
+    glossary:
+      dataset_term: Road Traffic Count Point
+      field_terms:
+        count_point_id: Count Point Identifier
+        aadf_year: Traffic Count Year
+        latitude: Count Point Latitude
+        longitude: Count Point Longitude
+        link_length_km: Link Length Kilometers
+    field_mappings:
+      - source_field: count_point_id
+        canonical_field: count_point_id
+        issue: same_name_different_meaning
+      - source_field: aadf_year
+        canonical_field: event_year
+        issue: different_timestamp_timezone_grain
+        time_role: event_time
+    standards:
+      units:
+        dimension_type: distance
+        canonical_unit: km
+        value_field: link_length_miles
+        converted_value_field: link_length_km_canonical
+        implicit_source_unit: mi
+        expected_range:
+          min: 0
+          max: 100
+      time:
+        event_time_field: aadf_year
+        ingestion_time_field: _nexus_ingested_at
+        source_timezone: UTC
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+      spatial:
+        latitude_field: latitude
+        longitude_field: longitude
+        source_crs: EPSG:4326
+        storage_crs: EPSG:4326
+        render_crs: EPSG:3857
+    grain:
+      entity_grain:
+        - count_point_id
+        - aadf_year
+      time_grain: year
+      spatial_grain: count_point
+      aggregation_level: annual_count

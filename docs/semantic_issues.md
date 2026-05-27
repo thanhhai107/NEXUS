@@ -7,6 +7,8 @@ Tài liệu này áp dụng lớp semantic governance cho các nguồn Environme
 - `domains/transport/semantic_rules.yml`: semantic contract theo dataset transport.
 - `transform/dbt/seeds/unit_mapping.csv`: bảng mapping đơn vị đo dùng bởi dbt seed và Great Expectations.
 - `transform/dbt/models/gold/schema.yml`: khai báo semantic grain, time standard và unit standardization cho Gold models.
+- `python -m cli.nexus semantic export`: sinh output OpenMetadata hoặc Business Glossary từ semantic contracts.
+- `python -m cli.nexus semantic match-entities`: tạo `canonical_entity_id` và entity crosswalk từ semantic rules.
 
 ## Checklist
 
@@ -36,7 +38,13 @@ Tài liệu này áp dụng lớp semantic governance cho các nguồn Environme
 ## Kiểm tra nhanh
 
 ```powershell
+$env:NEXUS_RUNTIME_DIR = "runtime"
 python -m cli.nexus semantic show --dataset openaq_measurements
+python -m cli.nexus semantic export --kind openmetadata --domain environment
+python -m cli.nexus semantic export --kind glossary --domain transport
+python -m cli.nexus semantic match-entities `
+  --dataset openaq_measurements `
+  --source assets/samples/openaq_measurements.csv
 python -m cli.nexus contract show --dataset openaq_measurements
 python -m cli.nexus quality check `
   --dataset openaq_measurements `

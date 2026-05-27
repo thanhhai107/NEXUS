@@ -38,9 +38,16 @@ from common.source_coverage import (
 )
 from common.source_registry import get_source, list_sources
 from common.data_contract import load_data_contract, list_data_contracts
-from common.semantic import load_semantic_contract, list_semantic_contracts
+from common.semantic import (
+    build_business_glossary_export,
+    build_openmetadata_export,
+    load_semantic_contract,
+    list_semantic_contracts,
+    write_semantic_export,
+)
 from governance.agents.governance_agent import review_batch
 from governance.dlq import list_dlq_events, replay_dlq_events
+from governance.entity_resolution import resolve_entities
 from governance.audit import write_audit_event
 from governance.lineage import record_lineage
 from governance.quality.auto_fix import (
@@ -655,6 +662,38 @@ def list_semantics(args: argparse.Namespace) -> None:
 def show_semantic(args: argparse.Namespace) -> None:
     print(json.dumps(load_semantic_contract(args.dataset).to_dict(), indent=2))
 
+def export_semantic(args: argparse.Namespace) -> None:
+    dataset_names = args.dataset or None
+    if args.kind == "openmetadata":
+        payload = build_openmetadata_export(dataset_names, domain=args.domain)
+    else:
+        payload = build_business_glossary_export(dataset_names, domain=args.domain)
+    if args.output:
+        output_path = write_semantic_export(payload, args.output)
+        print(json.dumps({"output_path": str(output_path), "kind": args.kind}, indent=2))
+    else:
+        print(json.dumps(payload, indent=2))
+
+def match_semantic_entities(args: argparse.Namespace) -> None:
+    records = read_csv_records(args.source)
+    result = resolve_entities(
+        args.dataset,
+        records,
+        fuzzy_threshold=args.fuzzy_threshold,
+        probabilistic_threshold=args.probabilistic_threshold,
+    ).to_dict()
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        print(json.dumps({
+            "dataset": args.dataset,
+            "record_count": result["record_count"],
+            "crosswalk_count": len(result["crosswalk"]),
+            "output_path": str(args.output),
+        }, indent=2))
+    else:
+        print(json.dumps(result, indent=2))
+
 def list_dlq(args: argparse.Namespace) -> None:
     events = list_dlq_events()
     if args.category:
@@ -878,6 +917,19 @@ def build_parser() -> argparse.ArgumentParser:
     semantic_show = semantic_subcommands.add_parser("show", help="Show one semantic contract")
     semantic_show.add_argument("--dataset", required=True)
     semantic_show.set_defaults(func=show_semantic)
+    semantic_export = semantic_subcommands.add_parser("export", help="Export OpenMetadata or glossary payloads")
+    semantic_export.add_argument("--kind", choices=["openmetadata", "glossary"], required=True)
+    semantic_export.add_argument("--dataset", action="append", help="Dataset to export. Repeat for multiple datasets.")
+    semantic_export.add_argument("--domain", help="Restrict export to one domain.")
+    semantic_export.add_argument("--output", type=Path, help="Optional JSON output path.")
+    semantic_export.set_defaults(func=export_semantic)
+    semantic_match = semantic_subcommands.add_parser("match-entities", help="Create canonical entity IDs and a crosswalk")
+    semantic_match.add_argument("--dataset", required=True)
+    semantic_match.add_argument("--source", required=True, type=Path)
+    semantic_match.add_argument("--output", type=Path, help="Optional JSON output path.")
+    semantic_match.add_argument("--fuzzy-threshold", type=float, default=0.88)
+    semantic_match.add_argument("--probabilistic-threshold", type=float, default=0.82)
+    semantic_match.set_defaults(func=match_semantic_entities)
 
     dlq = subcommands.add_parser("dlq", help="Dead Letter Queue commands")
     dlq_subcommands = dlq.add_subparsers(dest="dlq_command", required=True)

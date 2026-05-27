@@ -29,7 +29,6 @@ datasets:
         converted_value_field: value_canonical
         allowed_source_units:
           - ug/m3
-          - µg/m³
           - ppm
           - ppb
         expected_range:
@@ -143,3 +142,171 @@ datasets:
     definitions:
       temperature: API is requested with metric units; canonical temperature is celsius.
       wind_speed: API is requested with metric units; canonical speed is m/s.
+  ncei_cdo_climate:
+    glossary:
+      dataset_term: Climate Observation
+      field_terms:
+        station: Climate Station
+        date: Observation Event Time
+        datatype: Climate Measurement Type
+        value: Climate Measurement Value
+    field_mappings:
+      - source_field: station
+        canonical_field: climate_station_id
+        issue: different_name_same_meaning
+      - source_field: date
+        canonical_field: event_time
+        issue: different_timestamp_timezone_grain
+        time_role: event_time
+    standards:
+      units:
+        dimension_type: climate_observation
+        value_field: value
+        unit_field: datatype
+        canonical_unit: source_datatype_defined
+        converted_value_field: value_canonical
+        conversion_required: false
+        expected_range:
+          min: -100000
+          max: 100000
+      time:
+        event_time_field: date
+        ingestion_time_field: _nexus_ingested_at
+        source_timezone: UTC
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+    grain:
+      entity_grain:
+        - station
+        - datatype
+      time_grain: observation_date
+      spatial_grain: climate_station
+      aggregation_level: raw_observation
+    definitions:
+      datatype: NOAA CDO datatype controls the physical meaning and source unit; do not aggregate across datatypes without a datatype-specific metric definition.
+    entity_matching:
+      entity_type: climate_station
+      source_id_fields:
+        - station
+      candidate_fields:
+        - station
+      canonical_entity_id_field: canonical_entity_id
+      methods:
+        - exact
+        - rule_based
+        - fuzzy
+        - probabilistic
+  londonair_monitoring:
+    glossary:
+      dataset_term: London Air Quality Index Reading
+      field_terms:
+        site_code: Monitoring Site
+        site_name: Monitoring Site Name
+        species_code: Pollutant Parameter
+        air_quality_index: Air Quality Index
+        event_time: Observation Event Time
+    field_mappings:
+      - source_field: site_code
+        canonical_field: monitoring_site_id
+        issue: different_name_same_meaning
+      - source_field: species_code
+        canonical_field: pollutant_parameter
+        issue: different_name_same_meaning
+      - source_field: event_time
+        canonical_field: event_time
+        issue: different_timestamp_timezone_grain
+        time_role: event_time
+    standards:
+      time:
+        event_time_field: event_time
+        ingestion_time_field: _nexus_ingested_at
+        source_timezone: Europe/London
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+      spatial:
+        latitude_field: latitude
+        longitude_field: longitude
+        source_crs: EPSG:4326
+        storage_crs: EPSG:4326
+        render_crs: EPSG:3857
+        processing_tools:
+          - GeoPandas
+          - PostGIS
+    grain:
+      entity_grain:
+        - site_code
+        - species_code
+      time_grain: bulletin_timestamp
+      spatial_grain: monitoring_site
+      aggregation_level: air_quality_index_event
+    definitions:
+      air_quality_index: LondonAir monitoring index; keep separate from WAQI AQI, European AQI, and US AQI unless a metric explicitly declares the standard.
+    entity_matching:
+      entity_type: monitoring_site
+      source_id_fields:
+        - site_code
+      candidate_fields:
+        - site_name
+        - latitude
+        - longitude
+      canonical_entity_id_field: canonical_entity_id
+      methods:
+        - exact
+        - rule_based
+        - fuzzy
+        - probabilistic
+        - splink
+        - llm_assisted_review
+  openmeteo_air_quality:
+    glossary:
+      dataset_term: Air Quality Forecast Or Current Reading
+      field_terms:
+        event_time: Observation Event Time
+        latitude: Forecast Latitude
+        longitude: Forecast Longitude
+        pm10: PM10 Concentration
+        pm2_5: PM2.5 Concentration
+        european_aqi: European Air Quality Index
+        us_aqi: US Air Quality Index
+    field_mappings:
+      - source_field: pm2_5
+        canonical_field: pm25
+        issue: different_name_same_meaning
+      - source_field: event_time
+        canonical_field: event_time
+        issue: different_timestamp_timezone_grain
+        time_role: event_time
+    standards:
+      units:
+        dimension_type: concentration
+        canonical_unit: ug/m3
+        implicit_source_unit: ug/m3
+        conversion_required: false
+      time:
+        event_time_field: event_time
+        ingestion_time_field: _nexus_ingested_at
+        source_timezone: UTC
+        storage_timezone: UTC
+        timezone_standard: IANA
+        timestamp_format: ISO 8601
+      spatial:
+        latitude_field: latitude
+        longitude_field: longitude
+        source_crs: EPSG:4326
+        storage_crs: EPSG:4326
+        render_crs: EPSG:3857
+        processing_tools:
+          - GeoPandas
+          - PostGIS
+    grain:
+      entity_grain:
+        - latitude
+        - longitude
+      time_grain: observation_or_forecast_hour
+      spatial_grain: forecast_point
+      aggregation_level: point_time_snapshot
+    definitions:
+      european_aqi: European AQI metric; do not mix with US AQI in the same semantic metric.
+      us_aqi: US AQI metric; do not mix with European AQI in the same semantic metric.
