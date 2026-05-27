@@ -231,7 +231,7 @@ def _run_parallel(
     context: DownloadContext,
     max_workers: int,
 ) -> list[dict[str, Any]]:
-    """Run sources in parallel using ThreadPoolExecutor.
+    """Run sources in parallel using ThreadPoolExecutor with pretty logging.
 
     Args:
         specs: List of source specs to run
@@ -241,44 +241,9 @@ def _run_parallel(
     Returns:
         List of profiles from all sources
     """
-    results: list[dict[str, Any]] = []
-    start_time = datetime.now(timezone.utc)
+    from ingestion.downloaders.pretty_logging import run_parallel_pretty
 
-    print(f"[parallel] starting {len(specs)} sources with {max_workers} workers at {start_time.isoformat()}")
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit all tasks
-        future_to_spec = {
-            executor.submit(run_source, spec, context): spec
-            for spec in specs
-        }
-
-        # Collect results as they complete
-        for future in as_completed(future_to_spec):
-            spec = future_to_spec[future]
-            try:
-                profile = future.result()
-                results.append(profile)
-            except Exception as exc:
-                print(f"[{spec.key}] parallel execution failed: {exc}")
-                results.append({
-                    "source_id": spec.source_id,
-                    "source_key": spec.key,
-                    "status": "failed",
-                    "error": str(exc),
-                    "row_count": 0,
-                    "file_count": 0,
-                    "size_mb": 0.0,
-                })
-
-    elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
-    total_rows = sum(r.get("row_count", 0) for r in results)
-    total_size = sum(r.get("size_mb", 0) for r in results)
-    failed = sum(1 for r in results if r.get("status") == "failed")
-
-    print(f"[parallel] completed in {elapsed:.1f}s - total: rows={total_rows} size_mb={total_size:.2f} failed={failed}")
-
-    return results
+    return run_parallel_pretty(specs, context, max_workers)
 
 
 def run_polling(
