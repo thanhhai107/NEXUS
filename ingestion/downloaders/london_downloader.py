@@ -156,12 +156,15 @@ def maybe_infer_schema(run: SourceRun, context: DownloadContext) -> InferredSche
     if not inference_config.get("enabled", False):
         return None
 
-    # Find JSONL files in raw_dir
-    jsonl_files = list(run.raw_dir.glob("*.jsonl"))
+    # Find JSONL files in raw_dir (recursive, excluding metadata)
+    jsonl_files = list(run.raw_dir.rglob("*.jsonl"))
+    jsonl_files = [f for f in jsonl_files if "metadata" not in str(f)]
+    
     if not jsonl_files:
         return None
 
-    # Use the main JSONL file (or first one found)
+    # Sort by size (largest first = most data)
+    jsonl_files.sort(key=lambda p: p.stat().st_size, reverse=True)
     main_file = jsonl_files[0]
 
     try:

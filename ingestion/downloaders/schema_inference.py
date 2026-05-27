@@ -85,21 +85,17 @@ class InferredSchema:
             if field_schema.inferred_type == "null":
                 field_schema.inferred_type = value_type
             elif field_schema.inferred_type != value_type:
-                # Type mismatch - broaden to string
                 field_schema.inferred_type = "string"
 
-            # Update sample values
             if len(field_schema.sample_values) < 5:
                 field_schema.sample_values.append(value)
 
-            # Update min/max for numeric types
             if field_schema.inferred_type in ("integer", "number"):
                 if field_schema.min_value is None or value < field_schema.min_value:
                     field_schema.min_value = value
                 if field_schema.max_value is None or value > field_schema.max_value:
                     field_schema.max_value = value
 
-            # Detect string patterns
             if field_schema.inferred_type == "string" and isinstance(value, str):
                 pattern = self._detect_pattern(value)
                 if pattern and field_schema.pattern is None:
@@ -123,35 +119,22 @@ class InferredSchema:
 
     def _detect_pattern(self, value: str) -> str | None:
         """Detect common patterns in string values."""
-        # ISO datetime
         if re.match(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", value):
             return "datetime"
-        # Date only
         if re.match(r"\d{4}-\d{2}-\d{2}", value):
             return "date"
-        # UUID
         if re.match(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", value, re.I):
             return "uuid"
-        # Email
         if "@" in value and "." in value.split("@")[-1]:
             return "email"
-        # URL
         if value.startswith(("http://", "https://")):
             return "url"
-        # Coordinates (lat/lon)
         if re.match(r"-?\d+\.\d+", value):
             return "coordinate"
         return None
 
-    def detect_nested_paths(self) -> None:
-        """Detect nested object paths."""
-        for field_name, field_schema in self.fields.items():
-            if field_schema.inferred_type == "object":
-                # Will be populated if we see nested objects
-                pass
-
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
+        """Convert to JSON Schema format."""
         return {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "title": self.source_id,
@@ -238,7 +221,6 @@ class SchemaInference:
 
         Args:
             sample_size: Maximum records to sample for inference.
-                        Set to None for full scan.
         """
         self.sample_size = sample_size
 
@@ -249,17 +231,7 @@ class SchemaInference:
         source_key: str,
         run_id: str | None = None,
     ) -> InferredSchema:
-        """Infer schema from a JSONL file.
-
-        Args:
-            file_path: Path to JSONL file
-            source_id: Source dataset ID
-            source_key: Source key (e.g., 'openaq')
-            run_id: Optional run ID
-
-        Returns:
-            InferredSchema object
-        """
+        """Infer schema from a JSONL file."""
         schema = InferredSchema(
             source_id=source_id,
             source_key=source_key,
@@ -268,7 +240,6 @@ class SchemaInference:
         )
 
         record_count = 0
-        records_to_process = self.sample_size
 
         with file_path.open("r", encoding="utf-8") as f:
             for line in f:
@@ -282,55 +253,15 @@ class SchemaInference:
                     continue
 
                 record_count += 1
-
-                # Flatten nested objects for field-level analysis
                 flat_fields = self._flatten_record(record)
 
                 for field_name, field_value in flat_fields.items():
                     schema.add_field(field_name, field_value)
 
-                # Check sample limit
                 if self.sample_size and record_count >= self.sample_size:
                     break
 
         schema.record_count = record_count
-        schema.detect_nested_paths()
-
-        return schema
-
-    def infer_from_records(
-        self,
-        records: list[dict[str, Any]],
-        source_id: str,
-        source_key: str,
-        run_id: str | None = None,
-    ) -> InferredSchema:
-        """Infer schema from a list of records.
-
-        Args:
-            records: List of record dictionaries
-            source_id: Source dataset ID
-            source_key: Source key
-            run_id: Optional run ID
-
-        Returns:
-            InferredSchema object
-        """
-        schema = InferredSchema(
-            source_id=source_id,
-            source_key=source_key,
-            run_id=run_id,
-            inferred_at=datetime.now(timezone.utc).isoformat(),
-        )
-
-        for record in records[:self.sample_size or len(records)]:
-            flat_fields = self._flatten_record(record)
-            for field_name, field_value in flat_fields.items():
-                schema.add_field(field_name, field_value)
-
-        schema.record_count = len(records)
-        schema.detect_nested_paths()
-
         return schema
 
     def _flatten_record(
@@ -339,19 +270,9 @@ class SchemaInference:
         parent_key: str = "",
         sep: str = "_",
     ) -> dict[str, Any]:
-        """Flatten nested record to dot-separated keys.
-
-        Args:
-            record: Record dictionary
-            parent_key: Parent key prefix
-            sep: Separator for nested keys
-
-        Returns:
-            Flattened dictionary
-        """
+        """Flatten nested record to dot-separated keys."""
         items: dict[str, Any] = {}
 
-        # Handle envelope format with 'payload' field
         if "payload" in record:
             record = record["payload"]
 
@@ -361,14 +282,35 @@ class SchemaInference:
             if isinstance(value, dict):
                 items.update(self._flatten_record(value, new_key, sep))
             elif isinstance(value, list) and value and isinstance(value[0], dict):
-                # Array of objects - extract first item fields
                 items[new_key] = value[0] if value else None
-                # Also store array info
                 items[f"{new_key}_count"] = len(value)
             else:
                 items[new_key] = value
 
         return items
+
+    def infer_from_records(
+        self,
+        records: list[dict[str, Any]],
+        source_id: str,
+        source_key: str,
+        run_id: str | None = None,
+    ) -> InferredSchema:
+        """Infer schema from a list of records."""
+        schema = InferredSchema(
+            source_id=source_id,
+            source_key=source_key,
+            run_id=run_id,
+            inferred_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+        for record in records[: self.sample_size or len(records)]:
+            flat_fields = self._flatten_record(record)
+            for field_name, field_value in flat_fields.items():
+                schema.add_field(field_name, field_value)
+
+        schema.record_count = len(records)
+        return schema
 
 
 def infer_and_save(
@@ -378,26 +320,13 @@ def infer_and_save(
     source_key: str,
     run_id: str | None = None,
 ) -> InferredSchema:
-    """Convenience function to infer schema and save to files.
-
-    Args:
-        file_path: Path to JSONL file
-        output_dir: Output directory for schema files
-        source_id: Source dataset ID
-        source_key: Source key
-        run_id: Optional run ID
-
-    Returns:
-        InferredSchema object
-    """
+    """Convenience function to infer schema and save to files."""
     inference = SchemaInference()
     schema = inference.infer_from_jsonl(file_path, source_id, source_key, run_id)
 
-    # Save full schema
     schema_path = output_dir / f"{source_id}.schema.json"
     schema.save(schema_path)
 
-    # Save summary
     summary_path = output_dir / f"{source_id}.schema_summary.json"
     schema.save_summary(summary_path)
 
