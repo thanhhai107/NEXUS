@@ -69,7 +69,7 @@ runtime/
 │   │       └── run_id={run_id}/
 │   │           ├── metadata/                # Checkpoint, profile, request log
 │   │           ├── published/               # Published manifest
-│   │           ├── raw/                     # Downloaded raw files
+│   │           ├── raw/                     # Downloaded raw files (same as Bronze raw/)
 │   │           └── staging/                  # Temporary files during download
 │   │
 │   ├── silver/                              # SILVER - Đã clean, validate, envelope
