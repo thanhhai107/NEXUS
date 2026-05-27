@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
-from ingestion.downloaders.contracts import (
+from ingestion.base.contracts import (
     CHUNK_FAILED,
     CHUNK_SKIPPED,
     CHUNK_SUCCESS,
@@ -26,7 +26,7 @@ from ingestion.downloaders.contracts import (
     RunManifest,
     SourceSpec,
 )
-from ingestion.downloaders.utils import (
+from ingestion.base.utils import (
     earliest_timestamp,
     estimate_record_count,
     iter_timestamp_strings,
@@ -181,7 +181,6 @@ class SourceRun:
 
     def register_plan(self, plan: DownloadPlan) -> None:
         """Register expected chunks before execution so coverage can detect gaps."""
-
         for chunk in plan.chunks:
             self.expect_chunk(chunk)
 

@@ -44,7 +44,7 @@ infra/docker/          Local Docker Compose stack
 infra/terraform/gcp/   Optional GCP VM cluster for Nexus
 orchestration/         Airflow DAGs
 processing/            Spark Bronze/Silver/Gold jobs
-runtime/               Local generated outputs
+runtime/               Local generated outputs (mirrors /data/ on VM)
 assets/samples/        Sample files for each configured dataset (around 10 rows each)
 serving/               FastAPI, Trino, and Superset assets
 assets/source_discovery/ Generated source inventory and schema metadata
@@ -52,8 +52,113 @@ tests/                 Unit tests
 transform/             dbt project
 ```
 
-`runtime/` is generated output. Do not commit logs, raw data, metrics,
-quarantine files, or synced source-discovery exports from that directory.
+`runtime/` is generated output and mirrors `/data/` on the VM. Do not commit logs,
+raw data, metrics, quarantine files, or synced source-discovery exports from that
+directory.
+
+## Runtime Directory Structure (`runtime/`)
+
+The `runtime/` directory (equivalent to `/data/` on VM) follows the Medallion
+Architecture with additional pipeline infrastructure:
+
+```text
+runtime/
+├── lake/                                    # DATA LAKE - Nơi lưu trữ chính
+│   ├── bronze/                              # BRONZE - Raw data gốc (append-only)
+│   │   └── {domain}/
+│   │       └── {dataset}/
+│   │           └── year={YYYY}/month={MM}/
+│   │               └── {dataset}_{run_id}.{ext}
+│   │
+│   ├── silver/                              # SILVER - Đã clean, validate, envelope
+│   │   └── {domain}/
+│   │       └── {dataset}/
+│   │           └── year={YYYY}/month={MM}/
+│   │               └── {dataset}_{run_id}.jsonl
+│   │
+│   ├── gold/                               # GOLD - Business aggregates (optional)
+│   │   └── {domain}/
+│   │       └── {dataset}/
+│   │           └── year={YYYY}/month={MM}/
+│   │
+│   └── schemas/                           # SCHEMAS - JSON schemas cho mỗi dataset
+│       └── {domain}/
+│           └── {dataset}.schema.json
+│
+├── warehouse/                              # ANALYTICAL ENGINE - Query engines
+│   ├── trino/                             # Trino (distributed SQL engine)
+│   │   └── catalogs/
+│   │       ├── lake.properties            # Bronze/Silver/Gold catalogs
+│   │       └── system.properties
+│   │
+│   ├── minio/                            # MinIO (S3-compatible object store)
+│   │   └── data/                         # Optional: nếu dùng object storage
+│   │       ├── bronze/
+│   │       ├── silver/
+│   │       └── gold/
+│   │
+│   └── postgres/                         # PostgreSQL (metadata catalog)
+│       └── data/                         # PostgreSQL data directory
+│
+├── pipeline/                               # ORCHESTRATION - Pipeline definitions
+│   ├── airflow/                          # Apache Airflow
+│   │   ├── dags/
+│   │   ├── logs/
+│   │   └── config/
+│   │
+│   └── spark/                            # Apache Spark
+│       ├── conf/
+│       ├── jars/
+│       └── logs/
+│
+├── runtime/                               # RUNTIME WORKSPACE - Temporary
+│   ├── staging/                          # STAGING - Files đang download
+│   │   └── {dataset}/
+│   │       └── {run_id}/
+│   │           └── (temporary files)
+│   │
+│   ├── tmp/                             # TMP - Temp files (dọn tự động)
+│   │
+│   ├── logs/                            # LOGS - Application logs
+│   │   └── {service}/
+│   │       ├── downloader/
+│   │       ├── pipeline/
+│   │       └── airflow/
+│   │
+│   └── metrics/                         # METRICS - Prometheus metrics
+│
+├── dlq/                                   # DLQ - Dead Letter Queue (shared)
+│   └── {domain}/
+│       └── {dataset}/
+│           └── {error_type}/
+│               └── {timestamp}.json
+│
+└── quarantine/                            # QUARANTINE - Invalid records (shared)
+    └── {domain}/
+        └── {dataset}/
+            └── {batch_id}/
+                └── records.jsonl
+```
+
+### Layer Descriptions
+
+| Layer | Purpose | Transform? | Schema? |
+| --- | --- | --- | --- |
+| **Bronze** | Lưu raw gốc từ source | ❌ Không | ❌ Không |
+| **Silver** | Envelope wrap, validate, clean | ✅ Có | ✅ Có |
+| **Gold** | Business aggregates | ✅ Có | ✅ Có |
+
+### Directory Purposes
+
+- **`lake/bronze/`**: Raw files gốc từ downloader, không transform, append-only
+- **`lake/silver/`**: Records đã được wrap envelope với metadata, validated
+- **`lake/gold/`**: Business-level aggregates cho analytics/BI
+- **`lake/schemas/`**: JSON Schema definitions cho từng dataset
+- **`warehouse/`**: Query engines (Trino, MinIO, PostgreSQL) configs
+- **`pipeline/`**: Orchestration (Airflow DAGs, Spark configs)
+- **`runtime/staging/`**: Temporary files đang trong quá trình download
+- **`dlq/`**: Dead Letter Queue cho operational failures
+- **`quarantine/`**: Invalid records cần triage
 
 ## Local Setup
 

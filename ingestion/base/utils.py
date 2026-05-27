@@ -8,11 +8,11 @@ from typing import Any, Iterable
 
 import yaml
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "download_defaults.yml"
 DEFAULT_ENV_PATH = PROJECT_ROOT / ".env"
 
-from common.config import DATASETS_DIR
+from common.config import BRONZE_DIR
 
 
 BOROUGH_CENTROIDS: list[dict[str, Any]] = [
@@ -101,8 +101,7 @@ def resolve_dynamic_config_value(value: Any) -> Any:
 def resolve_output_dir(config: dict[str, Any], output_dir: Path | None) -> Path:
     if output_dir:
         return output_dir
-    # Always use DATASETS_DIR from config (which reads from RUNTIME_DIR)
-    return DATASETS_DIR
+    return BRONZE_DIR
 
 def limit_items(items: list[Any], limit: int | None) -> list[Any]:
     if limit is None:
@@ -207,22 +206,19 @@ def iter_dicts(value: Any) -> Iterable[dict[str, Any]]:
         for item in value:
             yield from iter_dicts(item)
 
-def source_options(context: DownloadContext, key: str) -> dict[str, Any]:
-    value = context.config.get(key, {})
-    return value if isinstance(value, dict) else {}
-
-def selected_boroughs(context: DownloadContext, limit_key: str = "borough_limit") -> list[dict[str, Any]]:
-    limit = context.mode.get(limit_key)
-    return limit_items(BOROUGH_CENTROIDS, int(limit) if limit is not None else None)
-
 def iso_start(value: date) -> str:
     return f"{value.isoformat()}T00:00:00Z"
 
 def iso_end(value: date) -> str:
     return f"{value.isoformat()}T23:59:59Z"
 
-def poll_time_slug(context: DownloadContext) -> dict[str, str]:
-    poll_time = context.poll_time or datetime.now(timezone.utc)
+def poll_time_slug(context: Any) -> dict[str, str]:
+    from ingestion.base.core import DownloadContext
+    poll_time = context.poll_time if isinstance(context, DownloadContext) else datetime.now(timezone.utc)
+    if hasattr(context, 'poll_time') and context.poll_time:
+        poll_time = context.poll_time
+    else:
+        poll_time = datetime.now(timezone.utc)
     return {
         "date": poll_time.strftime("%Y-%m-%d"),
         "hour": poll_time.strftime("%H"),

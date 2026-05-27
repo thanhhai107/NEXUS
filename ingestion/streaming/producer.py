@@ -1,36 +1,51 @@
-﻿from __future__ import annotations
+﻿"""
+Kafka Producer for NEXUS Streaming.
 
-import argparse
+Produces events to Kafka topics with retry and DLQ support.
+
+Usage:
+    python -m ingestion.streaming.producer --source openaq --events 10
+
+Environment Variables:
+    KAFKA_BOOTSTRAP_SERVERS - Kafka broker address (default: localhost:29092)
+    KAFKA_SECURITY_PROTOCOL - Security protocol (PLAINTEXT, SASL_SSL, etc.)
+    NEXUS_DLQ_TOPIC         - DLQ topic name (default: nexus.dlq)
+"""
+
+from __future__ import annotations
+
 import json
 import os
-import random
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from ingestion.downloaders.core import DownloadContext, SourceRun
-from ingestion.downloaders.http import download_file, request_json
-from ingestion.downloaders.utils import load_config, resolve_output_dir, run_id_now, sanitize_segment
-
-TOPICS = {
-    "transport": "transport-events",
-    "openaq": "environment-openaq",
-    "waqi": "environment-waqi",
-    "tfl": "transport-tfl",
-    "gtfs": "transport-gtfs",
-    "singapore": "transport-sg-traffic",
-    "londonair": "environment-londonair",
-    "openmeteo": "environment-openmeteo",
-    "openweather": "environment-openweather",
-}
+from ingestion.base.core import DownloadContext, SourceRun
+from ingestion.base.http import download_file, request_json
+from ingestion.base.utils import load_config, resolve_output_dir, run_id_now, sanitize_segment
+from ingestion.streaming.kafka_config import (
+    DEFAULT_STREAM_SOURCE,
+    DLQ_TOPIC,
+    KafkaConfig,
+    ProducerConfig,
+    StreamSourceConfig,
+    STREAM_TOPICS,
+)
 
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# ============================================================================
+# Event Generators (Simulated + Real API)
+# ============================================================================
+
 def sim_transport() -> dict[str, object]:
+    """Generate simulated transport event."""
+    import random
     return {
         "event_id": str(uuid.uuid4()),
         "source": "simulated-transport-producer",
@@ -45,6 +60,8 @@ def sim_transport() -> dict[str, object]:
 
 
 def sim_env() -> dict[str, object]:
+    """Generate simulated environment/air quality event."""
+    import random
     return {
         "event_id": str(uuid.uuid4()),
         "source": "simulated-environment-producer",
@@ -57,46 +74,73 @@ def sim_env() -> dict[str, object]:
     }
 
 
+def sim_event(source: str, count: int) -> list[dict[str, object]]:
+    """Generate simulated events for a source."""
+    if source in {"openaq", "waqi", "londonair", "openmeteo", "openweather"}:
+        return [sim_env() for _ in range(count)]
+    return [sim_transport() for _ in range(count)]
 
 
+# ============================================================================
+# API Event Fetchers
+# ============================================================================
 
-def streaming_source_run(source: str) -> SourceRun:
-    config = load_config()
-    context = DownloadContext(
-        config=config,
-        mode_name="streaming_api",
-        mode={},
-        output_dir=resolve_output_dir(config, None),
-        run_id=os.getenv("NEXUS_STREAM_RUN_ID") or run_id_now(),
-    )
-    return SourceRun(f"streaming_api_{sanitize_segment(source)}", context, source)
-
-
-def api_json(
+def fetch_api_events(
     source: str,
-    url: str,
-    api_key: str | None = None,
-    header: str = "Authorization",
-) -> Any:
+    api_url: str | None,
+    api_key: str | None,
+    auth_header: str = "Authorization",
+    limit: int = 100,
+) -> list[dict[str, object]]:
+    """Fetch events from real API and normalize them."""
+    if not api_url:
+        return []
+
     headers = {}
     if api_key:
-        headers[header] = api_key if header == "X-API-Key" else f"Bearer {api_key}"
-    run = streaming_source_run(source)
-    chunk_id = f"streaming_api:{source}:poll"
-    if run.should_skip(chunk_id):
-        return {}
+        if auth_header == "X-API-Key":
+            headers[auth_header] = api_key
+        else:
+            headers[auth_header] = f"Bearer {api_key}"
+
     try:
-        payload = request_json(run, url, headers=headers, timeout=20)
-        run.mark_complete(chunk_id, {"record_count": len(list_records(payload)) or 1})
-        run.finish("success" if not run.failed_requests else "partial")
-        return payload
-    except Exception as exc:
-        run.mark_failed(chunk_id, str(exc))
-        run.finish("failed", str(exc))
-        raise
+        payload = request_json.__wrapped__(None, api_url, headers=headers, timeout=20) if hasattr(request_json, '__wrapped__') else _raw_request(api_url, headers)
+    except Exception:
+        return []
+
+    return _normalize_payload(source, payload, limit)
 
 
-def list_records(payload: Any) -> list[dict[str, Any]]:
+def _raw_request(url: str, headers: dict[str, str]) -> Any:
+    """Direct HTTP request without SourceRun logging."""
+    import requests
+    response = requests.get(url, headers=headers, timeout=20)
+    response.raise_for_status()
+    return response.json()
+
+
+def _normalize_payload(source: str, payload: Any, limit: int) -> list[dict[str, object]]:
+    """Normalize API payload into standard event format."""
+    records = _extract_records(payload)
+
+    if source == "waqi":
+        return [_normalize_waqi(payload)][:limit]
+    if source == "londonair":
+        return _normalize_londonair(payload)[:limit]
+    if source == "openmeteo":
+        return _normalize_openmeteo(payload)[:limit]
+    if source == "openweather":
+        return [_normalize_openweather(payload)][:limit]
+    if source == "tfl":
+        events = []
+        for record in records[:limit]:
+            events.extend(_normalize_tfl(record))
+        return events[:limit]
+
+    return [_normalize_generic(record) for record in records[:limit]]
+
+
+def _extract_records(payload: Any) -> list[dict[str, Any]]:
     if isinstance(payload, list):
         return [item for item in payload if isinstance(item, dict)]
     if isinstance(payload, dict):
@@ -104,55 +148,14 @@ def list_records(payload: Any) -> list[dict[str, Any]]:
             value = payload.get(key)
             if isinstance(value, list):
                 return [item for item in value if isinstance(item, dict)]
-        nested = payload.get("data")
-        if isinstance(nested, dict):
-            for key in ("records", "readings", "items"):
-                value = nested.get(key)
-                if isinstance(value, list):
-                    return [item for item in value if isinstance(item, dict)]
     return []
 
 
-def norm_transport(record: dict[str, Any]) -> dict[str, object]:
-    return {
-        "event_id": str(record.get("event_id") or record.get("id") or uuid.uuid4()),
-        "source": str(record.get("source") or "real-time-transport-api"),
-        "event_type": str(record.get("event_type") or record.get("type") or "traffic_incident"),
-        "event_time": str(record.get("event_time") or record.get("start_time") or now_iso()),
-        "severity": record.get("severity"),
-        "state": record.get("state"),
-        "city": record.get("city"),
-        "latitude": record.get("latitude") or record.get("lat"),
-        "longitude": record.get("longitude") or record.get("lng"),
-    }
-
-
-def norm_openaq(record: dict[str, Any]) -> dict[str, object]:
-    period = record.get("period") or {}
-    coordinates = record.get("coordinates") or {}
-    parameter = record.get("parameter") or {}
-    observed_at = str(period.get("datetimeFrom") or record.get("datetime") or now_iso())
-    return {
-        "event_id": str(record.get("id") or uuid.uuid4()),
-        "source": "openaq",
-        "event_type": "air_quality_measurement",
-        "event_time": observed_at,
-        "datetime": observed_at,
-        "location_id": record.get("locationId") or record.get("location_id"),
-        "location": record.get("location") or record.get("locationName"),
-        "parameter": parameter.get("name") if isinstance(parameter, dict) else record.get("parameter"),
-        "value": record.get("value"),
-        "unit": record.get("unit"),
-        "latitude": coordinates.get("latitude") if isinstance(coordinates, dict) else None,
-        "longitude": coordinates.get("longitude") if isinstance(coordinates, dict) else None,
-    }
-
-
-def norm_waqi(payload: dict[str, Any]) -> dict[str, object]:
-    data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
-    city = data.get("city") if isinstance(data.get("city"), dict) else {}
-    time_data = data.get("time") if isinstance(data.get("time"), dict) else {}
-    geo = city.get("geo") if isinstance(city.get("geo"), list) else [None, None]
+def _normalize_waqi(payload: dict[str, Any]) -> dict[str, object]:
+    data = payload.get("data", {}) if isinstance(payload.get("data"), dict) else payload
+    city = data.get("city", {}) if isinstance(data.get("city"), dict) else {}
+    time_data = data.get("time", {}) if isinstance(data.get("time"), dict) else {}
+    geo = city.get("geo", [None, None]) if isinstance(city.get("geo"), list) else [None, None]
     return {
         "event_id": str(data.get("idx") or uuid.uuid4()),
         "source": "waqi",
@@ -161,124 +164,60 @@ def norm_waqi(payload: dict[str, Any]) -> dict[str, object]:
         "station_uid": data.get("idx"),
         "station_name": city.get("name"),
         "aqi": int(data.get("aqi")) if str(data.get("aqi", "")).isdigit() else None,
-        "observed_at": str(time_data.get("iso") or now_iso()),
         "latitude": geo[0],
         "longitude": geo[1],
-        "dominant_pollutant": data.get("dominentpol"),
     }
 
 
-def norm_tfl(record: dict[str, Any]) -> list[dict[str, object]]:
-    statuses = record.get("lineStatuses") if isinstance(record.get("lineStatuses"), list) else [{}]
-    events = []
-    for status in statuses:
-        events.append(
-            {
-                "event_id": str(uuid.uuid4()),
-                "source": "tfl",
-                "event_type": "line_status",
-                "event_time": now_iso(),
-                "line_id": record.get("id"),
-                "line_name": record.get("name"),
-                "status": status.get("statusSeverityDescription"),
-                "severity": status.get("statusSeverity"),
-                "reason": status.get("reason"),
-            }
-        )
-    return events
-
-
-def norm_sg(record: dict[str, Any]) -> dict[str, object]:
-    location = record.get("location") if isinstance(record.get("location"), dict) else {}
-    return {
-        "event_id": str(record.get("camera_id") or uuid.uuid4()),
-        "source": "data.gov.sg",
-        "event_type": "traffic_image",
-        "event_time": str(record.get("timestamp") or now_iso()),
-        "camera_id": str(record.get("camera_id") or ""),
-        "image_url": record.get("image") or record.get("image_url"),
-        "latitude": location.get("latitude"),
-        "longitude": location.get("longitude"),
-    }
-
-
-def norm_londonair(payload: Any) -> list[dict[str, object]]:
-    """Flatten LondonAir nested LocalAuthority > Site > Species structure."""
+def _normalize_londonair(payload: Any) -> list[dict[str, object]]:
+    import random
     authorities = payload if isinstance(payload, list) else [payload]
-    events: list[dict[str, object]] = []
+    events = []
     for auth in authorities:
         if not isinstance(auth, dict):
             continue
-        borough_code = auth.get("@LocalAuthorityCode", "")
-        borough_name = auth.get("@LocalAuthorityName", "")
-        sites = auth.get("Site") or []
+        sites = auth.get("Site", [])
         if isinstance(sites, dict):
             sites = [sites]
         for site in sites:
             if not isinstance(site, dict):
                 continue
-            species_list = site.get("Species") or []
-            if isinstance(species_list, dict):
-                species_list = [species_list]
-            for species in species_list:
-                if not isinstance(species, dict):
-                    continue
-                events.append({
-                    "event_id": str(uuid.uuid4()),
-                    "source": "londonair",
-                    "event_type": "air_quality_index",
-                    "event_time": str(site.get("@BulletinDate") or now_iso()),
-                    "site_code": site.get("@SiteCode", ""),
-                    "site_name": site.get("@SiteName", ""),
-                    "site_type": site.get("@SiteType", ""),
-                    "borough_code": borough_code,
-                    "borough_name": borough_name,
-                    "species_code": species.get("@SpeciesCode", ""),
-                    "species_description": species.get("@SpeciesDescription", ""),
-                    "air_quality_index": species.get("@AirQualityIndex"),
-                    "air_quality_band": species.get("@AirQualityBand"),
-                    "latitude": site.get("@Latitude"),
-                    "longitude": site.get("@Longitude"),
-                })
+            events.append({
+                "event_id": str(uuid.uuid4()),
+                "source": "londonair",
+                "event_type": "air_quality_index",
+                "event_time": str(site.get("@BulletinDate") or now_iso()),
+                "site_code": site.get("@SiteCode", ""),
+                "site_name": site.get("@SiteName", ""),
+                "borough_code": auth.get("@LocalAuthorityCode", ""),
+                "borough_name": auth.get("@LocalAuthorityName", ""),
+                "latitude": site.get("@Latitude"),
+                "longitude": site.get("@Longitude"),
+            })
     return events
 
 
-def norm_openmeteo_aq(payload: dict[str, Any]) -> list[dict[str, object]]:
-    """Flatten OpenMeteo air quality response into per-hour events."""
-    lat = payload.get("latitude")
-    lon = payload.get("longitude")
-    current = payload.get("current") or {}
-    if current:
-        return [{
-            "event_id": str(uuid.uuid4()),
-            "source": "openmeteo",
-            "event_type": "air_quality_current",
-            "event_time": str(current.get("time") or now_iso()),
-            "latitude": lat,
-            "longitude": lon,
-            "pm10": current.get("pm10"),
-            "pm2_5": current.get("pm2_5"),
-            "european_aqi": current.get("european_aqi"),
-            "us_aqi": current.get("us_aqi"),
-        }]
+def _normalize_openmeteo(payload: dict[str, Any]) -> list[dict[str, object]]:
+    current = payload.get("current", {}) or {}
     return [{
         "event_id": str(uuid.uuid4()),
         "source": "openmeteo",
-        "event_type": "air_quality_poll",
-        "event_time": now_iso(),
-        "latitude": lat,
-        "longitude": lon,
+        "event_type": "air_quality_current",
+        "event_time": str(current.get("time") or now_iso()),
+        "latitude": payload.get("latitude"),
+        "longitude": payload.get("longitude"),
+        "pm10": current.get("pm10"),
+        "pm2_5": current.get("pm2_5"),
+        "european_aqi": current.get("european_aqi"),
+        "us_aqi": current.get("us_aqi"),
     }]
 
 
-def norm_openweather(payload: dict[str, Any]) -> dict[str, object]:
-    """Normalize OpenWeather current weather response."""
-    coord = payload.get("coord") or {}
-    main_data = payload.get("main") or {}
-    wind = payload.get("wind") or {}
-    clouds_data = payload.get("clouds") or {}
-    weather_list = payload.get("weather") or [{}]
-    weather = weather_list[0] if weather_list else {}
+def _normalize_openweather(payload: dict[str, Any]) -> dict[str, object]:
+    coord = payload.get("coord", {}) or {}
+    main = payload.get("main", {}) or {}
+    wind = payload.get("wind", {}) or {}
+    weather = (payload.get("weather") or [{}])[0] if payload.get("weather") else {}
     return {
         "event_id": str(uuid.uuid4()),
         "source": "openweather",
@@ -287,241 +226,335 @@ def norm_openweather(payload: dict[str, Any]) -> dict[str, object]:
         "city_name": payload.get("name", ""),
         "latitude": coord.get("lat"),
         "longitude": coord.get("lon"),
-        "temp": main_data.get("temp"),
-        "feels_like": main_data.get("feels_like"),
-        "pressure": main_data.get("pressure"),
-        "humidity": main_data.get("humidity"),
+        "temp": main.get("temp"),
+        "humidity": main.get("humidity"),
         "wind_speed": wind.get("speed"),
-        "wind_deg": wind.get("deg"),
-        "clouds": clouds_data.get("all"),
-        "visibility": payload.get("visibility"),
         "weather_main": weather.get("main"),
         "weather_description": weather.get("description"),
     }
 
 
-def sg_events(payload: Any, limit: int) -> list[dict[str, object]]:
-    items = list_records(payload)
-    events: list[dict[str, object]] = []
-    for item in items:
-        cameras = item.get("cameras")
-        if not isinstance(cameras, list):
-            events.append(norm_sg(item))
-            continue
-        for camera in cameras:
-            if isinstance(camera, dict):
-                merged = dict(camera)
-                merged.setdefault("timestamp", item.get("timestamp"))
-                events.append(norm_sg(merged))
-                if len(events) >= limit:
-                    return events
-    return events[:limit]
+def _normalize_tfl(record: dict[str, Any]) -> list[dict[str, object]]:
+    import uuid
+    statuses = record.get("lineStatuses", []) or [{}]
+    events = []
+    for status in statuses:
+        events.append({
+            "event_id": str(uuid.uuid4()),
+            "source": "tfl",
+            "event_type": "line_status",
+            "event_time": now_iso(),
+            "line_id": record.get("id"),
+            "line_name": record.get("name"),
+            "status": status.get("statusSeverityDescription"),
+            "severity": status.get("statusSeverity"),
+        })
+    return events
 
 
-def gtfs_event(url: str) -> dict[str, object]:
-    run = streaming_source_run("gtfs")
-    chunk_id = "streaming_api:gtfs:poll"
-    if run.should_skip(chunk_id):
-        size_bytes = 0
-    else:
-        path, _row_count = download_file(
-            run,
-            url,
-            relative_path=f"gtfs_realtime/feed_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.bin",
-            timeout=20,
-        )
-        size_bytes = path.stat().st_size
-        run.mark_complete(chunk_id, {"record_count": 1, "path": str(path), "byte_size": size_bytes})
-    run.finish("success" if not run.failed_requests else "partial")
+def _normalize_generic(record: dict[str, Any]) -> dict[str, object]:
     return {
-        "event_id": str(uuid.uuid4()),
-        "source": "gtfs-realtime",
-        "event_type": os.getenv("GTFS_REALTIME_TYPE", "gtfs_feed_poll"),
-        "event_time": now_iso(),
-        "feed_url": url,
-        "feed_type": os.getenv("GTFS_REALTIME_TYPE", "unknown"),
-        "byte_size": size_bytes,
+        "event_id": str(record.get("id") or record.get("event_id") or uuid.uuid4()),
+        "source": "api",
+        "event_type": record.get("type") or record.get("event_type") or "unknown",
+        "event_time": record.get("timestamp") or record.get("event_time") or now_iso(),
+        "data": record,
     }
 
 
-def api_events(source: str, api_url: str, api_key: str | None, limit: int) -> list[dict[str, object]]:
-    if source == "gtfs":
-        return [gtfs_event(api_url)]
+# ============================================================================
+# Kafka Producer
+# ============================================================================
 
-    header = "X-API-Key" if source == "openaq" else "Authorization"
-    payload = api_json(source, api_url, api_key, header=header)
+def create_kafka_producer(
+    config: KafkaConfig | None = None,
+    producer_config: ProducerConfig | None = None,
+):
+    """Create a Kafka producer with the given configuration."""
+    try:
+        from kafka import KafkaProducer as _KafkaProducer
+    except ImportError:
+        raise ImportError(
+            "kafka-python is required for Kafka streaming. "
+            "Install with: pip install kafka-python"
+        )
 
-    if source == "waqi":
-        return [norm_waqi(payload)]
-    if source == "londonair":
-        auth_list = payload if isinstance(payload, list) else payload.get("HourlyAirQualityIndex", {}).get("LocalAuthority", [])
-        if isinstance(auth_list, dict):
-            auth_list = [auth_list]
-        return norm_londonair(auth_list)[:limit]
-    if source == "openmeteo":
-        return norm_openmeteo_aq(payload)[:limit]
-    if source == "openweather":
-        return [norm_openweather(payload)]
+    kafka_config = (config or KafkaConfig()).to_kafka_config()
+    prod_config = producer_config or ProducerConfig()
 
-    records = list_records(payload)
-    if source == "openaq":
-        return [norm_openaq(record) for record in records[:limit]]
-    if source == "tfl":
-        events: list[dict[str, object]] = []
-        for record in records[:limit]:
-            events.extend(norm_tfl(record))
-        return events[:limit]
-    if source == "singapore":
-        return sg_events(payload, limit)
-    return [norm_transport(record) for record in records[:limit]]
+    return _KafkaProducer(
+        **kafka_config,
+        acks=prod_config.acks,
+        retries=prod_config.retries,
+        retry_backoff_ms=prod_config.retry_backoff_ms,
+        max_in_flight_requests_per_connection=prod_config.max_in_flight_requests_per_connection,
+        compression_type=prod_config.compression_type,
+        linger_ms=prod_config.linger_ms,
+        batch_size=prod_config.batch_size,
+        max_block_ms=prod_config.max_block_ms,
+        value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode("utf-8"),
+        key_serializer=lambda k: k.encode("utf-8") if k else None,
+    )
 
 
-def event_stream(source: str, api_url: str | None, api_key: str | None, events: int) -> list[dict[str, object]]:
-    if api_url:
+def produce_events(
+    producer,
+    topic: str,
+    events: list[dict[str, object]],
+    key: str | None = None,
+) -> int:
+    """Produce a batch of events to a Kafka topic."""
+    from ingestion.base.core import SourceFailure
+
+    sent = 0
+    for event in events:
+        event_key = key or event.get("source") or event.get("event_id")
         try:
-            records = api_events(source, api_url, api_key, events)
-            if records:
-                return records
+            future = producer.send(topic, value=event, key=event_key)
+            future.get(timeout=10)
+            sent += 1
         except Exception as exc:
-            print(f"{source} API unavailable, using fallback: {exc}")
+            print(f"Failed to produce event {event.get('event_id')}: {exc}")
+            raise SourceFailure(f"Kafka produce failed: {exc}") from exc
+    return sent
 
 
-    if source in {"openaq", "waqi", "londonair", "openmeteo", "openweather"}:
-        return [sim_env() for _ in range(events)]
-    return [sim_transport() for _ in range(events)]
-
-
-DEFAULT_MAX_RETRIES = int(os.getenv("NEXUS_PRODUCER_MAX_RETRIES", "3"))
-DEFAULT_RETRY_BACKOFF_SECONDS = float(os.getenv("NEXUS_PRODUCER_RETRY_BACKOFF", "0.5"))
-DLQ_TOPIC = os.getenv("NEXUS_DLQ_TOPIC", "nexus.dlq")
-
-
-def _publish_to_dlq(producer, event: dict[str, object], *, source: str, topic: str, error: Exception, attempts: int) -> None:
-    """Publish a permanent failure to the Kafka DLQ topic and the local DLQ store."""
+def publish_to_dlq(
+    producer,
+    event: dict[str, object],
+    *,
+    original_topic: str,
+    source: str,
+    error: str,
+    attempts: int,
+    dlq_topic: str = DLQ_TOPIC,
+) -> None:
+    """Publish failed event to DLQ topic."""
     from governance.dlq import record_dlq_event
+
     dlq_payload = {
-        "original_topic": topic,
+        "original_topic": original_topic,
         "source": source,
-        "error": f"{type(error).__name__}: {error}",
+        "error": error,
         "attempts": attempts,
         "event": event,
+        "failed_at": now_iso(),
     }
+
     try:
-        producer.send(DLQ_TOPIC, dlq_payload)
-    except Exception as dlq_exc:  # noqa: BLE001 - DLQ best effort
-        print(f"Failed to publish to Kafka DLQ {DLQ_TOPIC}: {dlq_exc}")
+        producer.send(dlq_topic, value=dlq_payload)
+        producer.flush(timeout=5)
+    except Exception as dlq_exc:
+        print(f"Failed to publish to DLQ {dlq_topic}: {dlq_exc}")
+
     record_dlq_event(
         category="streaming_publish_failed",
         payload=event,
         source=source,
-        error=str(error),
-        error_type=type(error).__name__,
+        error=error,
+        error_type="KafkaProduceError",
         attempts=attempts,
-        topic=topic,
+        topic=original_topic,
     )
+
+
+# ============================================================================
+# Main Producer Runner
+# ============================================================================
+
+@dataclass
+class ProducerResult:
+    """Result of a producer run."""
+    attempted: int = 0
+    produced: int = 0
+    dlq: int = 0
+    events: list[dict[str, object]] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 def run_producer(
     source: str,
     topic: str,
-    bootstrap_servers: str,
     events: int,
-    delay_seconds: float,
+    delay_seconds: float = 0.5,
     api_url: str | None = None,
     api_key: str | None = None,
-    max_retries: int = DEFAULT_MAX_RETRIES,
-    retry_backoff_seconds: float = DEFAULT_RETRY_BACKOFF_SECONDS,
-) -> dict[str, int]:
-    """Produce events to Kafka with retry-then-DLQ semantics.
+    auth_header: str = "Authorization",
+    bootstrap_servers: str | None = None,
+    max_retries: int = 3,
+    retry_backoff: float = 0.5,
+    use_simulated: bool = False,
+) -> ProducerResult:
+    """Run the producer for a given source.
 
-    Returns a summary with `produced`, `dlq` and `attempted` counts.
+    Args:
+        source: Source identifier (openaq, waqi, tfl, etc.)
+        topic: Kafka topic to publish to
+        events: Number of events to produce
+        delay_seconds: Delay between events
+        api_url: API URL (if using real API)
+        api_key: API key (if required)
+        auth_header: Auth header name
+        bootstrap_servers: Kafka bootstrap servers
+        max_retries: Max retries per event
+        retry_backoff: Backoff between retries
+        use_simulated: Use simulated events instead of real API
+
+    Returns:
+        ProducerResult with counts
     """
-    from kafka import KafkaProducer
+    result = ProducerResult()
 
-    producer = KafkaProducer(
-        bootstrap_servers=bootstrap_servers,
-        value_serializer=lambda value: json.dumps(value).encode("utf-8"),
+    # Get events
+    if use_simulated:
+        result.events = sim_event(source, events)
+    else:
+        result.events = fetch_api_events(source, api_url, api_key, auth_header, events)
+        if not result.events:
+            print(f"No events from API {api_url}, falling back to simulated")
+            result.events = sim_event(source, events)
+
+    if not result.events:
+        result.errors.append("No events available")
+        return result
+
+    # Create producer
+    from ingestion.streaming.kafka_config import KafkaConfig
+    kafka_config = KafkaConfig(
+        bootstrap_servers=bootstrap_servers or KafkaConfig().bootstrap_servers
     )
+    producer = create_kafka_producer(kafka_config)
 
-    summary = {"attempted": 0, "produced": 0, "dlq": 0}
-    for event in event_stream(source, api_url, api_key, events):
-        summary["attempted"] += 1
-        last_error: Exception | None = None
-        for attempt in range(1, max_retries + 1):
-            try:
-                future = producer.send(topic, event)
-                future.get(timeout=10)
-                summary["produced"] += 1
-                last_error = None
-                print(f"Produced event_id={event['event_id']} source={source} topic={topic} attempt={attempt}")
-                break
-            except Exception as exc:  # noqa: BLE001 - retry then DLQ
-                last_error = exc
-                wait = retry_backoff_seconds * (2 ** (attempt - 1))
-                print(f"Publish failed for event_id={event.get('event_id')} attempt={attempt} error={exc}; retrying in {wait:.2f}s")
-                time.sleep(wait)
-        if last_error is not None:
-            summary["dlq"] += 1
-            _publish_to_dlq(producer, event, source=source, topic=topic, error=last_error, attempts=max_retries)
-        time.sleep(delay_seconds)
+    try:
+        for event in result.events:
+            result.attempted += 1
+            last_error = None
 
-    producer.flush()
-    return summary
+            for attempt in range(1, max_retries + 1):
+                try:
+                    produce_events(producer, topic, [event])
+                    result.produced += 1
+                    print(f"Produced: {event.get('event_id')} source={source} topic={topic}")
+                    last_error = None
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    wait = retry_backoff * (2 ** (attempt - 1))
+                    print(f"Retry {attempt}/{max_retries} for {event.get('event_id')}: {exc}")
+                    time.sleep(wait)
 
+            if last_error:
+                result.dlq += 1
+                publish_to_dlq(
+                    producer,
+                    event,
+                    original_topic=topic,
+                    source=source,
+                    error=str(last_error),
+                    attempts=max_retries,
+                )
 
-def default_url(source: str) -> str | None:
-    urls = {
-        "transport": os.getenv("TRANSPORT_EVENTS_API_URL"),
-        "openaq": os.getenv("OPENAQ_API_URL", "https://api.openaq.org/v3/measurements"),
-        "waqi": os.getenv("WAQI_API_URL"),
-        "tfl": os.getenv("TFL_API_URL", "https://api.tfl.gov.uk/Line/Mode/tube,dlr,overground,elizabeth-line/Status"),
-        "gtfs": os.getenv("GTFS_REALTIME_URL"),
-        "singapore": os.getenv("SG_TRAFFIC_API_URL", "https://api-open.data.gov.sg/v2/real-time/api/traffic-images"),
-        "londonair": os.getenv("LONDONAIR_API_BASE_URL", "https://api.erg.ic.ac.uk/AirQuality") + os.getenv("LONDONAIR_HOURLY_INDEX_ENDPOINT", "/Hourly/MonitoringIndex/GroupName=London/Json"),
-        "openmeteo": os.getenv("OPENMETEO_API_URL", "https://air-quality-api.open-meteo.com") + "/v1/air-quality?latitude=51.5074&longitude=-0.1278&current=pm10,pm2_5,european_aqi,us_aqi",
-        "openweather": os.getenv("OPENWEATHER_API_URL", "https://api.openweathermap.org") + "/data/2.5/weather?q=London&units=metric&appid=" + (os.getenv("OPENWEATHER_API_KEY") or ""),
-    }
-    return urls.get(source)
+            time.sleep(delay_seconds)
+    finally:
+        producer.flush()
+        producer.close()
+
+    return result
 
 
-def default_key(source: str) -> str | None:
-    keys = {
-        "transport": os.getenv("TRANSPORT_EVENTS_API_KEY"),
-        "openaq": os.getenv("OPENAQ_API_KEY"),
-        "waqi": os.getenv("WAQI_API_TOKEN"),
-        "tfl": os.getenv("TFL_API_KEY"),
-        "londonair": os.getenv("LONDONAIR_API_KEY"),
-        "openmeteo": None,
-        "openweather": os.getenv("OPENWEATHER_API_KEY"),
-    }
-    return keys.get(source)
+# ============================================================================
+# CLI Entry Point
+# ============================================================================
 
+def parse_args():
+    """Parse command line arguments."""
+    import argparse
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Produce domain streaming events into Kafka.")
+    parser = argparse.ArgumentParser(
+        description="Produce domain streaming events into Kafka."
+    )
     parser.add_argument(
         "--source",
-        choices=sorted(TOPICS),
+        choices=sorted(STREAM_TOPICS.keys()),
         default=os.getenv("NEXUS_STREAM_SOURCE", "transport"),
+        help="Data source to stream from",
     )
-    parser.add_argument("--topic")
-    parser.add_argument("--bootstrap-servers", default=os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092"))
-    parser.add_argument("--events", type=int, default=25)
-    parser.add_argument("--delay-seconds", type=float, default=0.5)
-    parser.add_argument("--api-url")
-    parser.add_argument("--api-key")
+    parser.add_argument(
+        "--topic",
+        help=f"Kafka topic (default: from STREAM_TOPICS config)",
+    )
+    parser.add_argument(
+        "--bootstrap-servers",
+        default=os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092"),
+        help="Kafka bootstrap servers",
+    )
+    parser.add_argument(
+        "--events",
+        type=int,
+        default=25,
+        help="Number of events to produce",
+    )
+    parser.add_argument(
+        "--delay-seconds",
+        type=float,
+        default=0.5,
+        help="Delay between events",
+    )
+    parser.add_argument(
+        "--api-url",
+        help="Override API URL",
+    )
+    parser.add_argument(
+        "--api-key",
+        help="Override API key",
+    )
+    parser.add_argument(
+        "--simulated",
+        action="store_true",
+        help="Use simulated events instead of real API",
+    )
+
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point."""
     args = parse_args()
-    source = args.source
-    run_producer(
-        source=source,
-        topic=args.topic or TOPICS[source],
-        bootstrap_servers=args.bootstrap_servers,
+
+    # Get source config
+    source_config = STREAM_TOPICS.get(args.source)
+    topic = args.topic or (source_config.topic if source_config else None)
+    if not topic:
+        print(f"Error: No topic specified for source {args.source}")
+        return 1
+
+    api_url = args.api_url or (source_config.api_url if source_config else None)
+    api_key = args.api_key or (source_config.api_key if source_config else None)
+    auth_header = source_config.auth_header if source_config else "Authorization"
+
+    print(f"Starting producer: source={args.source} topic={topic} events={args.events}")
+    print(f"API URL: {api_url or 'N/A'}")
+    print(f"Bootstrap: {args.bootstrap_servers}")
+
+    result = run_producer(
+        source=args.source,
+        topic=topic,
         events=args.events,
         delay_seconds=args.delay_seconds,
-        api_url=args.api_url if args.api_url is not None else default_url(source),
-        api_key=args.api_key if args.api_key is not None else default_key(source),
+        api_url=api_url,
+        api_key=api_key,
+        auth_header=auth_header,
+        bootstrap_servers=args.bootstrap_servers,
+        use_simulated=args.simulated,
     )
+
+    print(f"\nResult: attempted={result.attempted} produced={result.produced} dlq={result.dlq}")
+    if result.errors:
+        print(f"Errors: {result.errors}")
+
+    return 0 if result.produced > 0 else 1
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())

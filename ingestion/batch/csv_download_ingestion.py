@@ -10,10 +10,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from common.config import DATASETS_DIR
 from ingestion.batch.common import read_csv_records, write_jsonl
-from ingestion.downloaders.core import DownloadContext
-from ingestion.downloaders.http import download_file
-from ingestion.downloaders.utils import load_config, resolve_output_dir, run_id_now, sanitize_segment
-from ingestion.downloaders.core import SourceRun
+from ingestion.base.core import DownloadContext, SourceRun
+from ingestion.base.http import download_file
+from ingestion.base.utils import load_config, resolve_output_dir, run_id_now, sanitize_segment
 
 
 def download_csv(url: str, max_bytes: int = 200_000_000) -> Path:
