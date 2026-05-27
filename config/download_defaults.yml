@@ -251,13 +251,6 @@ openmeteo:
   - ammonia
   - aerosol_optical_depth
   - dust
-  - uv_index
-  - pollen_grass
-  - pollen_birch
-  - pollen_olive
-  - grass_pollen
-  - birch_pollen
-  - olive_pollen
   weather_hourly:
   - temperature_2m
   - relative_humidity_2m
@@ -269,10 +262,7 @@ openmeteo:
   - wind_direction_10m
   - surface_pressure
   - shortwave_radiation
-  - direct_radiation
-  - diffuse_radiation
-  - sunshine_duration
-  - weather_code
+  - uv_index
 londonair:
   base_url: https://api.erg.ic.ac.uk/AirQuality
   endpoints:
