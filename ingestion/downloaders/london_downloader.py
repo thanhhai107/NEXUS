@@ -308,36 +308,28 @@ def _run_parallel(
     Returns:
         List of profiles from all sources
     """
-    import threading
-
     results: list[dict[str, Any]] = []
     start_time = datetime.now(timezone.utc)
 
     print(f"[parallel] starting {len(specs)} sources with {max_workers} workers at {start_time.isoformat()}")
 
-    def run_with_logging(spec: SourceSpec, context: DownloadContext) -> dict[str, Any]:
-        """Run source with worker logging."""
-        profile = run_source(spec, context)
-        profile["worker_id"] = getattr(spec, "_worker_id", 0)
-        return profile
+    # Wrap specs with worker info
+    wrapped_specs = [
+        (spec, (idx % max_workers) + 1) for idx, spec in enumerate(specs)
+    ]
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Assign worker IDs
-        for idx, spec in enumerate(specs):
-            spec._worker_id = (idx % max_workers) + 1
-
         # Submit all tasks
         future_to_spec = {
-            executor.submit(run_with_logging, spec, context): spec
-            for spec in specs
+            executor.submit(run_source, spec, context): (spec, worker_id)
+            for spec, worker_id in wrapped_specs
         }
 
         # Collect results as they complete
         for future in as_completed(future_to_spec):
-            spec = future_to_spec[future]
+            spec, worker_id = future_to_spec[future]
             try:
                 profile = future.result()
-                worker_id = getattr(spec, "_worker_id", 0)
                 print(f"[worker-{worker_id}] [{spec.key}] completed")
                 results.append(profile)
             except Exception as exc:
