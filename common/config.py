@@ -46,12 +46,12 @@ def load_yaml(path: Path) -> dict[str, Any]:
 
 def _resolve_runtime_dir() -> Path:
     # Check environment variable first
-    env_runtime = _os.getenv("NEXUS_RUNTIME_DIR")
+    env_runtime = os.getenv("NEXUS_RUNTIME_DIR")
     if env_runtime:
         return Path(env_runtime).resolve()
 
     # Check runtime mode
-    runtime_mode = _os.getenv("NEXUS_RUNTIME_MODE", "local").lower()
+    runtime_mode = os.getenv("NEXUS_RUNTIME_MODE", "local").lower()
     if runtime_mode == "vm":
         return Path("/data").resolve()
     
@@ -68,7 +68,7 @@ def get_runtime_mode() -> str:
     Returns:
         "local" or "vm" depending on NEXUS_RUNTIME_MODE setting
     """
-    return _os.getenv("NEXUS_RUNTIME_MODE", "local").lower()
+    return os.getenv("NEXUS_RUNTIME_MODE", "local").lower()
 
 
 def is_vm_mode() -> bool:
@@ -77,7 +77,7 @@ def is_vm_mode() -> bool:
     Returns:
         True if NEXUS_RUNTIME_MODE=vm or NEXUS_FORCE_GCP=true
     """
-    if _os.getenv("NEXUS_FORCE_GCP"):
+    if os.getenv("NEXUS_FORCE_GCP"):
         return True
     return get_runtime_mode() == "vm"
 
@@ -212,7 +212,7 @@ def get_effective_runtime_dir() -> tuple[Path, str]:
     Returns:
         Tuple of (runtime_dir, location) where location is 'vm' or 'local'
     """
-    if is_vm_mode() or is_gcp_vm() or _os.getenv("NEXUS_FORCE_GCP"):
+    if is_vm_mode() or is_gcp_vm() or os.getenv("NEXUS_FORCE_GCP"):
         return (RUNTIME_DIR, "vm")
     return (RUNTIME_DIR, "local")
 
