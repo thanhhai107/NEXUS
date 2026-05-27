@@ -65,10 +65,12 @@ Architecture with additional pipeline infrastructure:
 runtime/
 ├── lake/                                    # DATA LAKE - Nơi lưu trữ chính
 │   ├── bronze/                              # BRONZE - Raw data gốc (append-only)
-│   │   └── {domain}/
-│   │       └── {dataset}/
-│   │           └── year={YYYY}/month={MM}/
-│   │               └── {dataset}_{run_id}.{ext}
+│   │   └── {dataset}/
+│   │       └── run_id={run_id}/
+│   │           ├── metadata/                # Checkpoint, profile, request log
+│   │           ├── published/               # Published manifest
+│   │           ├── raw/                     # Downloaded raw files
+│   │           └── staging/                  # Temporary files during download
 │   │
 │   ├── silver/                              # SILVER - Đã clean, validate, envelope
 │   │   └── {domain}/
@@ -111,29 +113,28 @@ runtime/
 │       ├── jars/
 │       └── logs/
 │
-├── runtime/                               # RUNTIME WORKSPACE - Temporary
-│   ├── staging/                          # STAGING - Files đang download
-│   │   └── {dataset}/
-│   │       └── {run_id}/
-│   │           └── (temporary files)
-│   │
-│   ├── tmp/                             # TMP - Temp files (dọn tự động)
-│   │
-│   ├── logs/                            # LOGS - Application logs
-│   │   └── {service}/
-│   │       ├── downloader/
-│   │       ├── pipeline/
-│   │       └── airflow/
-│   │
-│   └── metrics/                         # METRICS - Prometheus metrics
+├── staging/                               # STAGING - Files đang download
+│   └── {dataset}/
+│       └── {run_id}/
+│           └── (temporary files)
 │
-├── dlq/                                   # DLQ - Dead Letter Queue (shared)
+├── tmp/                                  # TMP - Temp files (dọn tự động)
+│
+├── logs/                                 # LOGS - Application logs
+│   └── {service}/
+│       ├── downloader/
+│       ├── pipeline/
+│       └── airflow/
+│
+├── metrics/                              # METRICS - Prometheus metrics
+│
+├── dlq/                                  # DLQ - Dead Letter Queue (shared)
 │   └── {domain}/
 │       └── {dataset}/
 │           └── {error_type}/
 │               └── {timestamp}.json
 │
-└── quarantine/                            # QUARANTINE - Invalid records (shared)
+└── quarantine/                           # QUARANTINE - Invalid records (shared)
     └── {domain}/
         └── {dataset}/
             └── {batch_id}/
@@ -144,19 +145,23 @@ runtime/
 
 | Layer | Purpose | Transform? | Schema? |
 | --- | --- | --- | --- |
-| **Bronze** | Lưu raw gốc từ source | ❌ Không | ❌ Không |
-| **Silver** | Envelope wrap, validate, clean | ✅ Có | ✅ Có |
-| **Gold** | Business aggregates | ✅ Có | ✅ Có |
+| **Bronze** | Lưu raw gốc từ source | Không | Không |
+| **Silver** | Envelope wrap, validate, clean | Có | Có |
+| **Gold** | Business aggregates | Có | Có |
 
 ### Directory Purposes
 
 - **`lake/bronze/`**: Raw files gốc từ downloader, không transform, append-only
+  - `metadata/`: Checkpoint, profile, request log
+  - `published/`: Published manifest
+  - `raw/`: Downloaded files (source format)
+  - `staging/`: Temporary files during download
 - **`lake/silver/`**: Records đã được wrap envelope với metadata, validated
 - **`lake/gold/`**: Business-level aggregates cho analytics/BI
 - **`lake/schemas/`**: JSON Schema definitions cho từng dataset
 - **`warehouse/`**: Query engines (Trino, MinIO, PostgreSQL) configs
 - **`pipeline/`**: Orchestration (Airflow DAGs, Spark configs)
-- **`runtime/staging/`**: Temporary files đang trong quá trình download
+- **`staging/`**: Temporary files đang trong quá trình download
 - **`dlq/`**: Dead Letter Queue cho operational failures
 - **`quarantine/`**: Invalid records cần triage
 

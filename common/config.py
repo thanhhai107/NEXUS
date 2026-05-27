@@ -8,9 +8,9 @@ Cấu trúc thư mục theo Medallion Architecture:
             ├── lake/           Bronze → Silver → Gold
             ├── pipeline/       Orchestration
             ├── warehouse/      Query engines
-            ├── runtime/        Workspace tạm
+            ├── staging/        Workspace tạm
             ├── dlq/            Dead Letter Queue
-            └── quarantine/     Invalid records
+            └── quarantine/      Invalid records
 """
 
 from __future__ import annotations
@@ -34,35 +34,69 @@ def load_yaml(path: Path) -> dict[str, Any]:
         return yaml.safe_load(file) or {}
 
 
-# ============================================================================
+# =============================================================================
 # RUNTIME DIRECTORY RESOLUTION
-# ============================================================================
+# =============================================================================
 # Resolution order:
 #   1. NEXUS_RUNTIME_DIR environment variable (highest priority)
-#   2. runtime_dir in download_defaults.yml
-#   3. PROJECT_ROOT / "runtime" (default)
+#   2. NEXUS_RUNTIME_MODE + default paths:
+#      - "local": PROJECT_ROOT / "runtime"
+#      - "vm": "/data"
+#   3. PROJECT_ROOT / "runtime" (default fallback)
 
 def _resolve_runtime_dir() -> Path:
-    env_runtime = os.getenv("NEXUS_RUNTIME_DIR")
+    # Check environment variable first
+    env_runtime = _os.getenv("NEXUS_RUNTIME_DIR")
     if env_runtime:
         return Path(env_runtime).resolve()
 
-    config_yaml = load_yaml(CONFIG_DIR / "download_defaults.yml")
-    config_runtime = config_yaml.get("runtime_dir", "")
-    if config_runtime:
-        config_path = Path(config_runtime).resolve()
-        return config_path if config_path.is_absolute() else PROJECT_ROOT / config_path
-
+    # Check runtime mode
+    runtime_mode = _os.getenv("NEXUS_RUNTIME_MODE", "local").lower()
+    if runtime_mode == "vm":
+        return Path("/data").resolve()
+    
+    # Default: PROJECT_ROOT / "runtime"
     return PROJECT_ROOT / "runtime"
 
 
 RUNTIME_DIR = _resolve_runtime_dir()
 
 
+def get_runtime_mode() -> str:
+    """Get the current runtime mode.
+    
+    Returns:
+        "local" or "vm" depending on NEXUS_RUNTIME_MODE setting
+    """
+    return _os.getenv("NEXUS_RUNTIME_MODE", "local").lower()
+
+
+def is_vm_mode() -> bool:
+    """Check if running in VM mode (using /data/).
+    
+    Returns:
+        True if NEXUS_RUNTIME_MODE=vm or NEXUS_FORCE_GCP=true
+    """
+    if _os.getenv("NEXUS_FORCE_GCP"):
+        return True
+    return get_runtime_mode() == "vm"
+
+
 # ============================================================================
 # LAKE STRUCTURE (Medallion Architecture)
 # ============================================================================
 # Data lake với 3 tier: Bronze → Silver → Gold
+#
+# Directory structure:
+#   lake/bronze/{domain}/{dataset}/run_id={run_id}/
+#       ├── metadata/       # Checkpoint, profile, request log
+#       ├── published/      # Published manifest
+#       ├── raw/            # Downloaded raw files
+#       └── staging/        # Temporary files during download
+#
+#   lake/silver/{domain}/{dataset}/           # Envelope-wrapped files
+#   lake/gold/{domain}/{dataset}/            # Business aggregates
+#   lake/schemas/{domain}/{dataset}.schema.json
 
 LAKE_DIR = RUNTIME_DIR / "lake"
 BRONZE_DIR = LAKE_DIR / "bronze"  # Raw data gốc (source format)
@@ -109,22 +143,47 @@ def get_runtime_path(*parts: str) -> Path:
     return path
 
 
-def get_bronze_path(dataset: str, run_id: str, filename: str) -> Path:
-    """Get bronze path for a dataset file with year/month partitioning."""
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
-    path = BRONZE_DIR / dataset / f"year={now.year}" / f"month={now.month:02d}"
+def get_bronze_path(
+    dataset: str,
+    run_id: str,
+    subdir: str = "raw",
+) -> Path:
+    """Get bronze path for a dataset run.
+    
+    Args:
+        dataset: Dataset name (e.g., 'londonair_monitoring', 'tfl_arrivals')
+        run_id: Run ID (e.g., '20260527T033320Z')
+        subdir: Subdirectory ('raw', 'staging', 'metadata', 'published')
+    
+    Returns:
+        Path to the bronze subdirectory for this run
+    """
+    path = BRONZE_DIR / dataset / f"run_id={run_id}" / subdir
     path.mkdir(parents=True, exist_ok=True)
-    return path / filename
+    return path
 
 
-def get_silver_path(dataset: str, run_id: str, filename: str) -> Path:
-    """Get silver path for a dataset file with year/month partitioning."""
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
-    path = SILVER_DIR / dataset / f"year={now.year}" / f"month={now.month:02d}"
-    path.mkdir(parents=True, exist_ok=True)
-    return path / filename
+def get_silver_path(
+    dataset: str,
+    run_id: str,
+    filename: str | None = None,
+) -> Path:
+    """Get silver path for a dataset.
+    
+    Args:
+        dataset: Dataset name
+        run_id: Run ID
+        filename: Optional filename (e.g., '{dataset}_{run_id}.jsonl')
+    
+    Returns:
+        Path to the silver directory or file for this dataset run
+    """
+    if filename:
+        path = SILVER_DIR / dataset / filename
+    else:
+        path = SILVER_DIR / dataset
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def get_schema_path(dataset: str) -> Path:
@@ -133,7 +192,11 @@ def get_schema_path(dataset: str) -> Path:
 
 
 def is_gcp_vm() -> bool:
-    """Check if running on GCP VM by checking metadata service."""
+    """Check if running on GCP VM by checking metadata service.
+    
+    Note: This checks actual GCP metadata service. For mode-based detection,
+    use is_vm_mode() instead.
+    """
     try:
         socket.setdefaulttimeout(2)
         sock = socket.create_connection(("metadata.google.internal", 80), timeout=2)
@@ -147,10 +210,10 @@ def get_effective_runtime_dir() -> tuple[Path, str]:
     """Get effective runtime dir and where it's mounted.
 
     Returns:
-        Tuple of (runtime_dir, location) where location is 'gcp' or 'local'
+        Tuple of (runtime_dir, location) where location is 'vm' or 'local'
     """
-    if is_gcp_vm() or os.getenv("NEXUS_FORCE_GCP"):
-        return (RUNTIME_DIR, "gcp")
+    if is_vm_mode() or is_gcp_vm() or _os.getenv("NEXUS_FORCE_GCP"):
+        return (RUNTIME_DIR, "vm")
     return (RUNTIME_DIR, "local")
 
 

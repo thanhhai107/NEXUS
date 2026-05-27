@@ -28,10 +28,10 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
-from common.config import DATASETS_DIR
+from common.config import BRONZE_DIR
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DOWNLOADS_DIR = DATASETS_DIR
+DEFAULT_DOWNLOADS_DIR = BRONZE_DIR
 DEFAULT_OUTPUT_RUN_ID = "consolidated"
 DEFAULT_STATUSES = {"success", "partial", "running"}
 RECORD_COUNT_FORMATS = {".csv", ".json", ".jsonl", ".geojson"}
