@@ -298,7 +298,7 @@ def _run_parallel(
     context: DownloadContext,
     max_workers: int,
 ) -> list[dict[str, Any]]:
-    """Run sources in parallel using ThreadPoolExecutor with pretty logging.
+    """Run sources in parallel using ThreadPoolExecutor.
 
     Args:
         specs: List of source specs to run
@@ -308,9 +308,58 @@ def _run_parallel(
     Returns:
         List of profiles from all sources
     """
-    from ingestion.downloaders.pretty_logging import run_parallel_pretty
+    import threading
 
-    return run_parallel_pretty(specs, context, max_workers)
+    results: list[dict[str, Any]] = []
+    start_time = datetime.now(timezone.utc)
+
+    print(f"[parallel] starting {len(specs)} sources with {max_workers} workers at {start_time.isoformat()}")
+
+    def run_with_logging(spec: SourceSpec, context: DownloadContext) -> dict[str, Any]:
+        """Run source with worker logging."""
+        profile = run_source(spec, context)
+        profile["worker_id"] = getattr(spec, "_worker_id", 0)
+        return profile
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Assign worker IDs
+        for idx, spec in enumerate(specs):
+            spec._worker_id = (idx % max_workers) + 1
+
+        # Submit all tasks
+        future_to_spec = {
+            executor.submit(run_with_logging, spec, context): spec
+            for spec in specs
+        }
+
+        # Collect results as they complete
+        for future in as_completed(future_to_spec):
+            spec = future_to_spec[future]
+            try:
+                profile = future.result()
+                worker_id = getattr(spec, "_worker_id", 0)
+                print(f"[worker-{worker_id}] [{spec.key}] completed")
+                results.append(profile)
+            except Exception as exc:
+                print(f"[{spec.key}] parallel execution failed: {exc}")
+                results.append({
+                    "source_id": spec.source_id,
+                    "source_key": spec.key,
+                    "status": "failed",
+                    "error": str(exc),
+                    "row_count": 0,
+                    "file_count": 0,
+                    "size_mb": 0.0,
+                })
+
+    elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
+    total_rows = sum(r.get("row_count", 0) for r in results)
+    total_size = sum(r.get("size_mb", 0) for r in results)
+    failed = sum(1 for r in results if r.get("status") == "failed")
+
+    print(f"[parallel] completed in {elapsed:.1f}s - total: rows={total_rows} size_mb={total_size:.2f} failed={failed}")
+
+    return results
 
 
 def run_polling(
