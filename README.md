@@ -222,6 +222,7 @@ NEXUS governance is metadata-driven and safe to run locally:
 - `governance/lineage.py`: OpenLineage-compatible events.
 - `governance/schema_history.py`: schema snapshots and fingerprints.
 - `governance/agents/governance_agent.py`: deterministic or optional LLM-backed decisions.
+- `config/semantic_defaults.yml` and `domains/<domain>/semantic_rules.yml`: semantic contracts for glossary mappings, units, time roles, CRS, grain, definitions, and entity matching.
 
 Set `GEMINI_API_KEY` only if you want the governance agent to call an LLM.
 Without it, the agent uses deterministic rules.
@@ -230,6 +231,18 @@ Great Expectations is installed as a Python dependency, not as a separate
 service. Airflow quality tasks run GX Core in-process and record the validation
 summary in audit and quality metrics. Set `NEXUS_GX_ENABLED=false` to disable
 GX locally while keeping the rest of the quality gate active.
+
+Semantic contracts can be inspected from the CLI:
+
+```powershell
+python -m cli.nexus semantic list --domain environment
+python -m cli.nexus semantic show --dataset openaq_measurements
+```
+
+The dbt seed `transform/dbt/seeds/unit_mapping.csv` is the canonical unit
+mapping table. Gold models use it for deterministic conversions such as miles
+to kilometers and pollutant readings to canonical concentration units. See
+`docs/semantic_issues.md` for the full semantic checklist.
 
 ## Metadata Stack
 

@@ -37,7 +37,9 @@ def run_great_expectations_validation(
         import pandas as pd
         from great_expectations.expectations import (
             ExpectColumnToExist,
+            ExpectColumnValuesToBeBetween,
             ExpectColumnValuesToBeDateutilParseable,
+            ExpectColumnValuesToBeInSet,
             ExpectColumnValuesToBeUnique,
             ExpectColumnValuesToNotBeNull,
             ExpectCompoundColumnsToBeUnique,
@@ -54,6 +56,7 @@ def run_great_expectations_validation(
 
     try:
         data_frame = pd.DataFrame([dict(record) for record in records])
+        data_frame, semantic_unit_check = _apply_semantic_unit_mapping(dataset, data_frame)
         observed_columns = set(data_frame.columns)
         context = gx.get_context(mode="ephemeral")
         datasource = context.data_sources.add_pandas(name=f"nexus_{_safe_name(dataset)}")
@@ -77,6 +80,29 @@ def run_great_expectations_validation(
 
         if freshness_column and freshness_column in observed_columns:
             expectations.append(ExpectColumnValuesToBeDateutilParseable(column=freshness_column))
+
+        if semantic_unit_check:
+            unit_field = semantic_unit_check["unit_field"]
+            converted_value_field = semantic_unit_check["converted_value_field"]
+            allowed_source_units = semantic_unit_check.get("allowed_source_units") or []
+            expected_range = semantic_unit_check.get("expected_range") or {}
+            if unit_field in observed_columns and allowed_source_units:
+                expectations.append(
+                    ExpectColumnValuesToBeInSet(
+                        column=unit_field,
+                        value_set=allowed_source_units,
+                    )
+                )
+            if converted_value_field in observed_columns:
+                expectations.append(ExpectColumnValuesToNotBeNull(column=converted_value_field))
+                if expected_range:
+                    expectations.append(
+                        ExpectColumnValuesToBeBetween(
+                            column=converted_value_field,
+                            min_value=expected_range.get("min"),
+                            max_value=expected_range.get("max"),
+                        )
+                    )
 
         results = []
         for expectation in expectations:
@@ -105,6 +131,115 @@ def run_great_expectations_validation(
 def _safe_name(value: str) -> str:
     name = re.sub(r"[^A-Za-z0-9_]+", "_", value).strip("_")
     return name or "dataset"
+
+
+def _apply_semantic_unit_mapping(dataset: str, data_frame: Any) -> tuple[Any, dict[str, Any]]:
+    """Add a derived canonical-value column for GX unit-conversion checks."""
+    try:
+        from common.semantic import (
+            load_semantic_contract,
+            load_unit_mapping_table,
+            normalize_unit_key,
+        )
+    except Exception:
+        return data_frame, {}
+
+    try:
+        contract = load_semantic_contract(dataset).to_dict()
+    except KeyError:
+        return data_frame, {}
+
+    dataset_rules = dict(contract.get("dataset_rules") or {})
+    standards = dict(dataset_rules.get("standards") or {})
+    units = dict(standards.get("units") or {})
+    if not units:
+        return data_frame, {}
+
+    value_field = str(units.get("value_field") or "")
+    unit_field = str(units.get("unit_field") or "")
+    implicit_source_unit = units.get("implicit_source_unit")
+    if not value_field or value_field not in data_frame.columns:
+        return data_frame, {}
+
+    if not unit_field and implicit_source_unit:
+        unit_field = f"__nexus_{value_field}_unit"
+        data_frame[unit_field] = str(implicit_source_unit)
+    if not unit_field or unit_field not in data_frame.columns:
+        return data_frame, {}
+
+    dimension_type = str(units.get("dimension_type") or "").strip().lower()
+    mapping_rows = [
+        row
+        for row in load_unit_mapping_table()
+        if not dimension_type or str(row.get("dimension_type") or "").strip().lower() == dimension_type
+    ]
+    supported_rows = [
+        row
+        for row in mapping_rows
+        if str(row.get("conversion_supported", "true")).strip().lower()
+        not in {"0", "false", "no", "unsupported"}
+    ]
+    lookup = {
+        str(row.get("source_unit_normalized") or ""): row
+        for row in supported_rows
+        if row.get("source_unit_normalized")
+    }
+    if not lookup:
+        return data_frame, {}
+
+    converted_value_field = str(units.get("converted_value_field") or f"__nexus_{value_field}_canonical")
+    converted_values = []
+    for raw_unit, raw_value in zip(data_frame[unit_field], data_frame[value_field]):
+        mapping = lookup.get(normalize_unit_key(raw_unit))
+        converted_values.append(_convert_unit_value(raw_value, mapping))
+
+    data_frame[converted_value_field] = converted_values
+    expected_range = dict(units.get("expected_range") or {})
+    expected_range = {
+        key: parsed
+        for key, value in expected_range.items()
+        if (parsed := _optional_float(value)) is not None
+    }
+    allowed_source_units = list(units.get("allowed_source_units") or [])
+    if not allowed_source_units:
+        allowed_source_units = sorted(
+            {
+                str(row.get("source_unit"))
+                for row in mapping_rows
+                if row.get("source_unit")
+            }
+        )
+
+    return data_frame, {
+        "unit_field": unit_field,
+        "value_field": value_field,
+        "converted_value_field": converted_value_field,
+        "canonical_unit": units.get("canonical_unit"),
+        "allowed_source_units": allowed_source_units,
+        "expected_range": expected_range,
+        "mapping_rows": len(mapping_rows),
+    }
+
+
+def _convert_unit_value(raw_value: object, mapping: Mapping[str, Any] | None) -> float | None:
+    if not mapping:
+        return None
+    try:
+        value = float(raw_value)
+        scale_factor = float(mapping.get("scale_factor"))
+        offset = float(mapping.get("offset") or 0)
+    except (TypeError, ValueError):
+        return None
+    return round((value * scale_factor) + offset, 6)
+
+
+def _optional_float(value: object) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _compact_result(validation: dict[str, Any]) -> dict[str, Any]:

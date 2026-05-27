@@ -1,8 +1,18 @@
-﻿version: 2
+version: 2
 
 models:
   - name: us_accidents_summary
     description: Gold aggregate of US accident counts and distance by state and severity.
+    meta:
+      semantic_grain:
+        entity_grain:
+          - state
+          - severity
+        aggregation_level: state_severity
+      unit_standardization:
+        source_unit: mi
+        canonical_unit: km
+        mapping_seed: unit_mapping
     columns:
       - name: state
         tests:
@@ -13,8 +23,21 @@ models:
       - name: accident_count
         tests:
           - not_null
+      - name: total_distance_km
+        description: Total affected road distance converted to kilometers through unit_mapping.
   - name: transport_events_hourly
     description: Gold hourly rollup of transport streaming events by state and event type.
+    meta:
+      semantic_grain:
+        entity_grain:
+          - state
+          - event_type
+        time_grain: hour
+        aggregation_level: hour_state_event_type
+      time_standard:
+        time_role: event_time
+        storage_timezone: UTC
+        format: ISO 8601
     columns:
       - name: event_hour
         tests:
@@ -24,11 +47,31 @@ models:
           - not_null
   - name: openaq_air_quality_hourly
     description: Gold hourly rollup of OpenAQ air quality readings by location and parameter.
+    meta:
+      semantic_grain:
+        entity_grain:
+          - location
+          - parameter
+        time_grain: hour
+        aggregation_level: hour_location_parameter
+      unit_standardization:
+        value_field: value
+        source_unit_field: unit
+        canonical_unit: ug/m3
+        mapping_seed: unit_mapping
+      time_standard:
+        time_role: event_time
+        storage_timezone: UTC
+        format: ISO 8601
     columns:
       - name: observed_hour
         tests:
           - not_null
       - name: parameter
+        tests:
+          - not_null
+      - name: unit
+        description: Canonical measurement unit after unit_mapping conversion where deterministic conversion is available.
         tests:
           - not_null
       - name: reading_count

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from common.config import PROJECT_ROOT, load_dataset_catalog, load_quality_config
+from common.semantic import load_semantic_contract
 from common.source_registry import (
     SourceRegistryEntry,
     build_registry_entry,
@@ -27,6 +28,7 @@ class DataContract:
     auto_fix: Mapping[str, Any]
     semantic_dedup_keys: tuple[str, ...]
     late_data_policy: Mapping[str, Any]
+    semantic: Mapping[str, Any]
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -42,6 +44,7 @@ class DataContract:
             "auto_fix": dict(self.auto_fix),
             "semantic_dedup_keys": list(self.semantic_dedup_keys),
             "late_data_policy": dict(self.late_data_policy),
+            "semantic": dict(self.semantic),
             "ingestion_method": self.source.ingestion_method,
             "update_frequency": self.source.update_frequency,
             "extra": dict(self.extra),
@@ -109,6 +112,7 @@ def load_data_contract(dataset_name: str) -> DataContract:
     auto_fix = dict(rules.get("auto_fix") or {})
     semantic_dedup_keys = derive_semantic_dedup_keys(dataset, primary_keys)
     late_data_policy = derive_late_data_policy(dataset, freshness_column)
+    semantic = load_semantic_contract(dataset_name).to_dict()
 
     return DataContract(
         dataset=dataset_name,
@@ -122,6 +126,7 @@ def load_data_contract(dataset_name: str) -> DataContract:
         auto_fix=auto_fix,
         semantic_dedup_keys=semantic_dedup_keys,
         late_data_policy=late_data_policy,
+        semantic=semantic,
         extra={
             "target": dict(dataset.get("target") or {}),
             "topic": dataset.get("topic"),

@@ -1,0 +1,16 @@
+dimension_type,source_unit,source_unit_normalized,canonical_unit,scale_factor,offset,conversion_supported,expected_min,expected_max,notes
+temperature,celsius,celsius,celsius,1,0,true,-90,70,Canonical air temperature unit
+temperature,C,c,celsius,1,0,true,-90,70,Celsius symbol without degree marker
+temperature,°C,c,celsius,1,0,true,-90,70,Celsius degree symbol
+temperature,fahrenheit,fahrenheit,celsius,0.5555555556,-17.7777777778,true,-130,160,Fahrenheit to Celsius
+temperature,kelvin,kelvin,celsius,1,-273.15,true,180,350,Kelvin to Celsius
+speed,km/h,km/h,km/h,1,0,true,0,300,Canonical road speed unit
+speed,m/s,m/s,km/h,3.6,0,true,0,100,Meters per second to kilometers per hour
+speed,mph,mph,km/h,1.609344,0,true,0,200,Miles per hour to kilometers per hour
+distance,km,km,km,1,0,true,0,10000,Canonical distance unit
+distance,m,m,km,0.001,0,true,0,10000000,Meters to kilometers
+distance,mi,mi,km,1.609344,0,true,0,6214,Miles to kilometers
+concentration,ug/m3,ug/m3,ug/m3,1,0,true,0,5000,Canonical pollutant concentration unit
+concentration,µg/m³,ug/m3,ug/m3,1,0,true,0,5000,Micrograms per cubic meter
+concentration,ppm,ppm,ug/m3,,,false,0,1000,Requires pollutant molecular weight and temperature pressure context
+concentration,ppb,ppb,ug/m3,,,false,0,1000000,Requires pollutant molecular weight and temperature pressure context

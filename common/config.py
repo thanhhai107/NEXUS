@@ -167,5 +167,15 @@ def load_quality_config(
     return {"default_rules": default_rules, "datasets": datasets}
 
 
+def load_semantic_config(
+    domains_dir: Path = DOMAINS_DIR,
+    config_dir: Path = CONFIG_DIR,
+) -> dict[str, Any]:
+    default_semantic = load_yaml(config_dir / "semantic_defaults.yml").get("default_semantic", {})
+    datasets: dict[str, Any] = {}
+    for path in sorted(domains_dir.glob("*/semantic_rules.yml")):
+        datasets.update(load_yaml(path).get("datasets", {}))
+    return {"default_semantic": default_semantic, "datasets": datasets}
+
 def load_governance_defaults(config_dir: Path = CONFIG_DIR) -> dict[str, Any]:
     return load_yaml(config_dir / "governance_defaults.yml").get("default_governance", {})
