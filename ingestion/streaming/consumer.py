@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -52,34 +53,76 @@ def create_kafka_consumer(
         KafkaConsumer instance
     """
     try:
-        from kafka import KafkaConsumer as _KafkaConsumer
+        from confluent_kafka import Consumer, KafkaError
     except ImportError:
         raise ImportError(
-            "kafka-python is required for Kafka streaming. "
-            "Install with: pip install kafka-python"
+            "confluent-kafka is required for Kafka streaming. "
+            "Install with: pip install confluent-kafka"
         )
 
     kafka_config = (config or KafkaConfig()).to_kafka_config()
     cons_config = consumer_config or ConsumerConfig()
 
-    consumer = _KafkaConsumer(
-        *([topics] if isinstance(topics, str) else topics),
-        **kafka_config,
-        group_id=cons_config.group_id,
-        auto_offset_reset=cons_config.auto_offset_reset,
-        enable_auto_commit=cons_config.enable_auto_commit,
-        auto_commit_interval_ms=cons_config.auto_commit_interval_ms,
-        max_poll_records=cons_config.max_poll_records,
-        max_poll_interval_ms=cons_config.max_poll_interval_ms,
-        session_timeout_ms=cons_config.session_timeout_ms,
-        heartbeat_interval_ms=cons_config.heartbeat_interval_ms,
-        fetch_min_bytes=cons_config.fetch_min_bytes,
-        fetch_max_wait_ms=cons_config.fetch_max_wait_ms,
-        value_deserializer=lambda m: json.loads(m.decode("utf-8")),
-        key_deserializer=lambda k: k.decode("utf-8") if k else None,
-    )
+    # Build confluent-kafka config
+    c_config = {
+        "bootstrap.servers": kafka_config.get("bootstrap_servers", "localhost:29092"),
+        "group.id": cons_config.group_id,
+        "auto.offset.reset": cons_config.auto_offset_reset,
+        "enable.auto.commit": cons_config.enable_auto_commit,
+        "auto.commit.interval.ms": cons_config.auto_commit_interval_ms,
+        "session.timeout.ms": cons_config.session_timeout_ms,
+        "heartbeat.interval.ms": cons_config.heartbeat_interval_ms,
+    }
+
+    consumer = Consumer(c_config)
+    
+    # Subscribe to topics
+    topic_list = [topics] if isinstance(topics, str) else topics
+    consumer.subscribe(topic_list)
 
     return consumer
+
+
+class KafkaMessage:
+    """Wrapper to match kafka-python message interface."""
+    def __init__(self, msg):
+        self._msg = msg
+        self.topic = msg.topic()
+        self.partition = msg.partition()
+        self.offset = msg.offset()
+        self.timestamp = msg.timestamp()[1] if msg.timestamp() else None
+        self.value = json.loads(msg.value().decode("utf-8")) if msg.value() else {}
+        self.key = msg.key().decode("utf-8") if msg.key() else None
+
+
+def consume_kafka_messages(consumer, max_messages: int = 100, timeout_ms: int = 10000):
+    """Generator that yields messages from confluent-kafka consumer."""
+    messages = []
+    start_time = time.time() * 1000
+    timeout_seconds = timeout_ms / 1000
+    
+    while len(messages) < max_messages:
+        elapsed = (time.time() * 1000) - start_time
+        remaining = max(0, timeout_ms - elapsed)
+        
+        msg = consumer.poll(timeout=min(remaining / 1000, 1.0))
+        
+        if msg is None:
+            if elapsed >= timeout_ms:
+                break
+            continue
+            
+        if msg.error():
+            if msg.error().code() == KafkaError._PARTITION_EOF:
+                continue
+            raise Exception(f"Kafka error: {msg.error()}")
+            
+        messages.append(KafkaMessage(msg))
+        
+        if elapsed >= timeout_ms:
+            break
+    
+    return messages
 
 
 # ============================================================================
@@ -110,21 +153,44 @@ def write_events_to_raw(
     events: list[dict[str, Any]],
     dataset: str,
     source: str,
+    run_id: str | None = None,
 ) -> Path:
-    """Write events to the raw landing zone using canonical format."""
+    """Write events to the bronze layer using canonical format.
+    
+    Args:
+        events: List of events to write
+        dataset: Dataset name
+        source: Source identifier
+        run_id: Optional run_id, defaults to streaming_{timestamp}
+    
+    Returns:
+        Path to the written file
+    """
     from ingestion.canonical.envelope import EnvelopeContext, build_raw_envelope
-    from ingestion.canonical.writer import default_raw_path, write_raw_envelopes
-    from common.config import RUNTIME_DIR
+    from ingestion.canonical.writer import write_raw_envelopes
+    from common.config import BRONZE_DIR
+    from datetime import datetime, timezone
+    import uuid
 
-    LOCAL_RAW_DIR = RUNTIME_DIR / "raw"
+    # Generate run_id if not provided
+    if run_id is None:
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        run_id = f"streaming_{timestamp}_{uuid.uuid4().hex[:8]}"
+
+    # Bronze path: runtime/lake/bronze/{dataset}/run_id={run_id}/raw/streaming.jsonl
+    bronze_base = BRONZE_DIR / dataset / f"run_id={run_id}"
+    bronze_base.mkdir(parents=True, exist_ok=True)
+    output_path = bronze_base / "raw" / "streaming.jsonl"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     context = EnvelopeContext(
         dataset_id=dataset,
         source_id=source,
         ingestion_type="streaming",
         source_key=source,
+        run_id=run_id,
     )
 
-    output_path = default_raw_path(dataset, LOCAL_RAW_DIR, prefix="streaming")
     return write_raw_envelopes(
         events,
         context,
@@ -195,7 +261,8 @@ def consume_events(
     landed_records: list[dict[str, Any]] = []
 
     try:
-        for message in consumer:
+        # Use confluent-kafka polling pattern
+        for message in consume_kafka_messages(consumer, max_messages, consume_timeout_ms):
             result.consumed += 1
 
             try:
@@ -227,9 +294,9 @@ def consume_events(
                 break
 
     finally:
-        # Commit offsets
+        # Commit offsets (confluent-kafka)
         try:
-            consumer.commit()
+            consumer.commit(asynchronous=False)
         except Exception:
             pass  # Best effort
         consumer.close()
@@ -239,10 +306,70 @@ def consume_events(
         try:
             raw_path = write_events_to_raw(landed_records, dataset, f"kafka://{topic}")
             result.raw_path = str(raw_path)
+            
+            # Extract run_id from path and trigger Bronze→Silver
+            _publish_streaming_to_silver(raw_path, dataset)
+            
         except Exception as exc:
             result.errors.append(f"Failed to write to raw: {exc}")
 
     return result
+
+
+def _publish_streaming_to_silver(raw_path: Path, dataset: str) -> str | None:
+    """Convert streaming Bronze data to Silver and return silver path."""
+    try:
+        from ingestion.downloaders.raw_adapter import published_run_to_raw_envelope
+        
+        # Create a minimal published manifest for streaming data
+        import json
+        from datetime import datetime, timezone
+        import hashlib
+        
+        run_path = raw_path.parents[2]  # bronze/{dataset}/run_id={run_id}
+        run_id = run_path.name.replace("run_id=", "")
+        
+        # Generate checksum for the raw file
+        checksum = hashlib.sha256(raw_path.read_bytes()).hexdigest()
+        
+        # Create published manifest
+        published_manifest = run_path / "published" / "published_manifest.json"
+        published_manifest.parent.mkdir(parents=True, exist_ok=True)
+        
+        manifest_data = {
+            "source_id": dataset,
+            "dataset_name": dataset,
+            "run_id": run_id,
+            "published_at": datetime.now(timezone.utc).isoformat(),
+            "coverage_status": "complete",
+            "publish_status": "published",
+            "chunks": [{
+                "chunk_id": "streaming",
+                "status": "success",
+                "required": True,
+                "paths": [str(raw_path)],
+                "checksums": {str(raw_path): checksum},
+                "record_count": raw_path.stat().st_size  # Approximate
+            }],
+            "raw_dir": str(run_path / "raw"),
+            "source_key": dataset,
+            "downstream_raw_path": None,
+            "raw_envelope_published_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        published_manifest.write_text(json.dumps(manifest_data, indent=2, ensure_ascii=False), encoding="utf-8")
+        
+        # Convert to silver via raw_adapter
+        result = published_run_to_raw_envelope(published_manifest)
+        
+        silver_path = result.get("raw_path", "N/A")
+        encoded = silver_path.encode('ascii', 'replace').decode('ascii') if silver_path else 'N/A'
+        print(f"  silver: {encoded}")
+        return result.get("raw_path")
+        
+    except Exception as exc:
+        print(f"  silver conversion failed: {exc}")
+        return None
 
 
 def _route_to_dlq(
@@ -409,7 +536,8 @@ def main():
     print(f"  consumed: {result.consumed}")
     print(f"  landed:   {result.landed}")
     print(f"  dlq:      {result.dlq}")
-    print(f"  raw_path: {result.raw_path or 'N/A'}")
+    encoded_path = result.raw_path.encode('ascii', 'replace').decode('ascii') if result.raw_path else 'N/A'
+    print(f"  raw_path: {encoded_path}")
 
     if result.errors:
         print(f"  errors:   {result.errors}")

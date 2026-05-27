@@ -97,11 +97,8 @@ def resolve_source_keys(
 
 
 def run_source(spec: SourceSpec, context: DownloadContext) -> dict[str, Any]:
-    run = SourceRun(spec.source_id, context, spec.key, dataset_name=spec.dataset_name)
-    required_chunks = spec.policies.get("required_chunks") if spec.policies else None
-    if required_chunks:
-        run.expect_chunks(str(chunk_id) for chunk_id in required_chunks)
-    print(f"[{spec.key}] start source_id={spec.source_id} run_id={context.run_id}")
+    run = SourceRun(spec.source_id, context, spec.source_key, dataset_name=spec.dataset_name)
+    print(f"[{spec.source_key}] start source_id={spec.source_id} run_id={context.run_id}")
     try:
         spec.func(run, context)
     except Exception as exc:
@@ -113,14 +110,14 @@ def run_source(spec: SourceSpec, context: DownloadContext) -> dict[str, Any]:
             error=exc,
         )
         route_run_failures_to_dlq(run)
-        print(f"[{spec.key}] failed: {exc}")
+        print(f"[{spec.source_key}] failed: {exc}")
         return profile
     status = "partial" if run.failed_requests else "success"
     profile = run.finish(status)
     if status == "partial":
         routed = route_run_failures_to_dlq(run)
         if routed:
-            print(f"[{spec.key}] dlq: routed_failed_chunks={routed}")
+            print(f"[{spec.source_key}] dlq: routed_failed_chunks={routed}")
     maybe_publish_raw_envelope(run, context)
 
     # Run schema inference
@@ -129,9 +126,9 @@ def run_source(spec: SourceSpec, context: DownloadContext) -> dict[str, Any]:
         profile["schema_inferred"] = True
         profile["inferred_fields"] = len(inferred_schema.fields)
 
-    print(
-        f"[{spec.key}] {status}: rows={profile['row_count']} "
-        f"files={profile['file_count']} size_mb={profile['size_mb']}"
+        print(
+        f"[{spec.source_key}] {status}: rows={profile.get('row_count', 0)} "
+        f"files={profile.get('file_count', 0)} size_mb={profile.get('size_mb', 0)}"
     )
     return profile
 
@@ -325,13 +322,13 @@ def _run_parallel(
             spec, worker_id = future_to_spec[future]
             try:
                 profile = future.result()
-                print(f"[worker-{worker_id}] [{spec.key}] completed")
+                print(f"[worker-{worker_id}] [{spec.source_key}] completed")
                 results.append(profile)
             except Exception as exc:
-                print(f"[{spec.key}] parallel execution failed: {exc}")
+                print(f"[{spec.source_key}] parallel execution failed: {exc}")
                 results.append({
                     "source_id": spec.source_id,
-                    "source_key": spec.key,
+                    "source_key": spec.source_key,
                     "status": "failed",
                     "error": str(exc),
                     "row_count": 0,
@@ -413,8 +410,8 @@ def normalize_source_key(source: str) -> str:
         "stats19_collisions": "stats19",
         "naptan_stops": "naptan",
         "dft_road_traffic": "dft",
-        "tfl": "tfl_status",
-        "tfl_transport_status": "tfl_status",
+        "tfl_status": "tfl",
+        "tfl_transport_status": "tfl",
     }
     key = aliases.get(source, source)
     if key not in SOURCE_REGISTRY:
@@ -509,74 +506,96 @@ def main(argv: list[str] | None = None) -> int:
 
 SOURCE_REGISTRY: dict[str, SourceSpec] = {
     "openmeteo": SourceSpec(
-        key="openmeteo",
+        source_key="openmeteo",
         source_id="openmeteo_air_quality",
+        source_name="Open-Meteo",
+        dataset_name="openmeteo_air_quality",
         description="Open-Meteo historical air quality and weather for borough centroids",
         func=download_openmeteo,
     ),
     "londonair": SourceSpec(
-        key="londonair",
+        source_key="londonair",
         source_id="londonair_monitoring",
+        source_name="LondonAir",
+        dataset_name="londonair_monitoring",
         description="LondonAir metadata, realtime indexes, wide historical data, and AQI summaries",
         func=download_londonair,
     ),
     "openaq": SourceSpec(
-        key="openaq",
+        source_key="openaq",
         source_id="openaq_measurements",
+        source_name="OpenAQ",
+        dataset_name="openaq_measurements",
         description="OpenAQ discovered London sensors and hourly measurements",
         func=download_openaq,
         required_env=("OPENAQ_API_KEY",),
     ),
     "ncei": SourceSpec(
-        key="ncei",
+        source_key="ncei",
         source_id="ncei_cdo_climate",
+        source_name="NCEI",
+        dataset_name="ncei_cdo_climate",
         description="NCEI daily climate data for discovered London stations",
         func=download_ncei,
         required_env=("NCEI_API_TOKEN",),
     ),
     "waqi": SourceSpec(
-        key="waqi",
+        source_key="waqi",
         source_id="waqi_air_quality",
+        source_name="WAQI",
+        dataset_name="waqi_air_quality",
         description="WAQI London station snapshot/feed",
         func=download_waqi,
         required_env=("WAQI_API_TOKEN",),
         realtime=True,
     ),
     "openweather": SourceSpec(
-        key="openweather",
+        source_key="openweather",
         source_id="openweather_current",
+        source_name="OpenWeather",
+        dataset_name="openweather_current",
         description="OpenWeather current weather and air-pollution snapshot",
         func=download_openweather,
         required_env=("OPENWEATHER_API_KEY",),
         realtime=True,
     ),
     "stats19": SourceSpec(
-        key="stats19",
+        source_key="stats19",
         source_id="stats19_collisions",
+        source_name="STATS19",
+        dataset_name="stats19_collisions",
         description="STATS19 collisions, vehicles, and casualties last-5-years files",
         func=download_stats19,
     ),
     "naptan": SourceSpec(
-        key="naptan",
+        source_key="naptan",
         source_id="naptan_stops",
+        source_name="NaPTAN",
+        dataset_name="naptan_stops",
         description="NaPTAN London ATCO 490 access nodes snapshot",
         func=download_naptan,
     ),
     "london_journeys": SourceSpec(
-        key="london_journeys",
+        source_key="london_journeys",
         source_id="london_journeys",
+        source_name="London Journeys",
+        dataset_name="london_journeys",
         description="London Datastore public transport journeys CSV",
         func=download_london_journeys,
     ),
     "dft": SourceSpec(
-        key="dft",
+        source_key="dft",
         source_id="dft_road_traffic",
+        source_name="DfT Road Traffic",
+        dataset_name="dft_road_traffic",
         description="DfT road traffic London count points and traffic counts",
         func=download_dft,
     ),
     "tfl": SourceSpec(
-        key="tfl",
+        source_key="tfl",
         source_id="tfl_transport",
+        source_name="TfL",
+        dataset_name="tfl_transport",
         description="TfL line status, routes, disruptions, and arrivals",
         func=download_tfl,
         required_env=("TFL_API_KEY",),

@@ -149,6 +149,147 @@ runtime/
 | **Silver** | Envelope wrap, validate, clean | Có | Có |
 | **Gold** | Business aggregates | Có | Có |
 
+### BRONZE Layer - Raw Data Structure
+
+```
+runtime/lake/bronze/{dataset}/
+└── run_id={run_id}/
+    ├── metadata/                    # Metadata của run này
+    │   ├── run_manifest.json     # Tổng hợp: profile + checkpoint + source config + coverage
+    │   ├── checkpoint.json       # Resume state: chunks completed/failed/skipped
+    │   ├── request_log.jsonl    # Audit log: từng HTTP request (append-only)
+    │   └── inferred_schema.json # Schema được infer từ data (optional)
+    │
+    ├── published/                   # Published manifest
+    │   └── published_manifest.json  # Mark đã publish với checksums
+    │
+    ├── raw/                        # FILES GỐC TẢI VỀ - Source format
+    │   ├── entity=average_annual_daily_flow/   # Partitioned by entity
+    │   │   └── year=2024/
+    │   │       └── *.csv, *.json          # Files gốc từ API
+    │   │
+    │   ├── group=latest_final_year/        # Partitioned by data group
+    │   │   └── table=collisions/
+    │   │       └── period=2024/
+    │   │           └── stats19_collisions_2024.csv
+    │   │
+    │   ├── date=2026-05-27/               # Partitioned by date (realtime data)
+    │   │   └── hour=14/
+    │   │       └── status.json
+    │   │
+    │   ├── snapshot=current/               # Snapshot data (không có date partition)
+    │   │   └── london_journeys.csv
+    │   │
+    │   └── metadata/                      # Metadata files riêng (site lists, species)
+    │       ├── health_advice.json
+    │       └── species.json
+    │
+    └── staging/                    # FILES ĐANG XỬ LÝ - Tạm thời
+        ├── entity=average_annual_daily_flow/
+        ├── group=latest_final_year/
+        └── date=2026-05-27/
+```
+
+**BRONZE File Types:**
+
+| File/Folder | Mục đích |
+|-------------|----------|
+| `run_manifest.json` | **Tổng hợp**: profile + checkpoint + source config + coverage (thay thế 4 file cũ) |
+| `checkpoint.json` | Resume state: chunks đã completed/failed/skipped |
+| `request_log.jsonl` | Audit log: từng HTTP request (append-only) |
+| `inferred_schema.json` | Schema được tự động infer từ dữ liệu thực tế |
+| `published_manifest.json` | Mark data đã publish với checksums |
+| `raw/*.csv, *.json` | Files gốc từ API - giữ nguyên format, không transform |
+| `staging/*` | Files đang download - sẽ move sang `raw/` khi complete |
+| `raw/metadata/*` | Metadata riêng của source (site lists, species codes) |
+
+**BRONZE Partitioning Patterns:**
+
+| Pattern | Dùng cho | Ví dụ |
+|---------|----------|-------|
+| `entity=X/` | Multiple entity types trong 1 dataset | DFT: count_points, average_annual_daily_flow |
+| `group=X/` + `table=Y/` | Stats19: final/provisional groups, collisions/vehicles/casualties | |
+| `date=X/` + `hour=Y/` | Realtime data (refresh mỗi giờ) | TfL, LondonAir, WAQI |
+| `year=X/` | Yearly data files | DFT, Stats19 |
+| `site=X/` | Multiple monitoring sites | LondonAir species per site |
+| `snapshot=current/` | Single snapshot không có time partition | London Journeys, NaPTAN |
+
+### SILVER Layer - Normalized Data Structure
+
+```
+runtime/lake/silver/{dataset}/
+└── {dataset}_{run_id}.jsonl    # 1 FILE CHÍNH chứa tất cả records
+```
+
+**Ví dụ:** `silver/stats19_collisions/stats19_collisions_test011.jsonl` (1.2 GB)
+
+**SILVER Record Structure (Envelope Format):**
+
+```json
+{
+  // === NEXUS METADATA HEADERS (prefix _nexus_) ===
+  "_nexus_ingestion_type": "download",      // download | api | stream | csv
+  "_nexus_source_id": "stats19_collisions",   // Dataset ID
+  "_nexus_source_key": "stats19",             // Source key (short name)
+  "_nexus_source_type": null,                 // Source type
+  "_nexus_dataset_id": "stats19_collisions",  // Dataset ID (same as source_id)
+  "_nexus_run_id": "test011",                 // Run ID - để track lineage
+  "_nexus_chunk_id": "stats19:latest_final_year:casualties:2024", // Chunk ID - partition info
+  "_nexus_record_id": "1fecd06205817ef...",   // SHA256 hash - deduplication key
+  "_nexus_entity_key": null,                  // Entity key (optional grouping)
+  "_nexus_event_time": null,                  // Event timestamp (nullable)
+  "_nexus_ingested_at": "2026-05-27T11:24:37.385855+00:00",  // Ingest timestamp
+  "_nexus_published_at": "2026-05-27T11:24:37.348067Z",      // Publish timestamp
+  "_nexus_schema_version": null,              // Schema version
+  "_nexus_trace_id": "08a3275a-...",         // Trace ID cho debugging
+  "_nexus_runtime_version": "raw-envelope-v1", // Envelope version
+  "_nexus_source_path": "D:\\...\\stats19_casualties_2024.csv", // Original file path
+  "_nexus_source": "stats19_collisions",     // Source name
+  "_nexus_dataset": "stats19_collisions",    // Dataset name
+  
+  // === PAYLOAD - DỮ LIỆU GỐC ===
+  "payload": {
+    // Các fields gốc từ source file
+    "collision_index": "2024991534042",
+    "collision_year": "2024",
+    "casualty_severity": "3",
+    ...
+  }
+}
+```
+
+**SILVER Fields Explained:**
+
+| Field Group | Field | Mục đích |
+|-------------|-------|----------|
+| **Ingestion** | `_nexus_ingestion_type` | Loại ingestion: download, api, stream, csv |
+| **Identity** | `_nexus_source_id`, `_nexus_source_key` | Identifiers của source |
+| **Lineage** | `_nexus_run_id`, `_nexus_chunk_id` | Track data từ đâu đến |
+| **Deduplication** | `_nexus_record_id` | SHA256 hash của record - tránh duplicate |
+| **Timestamps** | `_nexus_ingested_at`, `_nexus_published_at` | Khi nào được ingest/publish |
+| **Traceability** | `_nexus_trace_id`, `_nexus_source_path` | Debugging và audit |
+| **Data** | `payload` | Dữ liệu gốc được wrap trong envelope |
+
+**Tại sao dùng Envelope Pattern?**
+
+1. **Lineage đầy đủ**: Biết record đến từ source nào, run nào, chunk nào
+2. **Deduplication**: `_nexus_record_id` cho phép deduplicate chính xác
+3. **Audit**: Timestamps và trace_id cho debugging
+4. **Schema Evolution**: `_nexus_schema_version` track schema changes
+5. **Multi-source**: Một file có thể chứa data từ nhiều sources
+
+### So sánh Bronze vs Silver
+
+| Aspect | Bronze | Silver |
+|--------|--------|--------|
+| **Format** | Source format (CSV, JSON) | JSONL với envelope |
+| **Transform** | Không | Normalize, clean, wrap |
+| **Schema** | Không (raw) | Có (inferred + validated) |
+| **Partitioning** | Multiple files/folders | 1 file chính + partitions |
+| **Metadata** | Limited | Full lineage headers |
+| **Deduplication** | Không | Có (_nexus_record_id) |
+| **Use case** | Audit, reprocess | Analytics, serving |
+
 ### Directory Purposes
 
 - **`lake/bronze/`**: Raw files gốc từ downloader, không transform, append-only
@@ -228,7 +369,7 @@ table instead. Airflow exposes the same flow via the `nexus_dlq_replay` DAG.
 
 ## Streaming Consumer & Reprocessing
 
-- `ingestion/streaming/consumer.py` reads Kafka events, lands them in `runtime/raw/<dataset>/`, and routes decode/operational failures to the DLQ.
+- `ingestion/streaming/consumer.py` reads Kafka events, lands them in `runtime/lake/bronze/<dataset>/run_id=<run_id>/raw/`, and auto-converts to Silver. Decode/operational failures are routed to the DLQ.
 - `nexus_streaming_pipeline` runs producer → consumer → quality → lineage.
 - `nexus_reprocess_pipeline` replays raw landing files through Bronze, Silver and Gold for backfill/recovery (parameters: `dataset`, `raw_glob`, target tables).
 - `nexus_dlq_replay` re-emits DLQ events to a Kafka topic (or stdout for inspection).

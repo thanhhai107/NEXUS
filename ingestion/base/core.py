@@ -93,16 +93,12 @@ class SourceRun:
         self.metadata_dir.mkdir(parents=True, exist_ok=True)
         self.request_log_path = self.metadata_dir / "request_log.jsonl"
         self.checkpoint_path = self.metadata_dir / "checkpoint.json"
-        self.profile_path = self.metadata_dir / "profile.json"
-        self.manifest_path = self.metadata_dir / "source_manifest.json"
         self.run_manifest_path = self.metadata_dir / "run_manifest.json"
         self.published_manifest_path = self.published_dir / "published_manifest.json"
-        self.metadata_published_manifest_path = self.metadata_dir / "published_manifest.json"
         self.row_count = 0
         self.failed_requests = 0
         self.first_timestamp: str | None = None
         self.last_timestamp: str | None = None
-        self.previous_profile = self._load_previous_profile()
         self.checkpoint = self._load_checkpoint()
         self._chunk_outputs = self._load_output_index()
         self.initial_checkpoint_row_count = self._checkpoint_row_count()
@@ -110,16 +106,7 @@ class SourceRun:
         self._chunk_attempts: dict[str, int] = {}
         self._chunk_first_attempt_at: dict[str, str] = {}
         self._publish_status = PUBLISH_UNPUBLISHED
-        self.write_manifest()
         self.write_run_manifest()
-
-    def _load_previous_profile(self) -> dict[str, Any]:
-        if self.context.overwrite or not self.profile_path.exists():
-            return {}
-        try:
-            return json.loads(self.profile_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            return {}
 
     def _load_checkpoint(self) -> dict[str, Any]:
         if not self.context.resume or self.context.overwrite or not self.checkpoint_path.exists():
@@ -160,24 +147,6 @@ class SourceRun:
                 continue
             output[str(chunk_id)] = [dict(row) for row in rows if isinstance(row, dict)]
         return output
-
-    def write_manifest(self) -> None:
-        manifest = {
-            "source_id": self.source_id,
-            "source_key": self.source_key,
-            "dataset_name": self.dataset_name,
-            "run_id": self.run_id,
-            "mode": self.context.mode_name,
-            "started_at": self.started_at,
-            "spatial_scope": self.context.spatial_scope,
-            "date_ranges": {
-                "core_start": self.context.mode.get("core_start"),
-                "core_end": self.context.mode.get("core_end"),
-                "transport_start": self.context.mode.get("transport_start"),
-                "transport_end": self.context.mode.get("transport_end"),
-            },
-        }
-        self.manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     def register_plan(self, plan: DownloadPlan) -> None:
         """Register expected chunks before execution so coverage can detect gaps."""
@@ -262,7 +231,6 @@ class SourceRun:
         self.checkpoint.setdefault("skipped_chunks", {}).pop(chunk_id, None)
         self._active_chunk_id = None
         self._write_checkpoint()
-        self._write_profile("running")
         self.write_run_manifest()
 
     def mark_failed(self, chunk_id: str, error: str) -> None:
@@ -275,7 +243,6 @@ class SourceRun:
         }
         self._active_chunk_id = None
         self._write_checkpoint()
-        self._write_profile("partial")
         self.write_run_manifest()
 
     def mark_skipped(self, chunk_id: str, reason: str) -> None:
@@ -413,53 +380,25 @@ class SourceRun:
             if self.last_timestamp is None or timestamp > self.last_timestamp:
                 self.last_timestamp = timestamp
 
-    def _write_profile(self, status: str, error: str | None = None) -> dict[str, Any]:
-        previous_row_count = 0 if self.context.overwrite else int(self.previous_profile.get("row_count") or 0)
-        previous_row_count = max(previous_row_count, 0 if self.context.overwrite else self.initial_checkpoint_row_count)
-        previous_failed = 0 if self.context.overwrite else int(self.previous_profile.get("failed_requests") or 0)
-        first_timestamp = earliest_timestamp(self.previous_profile.get("first_timestamp"), self.first_timestamp)
-        last_timestamp = latest_timestamp(self.previous_profile.get("last_timestamp"), self.last_timestamp)
-        file_count, size_mb = profile_files(self.raw_dir)
-        updated_at = now_iso()
-        profile = {
-            "source_id": self.source_id,
-            "source_key": self.source_key,
-            "dataset_name": self.dataset_name,
-            "run_id": self.run_id,
-            "mode": self.context.mode_name,
-            "date_from": self.context.mode.get("core_start"),
-            "date_to": self.context.mode.get("core_end"),
-            "transport_date_from": self.context.mode.get("transport_start"),
-            "transport_date_to": self.context.mode.get("transport_end"),
-            "spatial_scope": self.context.spatial_scope.get("name", "Greater London"),
-            "row_count": previous_row_count + self.row_count,
-            "file_count": file_count,
-            "size_mb": size_mb,
-            "first_timestamp": first_timestamp,
-            "last_timestamp": last_timestamp,
-            "failed_requests": previous_failed + self.failed_requests,
-            "status": status,
-            "started_at": self.started_at,
-            "updated_at": updated_at,
-            "finished_at": None if status == "running" else updated_at,
-        }
-        if error:
-            profile["error"] = error
-        self.profile_path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
-        return profile
-
     def finish(self, status: str, error: str | None = None) -> dict[str, Any]:
-        profile = self._write_profile(status, error)
-        manifest_dict = self.write_run_manifest(finished_at=profile.get("finished_at"))
-        manifest = self._build_run_manifest(finished_at=profile.get("finished_at"))
+        manifest = self._build_run_manifest(status=status, error=error)
+        manifest_dict = self.write_run_manifest(manifest=manifest)
         if status in {"success", "partial"} and self._can_publish(manifest):
-            self.publish(manifest)
+            self.write_published_manifest(manifest)
         elif status == "failed":
             manifest_dict["publish_status"] = PUBLISH_UNPUBLISHED
-        return profile
+        
+        # Flatten details into top-level for backward compatibility
+        details = manifest_dict.get("details", {})
+        for key in ["row_count", "file_count", "size_mb", "failed_requests", "status", "error"]:
+            if key in details:
+                manifest_dict[key] = details[key]
+        
+        return manifest_dict
 
-    def write_run_manifest(self, finished_at: str | None = None) -> dict[str, Any]:
-        manifest = self._build_run_manifest(finished_at=finished_at)
+    def write_run_manifest(self, manifest: RunManifest | None = None, finished_at: str | None = None) -> dict[str, Any]:
+        if manifest is None:
+            manifest = self._build_run_manifest(finished_at=finished_at)
         payload = manifest.to_dict()
         self.run_manifest_path.write_text(
             json.dumps(payload, indent=2, ensure_ascii=False),
@@ -467,8 +406,8 @@ class SourceRun:
         )
         return payload
 
-    def publish(self, manifest: RunManifest | None = None) -> dict[str, Any]:
-        manifest = manifest or self._build_run_manifest()
+    def write_published_manifest(self, manifest: RunManifest) -> dict[str, Any]:
+        """Write published manifest to published/ directory."""
         publish_status = (
             PUBLISH_WITH_WARNING
             if manifest.coverage_status == COVERAGE_PARTIAL
@@ -492,15 +431,11 @@ class SourceRun:
             downstream_raw_path=manifest.downstream_raw_path,
         )
         payload = published.to_dict()
-        self.published_manifest_path.write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-        shutil.copy2(self.published_manifest_path, self.metadata_published_manifest_path)
-        self.write_run_manifest(finished_at=manifest.finished_at)
+        published_path = self.published_dir / "published_manifest.json"
+        published_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         return payload
 
-    def _build_run_manifest(self, finished_at: str | None = None) -> RunManifest:
+    def _build_run_manifest(self, finished_at: str | None = None, status: str | None = None, error: str | None = None) -> RunManifest:
         chunks = self._chunk_results()
         counted_chunks = [chunk for chunk in chunks if chunk.chunk_id != "__unassigned__"]
         success = sum(1 for chunk in counted_chunks if chunk.status == CHUNK_SUCCESS)
@@ -510,6 +445,15 @@ class SourceRun:
         covered = success + skipped
         coverage_ratio = round(covered / expected, 4) if expected else 0.0
         coverage_status = self._coverage_status(counted_chunks, coverage_ratio)
+        
+        # Compute profile stats
+        file_count, size_mb = profile_files(self.raw_dir)
+        previous_row_count = 0 if self.context.overwrite else self.initial_checkpoint_row_count
+        row_count = previous_row_count + self.row_count
+        previous_failed = 0 if self.context.overwrite else int(self.checkpoint.get("failed_requests", 0))
+        failed_requests = previous_failed + self.failed_requests
+        updated_at = now_iso()
+        
         return RunManifest(
             source_id=self.source_id,
             dataset_name=self.dataset_name,
@@ -523,15 +467,26 @@ class SourceRun:
             publish_status=self._publish_status,
             chunks=tuple(chunks),
             started_at=self.started_at,
-            updated_at=now_iso(),
-            finished_at=finished_at,
+            updated_at=updated_at,
+            finished_at=finished_at or updated_at,
             raw_dir=str(self.raw_dir),
             details={
                 "mode": self.context.mode_name,
                 "source_key": self.source_key,
+                "date_from": self.context.mode.get("core_start"),
+                "date_to": self.context.mode.get("core_end"),
+                "spatial_scope": self.context.spatial_scope,
+                "row_count": row_count,
+                "file_count": file_count,
+                "size_mb": size_mb,
+                "failed_requests": failed_requests,
+                "first_timestamp": self.first_timestamp,
+                "last_timestamp": self.last_timestamp,
+                "status": status or ("running" if finished_at is None else "success" if failed == 0 else "partial" if covered > 0 else "failed"),
+                "error": error,
                 "request_log_path": str(self.request_log_path),
-                "checkpoint_path": str(self.checkpoint_path),
-                "source_manifest_path": str(self.manifest_path),
+                # Profile aliases for backward compatibility
+                "row_count_alias": row_count,
             },
         )
 

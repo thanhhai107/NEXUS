@@ -12,7 +12,6 @@ from ingestion.batch.api_ingestion import (
     batch_api_source_run,
     extract_records,
     ingest_api_records,
-    run_api_source,
 )
 from ingestion.batch.common import (
     clean_col_name,
@@ -26,7 +25,6 @@ __all__ = [
     "batch_api_source_run",
     "extract_records",
     "ingest_api_records",
-    "run_api_source",
     # CSV utilities
     "clean_col_name",
     "read_csv_records",

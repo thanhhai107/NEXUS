@@ -26,9 +26,9 @@ from ingestion.sources.ncei import download_ncei
 from ingestion.downloaders.london_downloader import (
     main,
     maybe_publish_raw_envelope,
-    parse_args,
-    run_all_sources,
-    run_downloader,
+    run_source,
+    run_once,
+    run_polling,
     SOURCE_REGISTRY,
 )
 
@@ -48,8 +48,8 @@ __all__ = [
     # London downloader
     "main",
     "maybe_publish_raw_envelope",
-    "parse_args",
-    "run_all_sources",
-    "run_downloader",
+    "run_source",
+    "run_once",
+    "run_polling",
     "SOURCE_REGISTRY",
 ]

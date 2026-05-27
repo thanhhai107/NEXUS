@@ -22,6 +22,7 @@ docs/
 docs/_build/
 
 # Runtime outputs
+runtime/
 runtime/analysis/*
 !runtime/analysis/.gitkeep
 runtime/datasets/*

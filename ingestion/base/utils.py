@@ -8,7 +8,7 @@ from typing import Any, Iterable
 
 import yaml
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "download_defaults.yml"
 DEFAULT_ENV_PATH = PROJECT_ROOT / ".env"
 
@@ -50,6 +50,49 @@ BOROUGH_CENTROIDS: list[dict[str, Any]] = [
     {"name": "Wandsworth", "latitude": 51.4567, "longitude": -0.1910},
     {"name": "Westminster", "latitude": 51.4973, "longitude": -0.1372},
 ]
+
+
+def source_options(context: Any, source: str) -> dict[str, Any]:
+    """Get source-specific options from context mode config.
+    
+    Args:
+        context: DownloadContext instance
+        source: Source name (e.g., 'londonair', 'openaq')
+    
+    Returns:
+        Dictionary of source options from mode config
+    """
+    return context.mode.get(f"{source}_options", {})
+
+
+def selected_boroughs(
+    config_or_context: Any,
+    limit_key: str | None = None,
+) -> list[dict[str, Any]]:
+    """Get selected boroughs based on mode config.
+    
+    Args:
+        config_or_context: Either a config dict or DownloadContext with .mode
+        limit_key: Optional key to get borough_limit from config (default: "borough_limit")
+    
+    Returns:
+        List of borough centroid dicts
+    """
+    # Support both config dict and DownloadContext
+    if hasattr(config_or_context, "mode"):
+        config = config_or_context.mode
+    else:
+        config = config_or_context
+    
+    key = limit_key or "borough_limit"
+    mode = config.get(key, "london")
+    if mode == "london":
+        return BOROUGH_CENTROIDS
+    if isinstance(mode, int):
+        return BOROUGH_CENTROIDS[:mode]
+    if isinstance(mode, list):
+        return [b for b in BOROUGH_CENTROIDS if b["name"] in mode]
+    return BOROUGH_CENTROIDS
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")

@@ -10,7 +10,7 @@ Architecture:
 """
 
 from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
-from ingestion.canonical.writer import write_jsonl
+from ingestion.batch.common import write_jsonl
 from ingestion.streaming import (
     KafkaConfig,
     ProducerConfig,

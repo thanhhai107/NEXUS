@@ -74,7 +74,7 @@ class CoveragePolicy:
     required_chunks: tuple[str, ...] = field(default_factory=tuple)
 
 
-@dataclass(frozen=True)
+@dataclass
 class SourceSpec:
     source_id: str
     source_key: str
@@ -85,6 +85,11 @@ class SourceSpec:
     retry_policy: RetryPolicy = field(default_factory=RetryPolicy)
     timeout_policy: TimeoutPolicy = field(default_factory=TimeoutPolicy)
     rate_limit_policy: RateLimitPolicy = field(default_factory=RateLimitPolicy)
+    # Extended fields for downloader
+    description: str | None = None
+    func: Any = None
+    required_env: tuple[str, ...] = ()
+    realtime: bool = False
 
 
 @dataclass
