@@ -50,6 +50,12 @@ from ingestion.sources.naptan import download_naptan
 from ingestion.sources.dft import download_dft
 from ingestion.sources.london_journeys import download_london_journeys
 
+# Semantic annotation
+from ingestion.semantic import (
+    SemanticAnnotationPipeline,
+    AnnotationResult,
+)
+
 
 def find_latest_run_id(output_dir: Path, source_keys: list[str]) -> str | None:
     candidates: list[tuple[float, str]] = []
@@ -128,10 +134,17 @@ def run_source(spec: SourceSpec, context: DownloadContext) -> dict[str, Any]:
         profile["schema_inferred"] = True
         profile["inferred_fields"] = len(inferred_schema.fields)
 
+        # Run semantic annotation
+        annotation_result = maybe_annotate_semantic(run, context, inferred_schema)
+        if annotation_result:
+            profile["semantic_annotated"] = True
+            profile["annotated_fields"] = len(annotation_result.annotations)
+            profile["llm_calls"] = annotation_result.llm_calls
+
         print(
-        f"[{spec.source_key}] {status}: rows={profile.get('row_count', 0)} "
-        f"files={profile.get('file_count', 0)} size_mb={profile.get('size_mb', 0)}"
-    )
+            f"[{spec.source_key}] {status}: rows={profile.get('row_count', 0)} "
+            f"files={profile.get('file_count', 0)} size_mb={profile.get('size_mb', 0)}"
+        )
     return profile
 
 
@@ -192,6 +205,111 @@ def maybe_infer_schema(run: SourceRun, context: DownloadContext) -> InferredSche
     except Exception as exc:
         print(f"[{run.source_key}] schema inference failed: {exc}")
         return None
+
+
+def maybe_annotate_semantic(
+    run: SourceRun,
+    context: DownloadContext,
+    inferred_schema: InferredSchema,
+) -> AnnotationResult | None:
+    """
+    Run semantic annotation on inferred schema if enabled.
+
+    Args:
+        run: SourceRun instance with downloaded data
+        context: Download context
+        inferred_schema: Schema from maybe_infer_schema
+
+    Returns:
+        AnnotationResult if annotation ran successfully, None otherwise
+    """
+    # Check if semantic annotation is enabled
+    semantic_config = context.config.get("semantic_annotation", {})
+    if not semantic_config.get("enabled", False):
+        return None
+
+    try:
+        # Get config values
+        # semantic_cache goes to runtime/semantic_cache (same level as lake)
+        runtime_dir = context.output_dir.parent
+        cache_dir = runtime_dir / "semantic_cache"
+        llm_model = semantic_config.get("llm_model", "qwen2.5:0.5b")
+        llm_url = semantic_config.get("ollama_url", "http://localhost:11434")
+        llm_timeout = semantic_config.get("llm_timeout_seconds", 180)
+        min_new_fields = semantic_config.get("trigger", {}).get("min_new_fields", 3)
+        reannotate_threshold = semantic_config.get("trigger", {}).get("reannotate_threshold", 10)
+
+        # Get docs URL for this source
+        docs_urls = semantic_config.get("docs_urls", {})
+        docs_url = docs_urls.get(run.source_key)
+
+        # Create pipeline
+        pipeline = SemanticAnnotationPipeline(
+            cache_dir=cache_dir,
+            llm_model=llm_model,
+            llm_base_url=llm_url,
+            llm_timeout=llm_timeout,
+            min_new_fields=min_new_fields,
+            reannotate_threshold=reannotate_threshold,
+        )
+
+        # Get domain from source
+        domain = _get_source_domain(run.source_key, context.config)
+
+        # Run annotation
+        result = pipeline.process(
+            source_id=run.source_id,
+            source_key=run.source_key,
+            inferred_schema=inferred_schema,
+            docs_url=docs_url,
+            domain=domain,
+        )
+
+        # Log result with path
+        if result.llm_calls > 0:
+            print(
+                f"[{run.source_key}] semantic annotation: "
+                f"fields={result.total_annotations} "
+                f"new={result.new_fields_count} "
+                f"llm_calls={result.llm_calls}"
+            )
+        else:
+            print(
+                f"[{run.source_key}] semantic annotation: "
+                f"fields={result.total_annotations} "
+                f"from_cache=True llm_calls=0"
+            )
+
+        # Log path to annotations file
+        if result.annotations:
+            cache_path = cache_dir / run.source_key / f"v{result.schema_hash[:4]}" / "annotations.json"
+            print(f"[{run.source_key}] semantic metadata: path={cache_path}")
+
+        return result
+
+    except Exception as exc:
+        print(f"[{run.source_key}] semantic annotation failed: {exc}")
+        return None
+
+
+def _get_source_domain(source_key: str, config: dict) -> str:
+    """Get domain name for a source."""
+    # Check source-specific config
+    source_config = config.get(source_key, {})
+    if isinstance(source_config, dict):
+        domain = source_config.get("domain")
+        if domain:
+            return domain
+    
+    # Default domains based on source patterns
+    if source_key.startswith("tfl"):
+        return "transport"
+    elif source_key in {"waqi", "openaq", "openmeteo", "londonair", "ncei", "ukair"}:
+        return "environment"
+    elif source_key in {"stats19", "dft", "naptan", "london_journeys"}:
+        return "transport"
+    
+    return "unknown"
 
 
 def maybe_publish_raw_envelope(run: SourceRun, context: DownloadContext) -> dict[str, Any] | None:
