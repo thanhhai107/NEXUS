@@ -20,8 +20,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from common.source_registry import (
-    SourceRegistryEntry,
-    build_registry_entry,
     list_sources,
 )
 from ingestion.canonical.parser import iter_artifact_records
@@ -189,7 +187,7 @@ def test_freshness_tracking():
     print("TEST 5: Freshness Tracking")
     print("="*60)
     
-    from common.source_registry import derive_update_frequency, INGESTION_METHOD_BY_SOURCE_TYPE
+    from common.source_registry import derive_update_frequency
     
     # Test different freshness configurations
     test_cases = [

@@ -24,9 +24,6 @@ from typing import Any
 
 from airflow import DAG
 from airflow.decorators import task
-from airflow.models import Variable
-from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator
 
 # Project paths
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -325,7 +322,7 @@ def create_source_backfill_dag(source: str) -> DAG:
             }
 
         gap = detect_gap_for_source()
-        result = run_backfill_for_source(gap)
+        run_backfill_for_source(gap)
 
     return dag
 

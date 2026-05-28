@@ -209,7 +209,10 @@ services:
       - governance-db-data:/var/lib/postgresql/data
 
   airflow:
-    image: apache/airflow:2.9.1-python3.11
+    build:
+      context: ../..
+      dockerfile: infra/docker/airflow/Dockerfile
+    image: nexus-airflow:2.9.1-python3.11
     container_name: nexus-airflow
     depends_on:
       - airflow-db
@@ -221,7 +224,6 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__WEBSERVER__SECRET_KEY: nexus-local-secret
-      _PIP_ADDITIONAL_REQUIREMENTS: requests kafka-python PyYAML jsonschema psycopg[binary] great_expectations==1.16.1
       NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
       NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db:5432/nexus_governance}
       NEXUS_GX_ENABLED: ${NEXUS_GX_ENABLED:-true}
@@ -266,13 +268,15 @@ services:
       - ../../domains:/opt/airflow/domains
       - ../../ingestion:/opt/airflow/ingestion
       - ../../processing:/opt/airflow/processing
+      - ../../infra:/opt/airflow/infra
+      - ../../transform:/opt/airflow/transform
       - ../../governance:/opt/airflow/governance
       - ../../cli:/opt/airflow/cli
       - ../../assets:/opt/airflow/assets
       - ../../runtime:/opt/airflow/runtime
 
   airflow-scheduler:
-    image: apache/airflow:2.9.1-python3.11
+    image: nexus-airflow:2.9.1-python3.11
     container_name: nexus-airflow-scheduler
     depends_on:
       - airflow
@@ -281,7 +285,6 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      _PIP_ADDITIONAL_REQUIREMENTS: requests kafka-python PyYAML jsonschema psycopg[binary] great_expectations==1.16.1
       NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
       NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db:5432/nexus_governance}
       NEXUS_GX_ENABLED: ${NEXUS_GX_ENABLED:-true}
@@ -317,6 +320,8 @@ services:
       - ../../domains:/opt/airflow/domains
       - ../../ingestion:/opt/airflow/ingestion
       - ../../processing:/opt/airflow/processing
+      - ../../infra:/opt/airflow/infra
+      - ../../transform:/opt/airflow/transform
       - ../../governance:/opt/airflow/governance
       - ../../cli:/opt/airflow/cli
       - ../../assets:/opt/airflow/assets

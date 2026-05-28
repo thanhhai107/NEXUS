@@ -6,10 +6,12 @@ from pathlib import Path
 import pytest
 import requests
 
+from common.config import RAW_DIR
 from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
 from ingestion.base.http import request_json
 from ingestion.canonical.parser import iter_artifact_records
 from ingestion.downloaders.london_downloader import maybe_publish_raw_envelope
+from ingestion.downloaders import raw_adapter
 from ingestion.downloaders.raw_adapter import published_run_to_raw_envelope
 
 
@@ -52,6 +54,11 @@ def context(
         output_dir=tmp_path,
         run_id="run-1",
     )
+
+
+def test_raw_adapter_default_output_uses_raw_landing_zone() -> None:
+    assert raw_adapter.RAW_OUTPUT_DIR == RAW_DIR
+    assert raw_adapter.RAW_OUTPUT_DIR.name == "raw"
 
 
 def test_source_run_writes_checkpoint_manifest_and_published_manifest(tmp_path: Path) -> None:

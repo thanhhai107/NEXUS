@@ -5,11 +5,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from common.config import RUNTIME_DIR, SILVER_DIR
+from common.config import RAW_DIR
 from ingestion.canonical.envelope import EnvelopeContext, build_raw_envelope
 from ingestion.canonical.parser import iter_artifact_records, resolve_artifact_path
 
-RAW_OUTPUT_DIR = SILVER_DIR
+RAW_OUTPUT_DIR = RAW_DIR
 
 
 def published_run_to_raw_envelope(

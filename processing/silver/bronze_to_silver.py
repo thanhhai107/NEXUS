@@ -1,14 +1,18 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
 
-from common.data_contract import load_data_contract
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
+
 from processing.common.idempotency import parse_key_list, write_idempotent_iceberg
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, current_timestamp, trim
 
 
-def build_spark() -> SparkSession:
+def build_spark():
+    from pyspark.sql import SparkSession
+
     return (
         SparkSession.builder.appName("nexus-bronze-to-silver")
         .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
@@ -28,6 +32,8 @@ def run(
 
     Replace the sample flattening logic with dataset-specific normalization rules.
     """
+    from pyspark.sql.functions import col, current_timestamp, trim
+
     spark = build_spark()
     bronze_df = spark.table(bronze_table)
 
@@ -55,6 +61,8 @@ def run(
             silver_df = silver_df.withColumn(field.name, trim(col(field.name)))
 
     if dataset and not dedup_keys:
+        from common.data_contract import load_data_contract
+
         dedup_keys = list(load_data_contract(dataset).semantic_dedup_keys)
     silver_df = silver_df.withColumn("_nexus_silver_loaded_at", current_timestamp())
     write_idempotent_iceberg(

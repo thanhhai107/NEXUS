@@ -1,4 +1,4 @@
-﻿"""
+"""
 Kafka Consumer for NEXUS Streaming.
 
 Consumes events from Kafka topics and lands them into the raw layer.
@@ -18,7 +18,6 @@ import os
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -53,7 +52,7 @@ def create_kafka_consumer(
         KafkaConsumer instance
     """
     try:
-        from confluent_kafka import Consumer, KafkaError
+        from confluent_kafka import Consumer
     except ImportError:
         raise ImportError(
             "confluent-kafka is required for Kafka streaming. "
@@ -97,9 +96,10 @@ class KafkaMessage:
 
 def consume_kafka_messages(consumer, max_messages: int = 100, timeout_ms: int = 10000):
     """Generator that yields messages from confluent-kafka consumer."""
+    from confluent_kafka import KafkaError
+
     messages = []
     start_time = time.time() * 1000
-    timeout_seconds = timeout_ms / 1000
     
     while len(messages) < max_messages:
         elapsed = (time.time() * 1000) - start_time
@@ -166,7 +166,7 @@ def write_events_to_raw(
     Returns:
         Path to the written file
     """
-    from ingestion.canonical.envelope import EnvelopeContext, build_raw_envelope
+    from ingestion.canonical.envelope import EnvelopeContext
     from ingestion.canonical.writer import write_raw_envelopes
     from common.config import BRONZE_DIR
     from datetime import datetime, timezone
@@ -381,8 +381,8 @@ def consume_events(
             raw_path = write_events_to_raw(landed_records, dataset, f"kafka://{topic}")
             result.raw_path = str(raw_path)
             
-            # Extract run_id from path and trigger Bronze→Silver
-            _publish_streaming_to_silver(raw_path, dataset)
+            # Stamp a published manifest and adapt the streaming artifact into the shared raw envelope zone.
+            _publish_streaming_raw_envelope(raw_path, dataset)
             
         except Exception as exc:
             result.errors.append(f"Failed to write to raw: {exc}")
@@ -390,8 +390,8 @@ def consume_events(
     return result
 
 
-def _publish_streaming_to_silver(raw_path: Path, dataset: str) -> str | None:
-    """Convert streaming Bronze data to Silver and return silver path."""
+def _publish_streaming_raw_envelope(raw_path: Path, dataset: str) -> str | None:
+    """Publish a streaming artifact to the shared raw envelope zone."""
     try:
         from ingestion.downloaders.raw_adapter import published_run_to_raw_envelope
         
@@ -433,16 +433,16 @@ def _publish_streaming_to_silver(raw_path: Path, dataset: str) -> str | None:
         
         published_manifest.write_text(json.dumps(manifest_data, indent=2, ensure_ascii=False), encoding="utf-8")
         
-        # Convert to silver via raw_adapter
+        # Convert the published artifact into the canonical raw envelope landing zone.
         result = published_run_to_raw_envelope(published_manifest)
         
-        silver_path = result.get("raw_path", "N/A")
-        encoded = silver_path.encode('ascii', 'replace').decode('ascii') if silver_path else 'N/A'
-        print(f"  silver: {encoded}")
+        envelope_path = result.get("raw_path", "N/A")
+        encoded = envelope_path.encode("ascii", "replace").decode("ascii") if envelope_path else "N/A"
+        print(f"  raw_envelope: {encoded}")
         return result.get("raw_path")
         
     except Exception as exc:
-        print(f"  silver conversion failed: {exc}")
+        print(f"  raw envelope publish failed: {exc}")
         return None
 
 
@@ -611,7 +611,7 @@ def main():
         write_to_raw=not args.no_raw,
     )
 
-    print(f"\nResult:")
+    print("\nResult:")
     print(f"  consumed: {result.consumed}")
     print(f"  landed:   {result.landed}")
     print(f"  dlq:      {result.dlq}")

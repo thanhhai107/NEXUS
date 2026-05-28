@@ -7,7 +7,7 @@ Stores and retrieves semantic annotations for sources.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any

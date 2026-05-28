@@ -16,7 +16,6 @@ from __future__ import annotations
 import platform
 import subprocess
 import sys
-from pathlib import Path
 
 
 # Model configuration
@@ -141,7 +140,7 @@ def main():
     
     # Check if Ollama is running
     running = check_ollama_running()
-    print(f"\nOllama installed: ✅")
+    print("\nOllama installed: ✅")
     print(f"Ollama running:    {'✅' if running else '❌'}")
     
     # Parse arguments
@@ -213,7 +212,7 @@ def main():
         print(f"\n✅ Model {DEFAULT_MODEL} is installed!")
     else:
         print(f"\n❌ Model {DEFAULT_MODEL} is not installed!")
-        print(f"\nPull it now? (y/n)")
+        print("\nPull it now? (y/n)")
         
         if len(sys.argv) > 1 and sys.argv[1] == "--yes":
             response = "y"
@@ -224,7 +223,7 @@ def main():
             if pull_model(DEFAULT_MODEL):
                 print(f"\n✅ Model {DEFAULT_MODEL} installed successfully!")
             else:
-                print(f"\n❌ Failed to pull model")
+                print("\n❌ Failed to pull model")
                 sys.exit(1)
 
 

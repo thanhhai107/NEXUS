@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from processing.common.idempotency import parse_key_list, write_idempotent_iceberg
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, count, current_timestamp, to_timestamp, window
-from pyspark.sql.functions import sum as spark_sum
 
 
-def build_spark() -> SparkSession:
+def build_spark():
+    from pyspark.sql import SparkSession
+
     return (
         SparkSession.builder.appName("nexus-streaming-event-time-to-gold")
         .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
@@ -33,6 +37,9 @@ def run(
     skip_overwrite_snapshots: bool = True,
     skip_delete_snapshots: bool = True,
 ) -> None:
+    from pyspark.sql.functions import col, count, current_timestamp, to_timestamp, window
+    from pyspark.sql.functions import sum as spark_sum
+
     spark = build_spark()
     stream_reader = spark.readStream
     if skip_overwrite_snapshots:

@@ -4,11 +4,11 @@ import csv
 from pathlib import Path
 from typing import Iterable, Mapping
 
-from common.config import RUNTIME_DIR
-from ingestion.canonical.envelope import EnvelopeContext, clean_field_name, normalize_record
+from common.config import RAW_DIR
+from ingestion.canonical.envelope import EnvelopeContext, clean_field_name
 from ingestion.canonical.writer import default_raw_path, write_raw_envelopes
 
-LOCAL_RAW_DIR = RUNTIME_DIR / "raw"
+LOCAL_RAW_DIR = RAW_DIR
 
 
 def clean_col_name(name: str) -> str:
