@@ -141,12 +141,6 @@ modes:
       - pressure_msl
       - wind_speed_10m
       - wind_direction_10m
-      - pm2_5
-      - pm10
-      - nitrogen_dioxide
-      - ozone
-      - sulphur_dioxide
-      - carbon_monoxide
     ukair_air_quality_archive_options:
       site_limit: 3
       year_start: 2025
@@ -260,8 +254,8 @@ rate_limits:
   openaq_delay_seconds: 0.2
   londonair_delay_seconds: 0.2
   ukair_air_quality_archive_delay_seconds: 0.2
-  openmeteo_delay_seconds: 1.0
-  openmeteo_historical_weather_delay_seconds: 1.0
+  openmeteo_delay_seconds: 3.0
+  openmeteo_historical_weather_delay_seconds: 5.0
   ncei_delay_seconds: 0.25
   waqi_delay_seconds: 1.0
   openweather_delay_seconds: 0.2
@@ -308,6 +302,8 @@ openmeteo:
   air_quality_url: https://air-quality-api.open-meteo.com/v1/air-quality
   weather_url: https://archive-api.open-meteo.com/v1/archive
   timezone: Europe/London
+  rate_limit_policy:
+    min_delay_on_429_seconds: 60.0
   air_quality_hourly:
   - pm10
   - pm2_5
@@ -343,6 +339,8 @@ openmeteo_historical_weather:
   grid_spacing_km: 10
   max_locations_per_request: 50
   max_bytes_per_file: 2000000000
+  rate_limit_policy:
+    min_delay_on_429_seconds: 60.0
   weather_variables:
   - temperature_2m
   - relative_humidity_2m

@@ -64,6 +64,7 @@ def download_openmeteo_historical_weather(run: SourceRun, context: DownloadConte
     _write_grid_metadata(run, bbox, grid, spacing_km, start_date, end_date, timezone_name)
 
     successes = 0
+    failures: list[str] = []
     for batch_index, batch in enumerate(batch_points(grid, max_locations), start=1):
         chunk_id = (
             "openmeteo_historical_weather:"
@@ -118,10 +119,13 @@ def download_openmeteo_historical_weather(run: SourceRun, context: DownloadConte
             )
             successes += 1
         except Exception as exc:
+            failures.append(f"batch={batch_index:03d}: {exc}")
             run.mark_failed(chunk_id, str(exc))
 
     if successes == 0:
-        raise SourceFailure("All Open-Meteo historical weather grid requests failed.")
+        detail = "; ".join(failures[:3])
+        suffix = f" First failures: {detail}" if detail else ""
+        raise SourceFailure(f"All Open-Meteo historical weather grid requests failed.{suffix}")
 
 
 def resolve_bbox(context: DownloadContext, opts: dict[str, Any]) -> BoundingBox:

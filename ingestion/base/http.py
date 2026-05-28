@@ -99,12 +99,16 @@ def timeout_policy(config: dict[str, Any], timeout: int | float | None = None) -
 
 def rate_limit_policy(config: dict[str, Any], source_key: str, delay_seconds: float | None = None) -> RateLimitPolicy:
     runtime = dict((config.get("resilient_runtime") or {}).get("rate_limit_policy") or {})
+    source_cfg = dict(config.get(source_key) or {})
+    source_rate = dict(source_cfg.get("rate_limit_policy") or {})
     if delay_seconds is None:
         delay_seconds = source_delay(config, source_key)
     return RateLimitPolicy(
-        delay_seconds=float(delay_seconds or 0.0),
-        min_delay_on_429_seconds=float(runtime.get("min_delay_on_429_seconds", 2.0)),
-        max_concurrency=max(1, int(runtime.get("max_concurrency", 1))),
+        delay_seconds=float(source_rate.get("delay_seconds", delay_seconds or 0.0)),
+        min_delay_on_429_seconds=float(
+            source_rate.get("min_delay_on_429_seconds", runtime.get("min_delay_on_429_seconds", 2.0))
+        ),
+        max_concurrency=max(1, int(source_rate.get("max_concurrency", runtime.get("max_concurrency", 1)))),
     )
 
 
@@ -240,7 +244,13 @@ def _request_with_retries(
             )
             if not should_retry:
                 raise SourceFailure(masked_error) from exc
-            sleep_for_retry(run.context.config, attempt - 1, status_code, retry_after_seconds)
+            sleep_for_retry(
+                run.context.config,
+                attempt - 1,
+                status_code,
+                retry_after_seconds,
+                source_key=run.source_key,
+            )
     raise SourceFailure(f"Request failed after {retry.max_attempts} attempts: {masked}")
 
 
@@ -323,7 +333,13 @@ def download_file(
             )
             if not should_retry:
                 raise SourceFailure(masked_error) from exc
-            sleep_for_retry(run.context.config, attempt - 1, status_code, retry_after_seconds)
+            sleep_for_retry(
+                run.context.config,
+                attempt - 1,
+                status_code,
+                retry_after_seconds,
+                source_key=run.source_key,
+            )
     raise SourceFailure(f"Download failed after {retry.max_attempts} attempts: {masked}")
 
 
@@ -367,9 +383,10 @@ def sleep_for_retry(
     attempt: int,
     status_code: int | None,
     retry_after_seconds: float | None = None,
+    source_key: str = "",
 ) -> None:
     retry = retry_policy(config)
-    rate = rate_limit_policy(config, source_key="")
+    rate = rate_limit_policy(config, source_key=source_key)
     delay = min(retry.backoff_max_seconds, retry.backoff_base_seconds * (2**attempt))
     if retry.jitter_seconds > 0:
         delay += random.uniform(0, retry.jitter_seconds)

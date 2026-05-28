@@ -257,6 +257,12 @@ def run_once(
     load_dotenv(DEFAULT_ENV_PATH, override=True)
     config = load_config(config_path)
     resolved_mode_name, mode = resolve_mode(config, mode_name)
+    if source_group == "small_demo" and resolved_mode_name != "small_demo":
+        print(
+            "[config] warning: --source-group small_demo is intended to run with "
+            "--mode small_demo. Current mode may request full date ranges and hit "
+            "external API rate limits."
+        )
     resolved_output_dir = resolve_output_dir(config, output_dir)
     source_groups = config.get("sources", {})
     if not isinstance(source_groups, dict):

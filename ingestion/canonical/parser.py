@@ -25,8 +25,7 @@ def iter_artifact_records(path: str | Path) -> Iterable[dict[str, Any]]:
         yield from extract_records(payload)
         return
     if suffix == ".csv":
-        with artifact_path.open("r", encoding="utf-8-sig", newline="") as file:
-            yield from csv.DictReader(file)
+        yield from _iter_csv(artifact_path)
         return
     raise ValueError(f"Unsupported ingestion artifact type: {artifact_path.suffix}")
 
@@ -44,3 +43,16 @@ def _iter_jsonl(path: Path) -> Iterable[dict[str, Any]]:
 def _read_json_payload(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as file:
         return json.load(file)
+
+
+def _iter_csv(path: Path) -> Iterable[dict[str, Any]]:
+    last_error: UnicodeDecodeError | None = None
+    for encoding in ("utf-8-sig", "cp1252", "latin-1"):
+        try:
+            with path.open("r", encoding=encoding, newline="") as file:
+                yield from csv.DictReader(file)
+            return
+        except UnicodeDecodeError as exc:
+            last_error = exc
+    if last_error:
+        raise last_error

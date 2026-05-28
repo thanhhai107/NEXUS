@@ -167,6 +167,13 @@ def test_json_array_artifact_records_are_supported(tmp_path: Path) -> None:
     assert list(iter_artifact_records(path)) == [{"id": "1"}, {"id": "2"}]
 
 
+def test_csv_artifact_records_fall_back_to_cp1252(tmp_path: Path) -> None:
+    path = tmp_path / "records.csv"
+    path.write_bytes("site,name\nMY1,Caf\xe9\n".encode("cp1252"))
+
+    assert list(iter_artifact_records(path)) == [{"site": "MY1", "name": "Café"}]
+
+
 def test_downloader_publish_routes_parser_failures_to_dlq(monkeypatch, tmp_path: Path) -> None:
     dlq_dir = tmp_path / "dlq"
     monkeypatch.setattr("governance.dlq.DEFAULT_DLQ_DIR", dlq_dir)
@@ -290,6 +297,27 @@ def test_request_json_honors_retry_after_for_429(monkeypatch, tmp_path: Path) ->
 
     assert payload == {"results": [{"id": "1"}]}
     assert sleeps and sleeps[0] == 7
+
+
+def test_request_json_uses_source_specific_429_delay(monkeypatch, tmp_path: Path) -> None:
+    run_context = context(tmp_path, max_attempts=2)
+    run_context.config["openmeteo"] = {
+        "rate_limit_policy": {"min_delay_on_429_seconds": 42}
+    }
+    run = SourceRun("demo_source", run_context, "openmeteo")
+    calls = [
+        FakeResponse(429, {"error": "slow down"}),
+        FakeResponse(200, {"results": [{"id": "1"}]}),
+    ]
+    sleeps: list[float] = []
+
+    monkeypatch.setattr("time.sleep", lambda seconds: sleeps.append(seconds))
+    monkeypatch.setattr("requests.get", lambda *_args, **_kwargs: calls.pop(0))
+
+    payload = request_json(run, "https://example.test/data")
+
+    assert payload == {"results": [{"id": "1"}]}
+    assert sleeps and sleeps[0] == 42
 
 
 def test_request_json_bounded_timeout_retries(monkeypatch, tmp_path: Path) -> None:
