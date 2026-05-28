@@ -228,6 +228,26 @@ modes:
     openweather_borough_limit: 5
     ncei_station_limit: 3
     dft_page_limit: 2
+  backfill:
+    core_start: '2025-01-01'
+    core_end: current_date
+    transport_start: '2025-01-01'
+    transport_end: current_date
+    transport_start_year: 2025
+    transport_end_year: current_year
+    borough_limit: 33
+    londonair_site_limit: null
+    londonair_species:
+    - NO2
+    - PM10
+    - PM25
+    - O3
+    openaq_location_limit: 10
+    openaq_sensor_limit: 2
+    waqi_station_limit: 5
+    openweather_borough_limit: 5
+    ncei_station_limit: 3
+    dft_page_limit: 2
 sources:
   small_demo:
   - openmeteo

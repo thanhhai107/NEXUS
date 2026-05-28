@@ -7,12 +7,6 @@ Fetches documentation from URLs provided in source config.
 from __future__ import annotations
 
 import requests
-from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from requests import Response
-
 # Default headers for API documentation fetching
 DEFAULT_HEADERS = {
     "User-Agent": "NEXUS-SemanticAnnotator/1.0 (data-pipeline)",
@@ -168,13 +162,10 @@ def fetch_with_retry(
     """
     import time
     
-    last_error = None
-    
     for attempt in range(max_retries):
         try:
             return fetch_api_docs(docs_url, timeout)
-        except Exception as e:
-            last_error = e
+        except Exception:
             if attempt < max_retries - 1:
                 # Exponential backoff
                 wait_time = 2 ** attempt

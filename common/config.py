@@ -1,4 +1,4 @@
-﻿"""
+"""
 NEXUS Configuration Module.
 
 Unified config cho cả local (runtime/) và VM (/data/).
@@ -95,19 +95,19 @@ def is_vm_mode() -> bool:
 # Data lake với 3 tier: Bronze → Silver → Gold
 #
 # Directory structure:
-#   lake/bronze/{domain}/{dataset}/run_id={run_id}/
+#   lake/bronze/{dataset}/run_id={run_id}/
 #       ├── metadata/       # Checkpoint, profile, request log
 #       ├── published/      # Published manifest
 #       ├── raw/            # Downloaded raw files
 #       └── staging/        # Temporary files during download
 #
-#   lake/silver/{domain}/{dataset}/           # Envelope-wrapped files
-#   lake/gold/{domain}/{dataset}/            # Business aggregates
-#   lake/schemas/{domain}/{dataset}.schema.json
+#   lake/silver/{dataset}/                   # Validated, standardized data
+#   lake/gold/{dataset}/                     # Business aggregates
+#   lake/schemas/{dataset}.schema.json
 
 LAKE_DIR = RUNTIME_DIR / "lake"
 BRONZE_DIR = LAKE_DIR / "bronze"  # Raw data gốc (source format)
-SILVER_DIR = LAKE_DIR / "silver"  # Validated + Envelope wrapped
+SILVER_DIR = LAKE_DIR / "silver"  # Validated + standardized data
 GOLD_DIR = LAKE_DIR / "gold"      # Business aggregates (optional)
 SCHEMAS_DIR = LAKE_DIR / "schemas"  # JSON schemas cho từng dataset
 
@@ -131,12 +131,21 @@ QUARANTINE_DIR = RUNTIME_DIR / "quarantine"  # Invalid records
 
 
 # ============================================================================
+# RAW ENVELOPE LANDING ZONE
+# ============================================================================
+# Canonical raw JSONL envelopes live outside the lake tiers. Raw source artifacts
+# remain under BRONZE_DIR/{dataset}/run_id={run_id}/raw until they are adapted
+# into this shared landing zone. Spark raw→Bronze jobs consume RAW_DIR.
+
+RAW_DIR = RUNTIME_DIR / "raw"
+
+
+# ============================================================================
 # LEGACY ALIASES (Backward Compatibility - Deprecated)
 # ============================================================================
 # Will be removed after migration
 
 DATASETS_DIR = BRONZE_DIR  # Legacy alias - use BRONZE_DIR
-RAW_DIR = SILVER_DIR       # Legacy alias - use SILVER_DIR
 
 
 # ============================================================================

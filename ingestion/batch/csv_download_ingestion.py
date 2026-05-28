@@ -8,7 +8,6 @@ from urllib.parse import urlparse
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from common.config import BRONZE_DIR
 from ingestion.batch.common import read_csv_records, write_jsonl
 from ingestion.base.core import DownloadContext, SourceRun
 from ingestion.base.http import download_file

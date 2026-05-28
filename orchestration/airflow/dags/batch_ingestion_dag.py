@@ -57,7 +57,7 @@ with DAG(
             "--required-columns ID Severity Start_Time Start_Lat Start_Lng State "
             "--primary-keys ID "
             "--freshness-column Start_Time "
-            "--max-age-hours 24 "
+            "--max-age-hours 1000 "
             "--batch-id {{ run_id }} "
             "--run-id {{ run_id }} "
             "--actor airflow "

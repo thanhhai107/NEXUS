@@ -23,15 +23,11 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from ingestion.base.core import DownloadContext, SourceRun
-from ingestion.base.http import download_file, request_json
-from ingestion.base.utils import load_config, resolve_output_dir, run_id_now, sanitize_segment
+from ingestion.base.http import request_json
 from ingestion.streaming.kafka_config import (
-    DEFAULT_STREAM_SOURCE,
     DLQ_TOPIC,
     KafkaConfig,
     ProducerConfig,
-    StreamSourceConfig,
     STREAM_TOPICS,
 )
 
@@ -227,7 +223,6 @@ def _normalize_waqi(payload: dict[str, Any]) -> dict[str, object]:
 
 
 def _normalize_londonair(payload: Any) -> list[dict[str, object]]:
-    import random
     authorities = payload if isinstance(payload, list) else [payload]
     events = []
     for auth in authorities:
@@ -565,7 +560,7 @@ def parse_args():
     )
     parser.add_argument(
         "--topic",
-        help=f"Kafka topic (default: from STREAM_TOPICS config)",
+        help="Kafka topic (default: from STREAM_TOPICS config)",
     )
     parser.add_argument(
         "--bootstrap-servers",

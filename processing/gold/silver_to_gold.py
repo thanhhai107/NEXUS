@@ -1,14 +1,18 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from processing.common.idempotency import parse_key_list, write_idempotent_iceberg
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, count, current_timestamp, to_timestamp, window
-from pyspark.sql.functions import sum as spark_sum
 
 
-def build_spark() -> SparkSession:
+def build_spark():
+    from pyspark.sql import SparkSession
+
     return (
         SparkSession.builder.appName("nexus-silver-to-gold")
         .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
@@ -31,6 +35,9 @@ def run(
 
     This is intentionally generic; real projects should add one job/model per domain use case.
     """
+    from pyspark.sql.functions import col, count, current_timestamp, to_timestamp, window
+    from pyspark.sql.functions import sum as spark_sum
+
     spark = build_spark()
     silver_df = spark.table(silver_table)
 

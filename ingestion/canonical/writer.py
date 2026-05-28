@@ -5,10 +5,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Mapping
 
-from common.config import RUNTIME_DIR
+from common.config import RAW_DIR
 from ingestion.canonical.envelope import EnvelopeContext, build_raw_envelope
 
-LOCAL_RAW_DIR = RUNTIME_DIR / "raw"
+LOCAL_RAW_DIR = RAW_DIR
 
 
 def raw_dataset_dir(dataset_id: str, output_dir: Path | None = None) -> Path:

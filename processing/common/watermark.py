@@ -14,14 +14,10 @@ Usage:
 from __future__ import annotations
 
 import json
-import os
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from pyspark.sql import SparkSession
+from typing import Any
 
 
 # Watermark storage path (when Iceberg is not available)

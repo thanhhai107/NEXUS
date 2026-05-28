@@ -8,14 +8,9 @@ Default model: qwen2.5:0.5b (lightweight, fast)
 from __future__ import annotations
 
 import json
-import os
 import requests
 from dataclasses import dataclass
-from pathlib import Path
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from ingestion.downloaders.schema_inference import InferredSchema
+from typing import Any
 
 # Default settings
 DEFAULT_MODEL = "qwen2.5:0.5b"

@@ -32,7 +32,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from common.config import (
     load_polling_config,
     load_backfill_config,
-    DATASETS_DIR,
 )
 
 

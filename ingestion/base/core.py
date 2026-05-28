@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -24,13 +23,10 @@ from ingestion.base.contracts import (
     DownloadPlan,
     PublishedManifest,
     RunManifest,
-    SourceSpec,
 )
 from ingestion.base.utils import (
-    earliest_timestamp,
     estimate_record_count,
     iter_timestamp_strings,
-    latest_timestamp,
     now_iso,
     profile_files,
 )

@@ -357,6 +357,39 @@ def maybe_publish_raw_envelope(run: SourceRun, context: DownloadContext) -> dict
     return result
 
 
+def _date_from_cli(value: str) -> str:
+    """Normalize an ISO date/datetime CLI value to YYYY-MM-DD for downloader modes."""
+    normalized = value.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(normalized).date().isoformat()
+    except ValueError:
+        return datetime.strptime(value[:10], "%Y-%m-%d").date().isoformat()
+
+
+def _apply_time_window(
+    mode: dict[str, Any],
+    *,
+    start_time: str | None = None,
+    end_time: str | None = None,
+) -> dict[str, Any]:
+    """Override downloader mode date windows from optional backfill CLI args."""
+    if not start_time and not end_time:
+        return mode
+
+    updated = dict(mode)
+    if start_time:
+        start_date = _date_from_cli(start_time)
+        updated["core_start"] = start_date
+        updated["transport_start"] = start_date
+        updated["transport_start_year"] = int(start_date[:4])
+    if end_time:
+        end_date = _date_from_cli(end_time)
+        updated["core_end"] = end_date
+        updated["transport_end"] = end_date
+        updated["transport_end_year"] = int(end_date[:4])
+    return updated
+
+
 def run_once(
     *,
     source_keys: list[str] | None = None,
@@ -369,12 +402,15 @@ def run_once(
     resume_latest: bool = False,
     overwrite: bool = False,
     poll_time: datetime | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
     parallel: bool = False,
     max_workers: int = 4,
 ) -> list[dict[str, Any]]:
     load_dotenv(DEFAULT_ENV_PATH, override=True)
     config = load_config(config_path)
     resolved_mode_name, mode = resolve_mode(config, mode_name)
+    mode = _apply_time_window(mode, start_time=start_time, end_time=end_time)
     if source_group == "small_demo" and resolved_mode_name != "small_demo":
         print(
             "[config] warning: --source-group small_demo is intended to run with "
@@ -492,6 +528,8 @@ def run_polling(
     resume: bool = True,
     resume_latest: bool = False,
     overwrite: bool = False,
+    start_time: str | None = None,
+    end_time: str | None = None,
 ) -> list[dict[str, Any]]:
     config = load_config(config_path)
     selected = resolve_source_keys(
@@ -524,6 +562,8 @@ def run_polling(
                 resume_latest=False,
                 overwrite=overwrite,
                 poll_time=poll_time,
+                start_time=start_time,
+                end_time=end_time,
             )
         )
         if datetime.now(timezone.utc) >= end_at:
@@ -573,6 +613,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH, help="Downloader YAML config.")
     parser.add_argument("--output-dir", type=Path, help="Output directory. Defaults to config output_dir.")
     parser.add_argument("--run-id", help="Run id. Use the same value to resume a partial run.")
+    parser.add_argument("--start-time", help="Optional backfill window start as ISO date/datetime.")
+    parser.add_argument("--end-time", help="Optional backfill window end as ISO date/datetime.")
     parser.add_argument("--overwrite", action="store_true", help="Allow overwriting files for the same run_id.")
     parser.add_argument("--no-resume", action="store_true", help="Ignore existing checkpoint for this run_id.")
     parser.add_argument(
@@ -621,6 +663,8 @@ def main(argv: list[str] | None = None) -> int:
                 resume=not args.no_resume,
                 resume_latest=args.resume_latest,
                 overwrite=args.overwrite,
+                start_time=args.start_time,
+                end_time=args.end_time,
             )
         else:
             run_once(
@@ -633,6 +677,8 @@ def main(argv: list[str] | None = None) -> int:
                 resume=not args.no_resume,
                 resume_latest=args.resume_latest,
                 overwrite=args.overwrite,
+                start_time=args.start_time,
+                end_time=args.end_time,
                 parallel=args.parallel,
                 max_workers=args.max_workers,
             )
