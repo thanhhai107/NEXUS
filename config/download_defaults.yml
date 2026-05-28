@@ -12,6 +12,43 @@ schema_inference:
   save_json_schema: true
   save_summary: true
 
+# Semantic annotation configuration (LLM-based)
+semantic_annotation:
+  enabled: true
+  llm_model: "qwen2.5:0.5b"  # Lightweight model for local inference
+  ollama_url: "http://localhost:11434"
+  llm_timeout_seconds: 180
+  
+  # Trigger conditions
+  trigger:
+    min_new_fields: 3           # Call LLM if >= 3 new fields
+    reannotate_threshold: 10    # Re-annotate entire source if >= 10 new fields
+
+  # Documentation URLs per source (optional - LLM can work without it)
+  docs_urls:
+    # Transport
+    tfl: ""
+    tfl_arrivals: ""
+    tfl_line_status: ""
+    london_journeys: "https://datahub.io/luccasmmg/london-transport/_r/-/data/datapackage.json"
+    naptan: "https://naptan.api.dft.gov.uk/swagger/index.html"
+
+    # Environment - Air Quality
+    openaq: "https://docs.openaq.org/resources/measurements"
+    waqi: "https://aqicn.org/json-api/doc/"
+    londonair: "https://api.erg.ic.ac.uk/AirQuality/help"
+    ukair_air_quality_archive: "https://uk-air.defra.gov.uk/data/flat_files"
+
+    # Environment - Weather
+    openmeteo: "https://open-meteo.com/en/docs"
+    openmeteo_historical_weather: "https://open-meteo.com/en/docs"
+    openweather: "https://openweathermap.org/api/one-call-4"
+    ncei: "https://www.ncei.noaa.gov/cdo-web/webservices/v2"
+
+    # Road Safety
+    stats19: "https://www.gov.uk/government/statistical-data-sets/road-safety-open-data"
+    dft: "https://storage.googleapis.com/dft-statistics/road-traffic/all-traffic-data-metadata.pdf"
+
 polling:
   tfl:
     enabled: false
