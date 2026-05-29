@@ -1,322 +1,333 @@
 # NEXUS
 
-NEXUS is a local-first data lakehouse scaffold for open data. It ingests
-batch files and API streams, runs quality and governance checks, moves records
-through Raw/Bronze/Silver/Gold layers, and exposes metadata through FastAPI,
-Trino, Superset, and Airflow.
+NEXUS is a local-first lakehouse scaffold for open data. It ingests batch files,
+downloaded API data, and streaming snapshots; validates records with data
+contracts, JSON Schema, Great Expectations, schema-drift policy, and semantic
+rules; then routes data through Bronze, Silver, Gold, Quarantine, audit, lineage,
+and optional serving/metadata services.
 
-The generated source inventory is integrated in this repository under
-`assets/source_discovery/`.
+The project is intentionally runnable from a single Ubuntu working tree with
+`.venv`, while Docker Compose can start the heavier Airflow, Kafka, Spark, Trino,
+Superset, OpenMetadata, and Marquez services when needed.
 
-## Pipeline Overview
+## Current Capabilities
 
-Nexus implements the canonical lakehouse pipeline:
-
-1. **Data Sources** described by domain catalogs in `domains/<domain>/datasets.yml`.
-2. **Ingestion patterns**: batch CSV/API, downloaded CSV, REST API, simulated and real Kafka streaming. Airflow orchestrates schedules, retries, backfill and dependencies via DAGs in `orchestration/airflow/dags/`.
-3. **Streaming and failure handling**: the Kafka producer retries failed publishes and routes permanent failures to a Dead Letter Queue (Kafka topic `nexus.dlq` plus `runtime/dlq/`). DLQ captures **operational** failures; the Quarantine Zone captures **invalid data records**.
-4. **Source governance**: every dataset is exposed as a Source Registry entry (`python -m cli.nexus registry list`) and a Data Contract (`python -m cli.nexus contract show --dataset <name>`) that combines the JSON Schema, quality rules, freshness and ownership.
-5. **Validation gate**: `governance/quality/checks.py` runs schema, type, format and Great Expectations rules. Valid records flow to Bronze; invalid records go to Quarantine.
-6. **Quarantine Zone**: invalid records are written to `runtime/quarantine/` with the failure reason for triage.
-7. **Medallion architecture**: Bronze (`processing/bronze/raw_to_bronze.py`), Silver (`processing/silver/bronze_to_silver.py`), Gold (`transform/dbt/models/gold/`). dbt is the canonical Silver→Gold tool; the Spark `silver_to_gold.py` script remains for ad hoc backfills.
-8. **Metadata, governance, lineage**: OpenMetadata catalogs datasets, owners, schemas, quality results and contracts; OpenLineage events from Spark, dbt and audit hooks land in Marquez.
-9. **Serving layer**: Trino, FastAPI and Superset consume Gold tables.
-## What Is Included
-
-- Batch CSV/API ingestion and simulated Kafka streaming ingestion.
-- Transport and Environment domain catalogs, schemas, and quality rules.
-- Raw JSONL landing, Spark medallion jobs, dbt model scaffolding, and serving assets.
-- Governance audit logs, Great Expectations validation, lineage, schema history, quarantine, quality metrics, and a lightweight governance agent.
-- Optional OpenMetadata catalog and OpenLineage backend through Marquez.
-- Generated source discovery metadata from `Akapi895/data-bigdata`.
-- Optional GCP VM provisioning for Nexus only.
+- Domain catalogs, JSON Schemas, quality rules, and semantic contracts under
+  `domains/`.
+- Source registry and data contract CLI for every configured dataset.
+- Batch/API/download/streaming ingestion modules with raw envelope support.
+- Great Expectations Core validation, JSON Schema validation, schema coercion,
+  readiness scoring, quality metrics, audit logs, and quarantine routing.
+- Schema drift detection for missing fields, unknown fields, dropped downstream
+  fields, rename candidates, and type changes.
+- Generated Great Expectations suite payloads from data contracts.
+- Bronze validation CLI using contract, quality, schema drift, quarantine, and
+  OpenMetadata-compatible DQ payloads.
+- Semantic governance for glossary terms, aliases, units, timestamps, CRS, grain,
+  metric definitions, and entity matching.
+- Spark Bronze/Silver/Gold scripts plus dbt Gold model scaffolding.
+- Optional OpenMetadata/OpenLineage/Marquez integration.
 
 ## Repository Map
 
 ```text
-cli/                  Operational CLI
-common/               Shared config loading
-config/               Quality, governance, and Spark defaults
-domains/              Dataset catalogs, schemas, and quality rules
-governance/            Quality checks, policy, lineage, audit, agent logic
-ingestion/             Batch and streaming ingestion
-infra/docker/          Local Docker Compose stack
-infra/terraform/gcp/   Optional GCP VM cluster for Nexus
-orchestration/         Airflow DAGs
-processing/            Spark Bronze/Silver/Gold jobs
-runtime/               Local generated outputs (mirrors /data/ on VM)
-assets/samples/        Sample files for each configured dataset (around 10 rows each)
-serving/               FastAPI, Trino, and Superset assets
-assets/source_discovery/ Generated source inventory and schema metadata
-tests/                 Unit tests
-transform/             dbt project
+cli/                    Operational CLI entrypoint
+common/                 Config, registry, contracts, semantic helpers
+config/                 Defaults for download, quality, governance, semantic, Spark
+docs/                   Design notes and implementation checklists
+domains/                Dataset catalogs, schemas, quality rules, semantic rules
+governance/             Quality, schema drift, quarantine, audit, lineage, metadata
+ingestion/              Batch, download, streaming, source adapters
+orchestration/airflow/  Airflow DAGs
+processing/             Spark Bronze, Silver, Gold jobs
+serving/                FastAPI, Trino, Superset configs
+transform/dbt/          dbt project, seeds, Gold models
+assets/samples/         Small local CSV fixtures
+assets/source_discovery/Generated source inventory
+tests/                  Unit and workflow tests
+runtime/                Generated local outputs; do not commit
 ```
 
-`runtime/` is generated output and mirrors `/data/` on the VM. Do not commit logs,
-raw data, metrics, quarantine files, or synced source-discovery exports from that
-directory.
+## Quick Start On Ubuntu
 
-## Runtime Directory Structure (`runtime/`)
+Use the project virtual environment:
 
-The `runtime/` directory (equivalent to `/data/` on VM) follows the Medallion
-Architecture with additional pipeline infrastructure:
+```bash
+cd /opt/nexus/nexus
+source .venv/bin/activate
+python -m cli.nexus --help
+python -m pytest -q
+```
+
+If `.venv` is missing:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+The expected tested environment includes:
+
+- Python 3.10
+- `pytest==8.2.2`
+- `great_expectations==1.16.1`
+- `jsonschema==4.23.0`
+- `pyspark==3.5.1`
+- `dbt-trino==1.8.1`
+
+## Local Smoke Test
+
+These commands exercise the main local system without starting Docker services:
+
+```bash
+source .venv/bin/activate
+
+python -m cli.nexus registry list --domain environment
+python -m cli.nexus contract show --dataset openaq_measurements
+python -m cli.nexus semantic show --dataset openaq_measurements
+
+python -m cli.nexus quality gx-suite --dataset openaq_measurements
+python -m cli.nexus quality bronze-validate \
+  --dataset openaq_measurements \
+  --source assets/samples/openaq_measurements.csv \
+  --no-exit-on-fail
+
+python -m cli.nexus quality check \
+  --dataset openaq_measurements \
+  --source assets/samples/openaq_measurements.csv \
+  --required-columns location_id location parameter value unit datetime \
+  --primary-keys location_id parameter datetime \
+  --freshness-column datetime \
+  --max-age-hours 10000 \
+  --no-exit-on-fail
+
+python -m cli.nexus semantic match-entities \
+  --dataset openaq_measurements \
+  --source assets/samples/openaq_measurements.csv
+
+python -m pytest -q
+```
+
+On the current tree, the full test suite is expected to pass. You may still see
+non-blocking pytest warnings from older tests that return `True` instead of
+using `assert`, plus a PySpark/pandas deprecation warning.
+
+## Operational CLI
+
+The CLI entrypoint is:
+
+```bash
+python -m cli.nexus --help
+```
+
+Top-level commands:
+
+| Command | Purpose |
+| --- | --- |
+| `registry` | List or show source registry entries. |
+| `contract` | Show data contracts assembled from catalog, schema, quality, semantic config. |
+| `quality check` | Validate a local CSV against explicit quality arguments. |
+| `quality bronze-validate` | Validate a file using the configured data contract. |
+| `quality gx-suite` | Generate a Great Expectations suite payload from a contract. |
+| `quality stream` | Validate sampled streaming events. |
+| `semantic` | Inspect contracts, export OpenMetadata/glossary payloads, match entities. |
+| `batch run` | Run config-driven batch ingestion and quality gate. |
+| `lineage record` | Write OpenLineage-compatible lineage events. |
+| `dlq` | List or replay operational dead-letter events. |
+| `agent review` | Run deterministic or optional LLM-backed governance review. |
+
+## Data Contracts
+
+Data contracts are assembled from:
+
+- `domains/<domain>/datasets.yml`
+- `domains/<domain>/schemas/*.schema.json`
+- `domains/<domain>/quality_rules.yml`
+- `domains/<domain>/semantic_rules.yml`
+- `config/quality_defaults.yml`
+- `config/semantic_defaults.yml`
+
+Show a contract:
+
+```bash
+python -m cli.nexus contract show --dataset openaq_measurements
+```
+
+Each contract exposes required columns, primary keys, freshness policy, schema
+path, thresholds, auto-fix rules, semantic dedup keys, late-data policy, owner,
+steward, source type, ingestion method, and target tables.
+
+## Quality And Schema Drift
+
+Quality validation includes:
+
+- Required column existence and not-null checks.
+- Primary key uniqueness and compound uniqueness.
+- Freshness scoring.
+- JSON Schema validation with type coercion.
+- Great Expectations Core checks.
+- Semantic unit checks for allowed source units and derived canonical values.
+- Threshold-based pass/fail decisions.
+- Quarantine routing for invalid records.
+- Audit and quality metric logs.
+- OpenMetadata-compatible DQ result payloads.
+
+Schema drift detection covers:
+
+- Required or optional missing fields.
+- New unknown fields preserved for Bronze review.
+- Dropped fields used downstream.
+- Rename candidates from configured aliases or name similarity.
+- Type changes, with safe-cast vs quarantine action.
+
+Run a contract-driven Bronze validation:
+
+```bash
+python -m cli.nexus quality bronze-validate \
+  --dataset openaq_measurements \
+  --source assets/samples/openaq_measurements.csv \
+  --no-exit-on-fail
+```
+
+Generate a Great Expectations suite payload:
+
+```bash
+python -m cli.nexus quality gx-suite --dataset openaq_measurements
+```
+
+OpenMetadata DQ payloads are logged locally by default. To POST them to a
+service, set:
+
+```bash
+export OPENMETADATA_DQ_ENDPOINT="http://<host>/api/..."
+export OPENMETADATA_AUTH_TOKEN="<token>"  # optional
+```
+
+## Semantic Governance
+
+Semantic config lives in:
+
+- `config/semantic_defaults.yml`
+- `domains/environment/semantic_rules.yml`
+- `domains/transport/semantic_rules.yml`
+- `transform/dbt/seeds/unit_mapping.csv`
+- `transform/dbt/models/gold/schema.yml`
+
+Inspect and export semantic metadata:
+
+```bash
+python -m cli.nexus semantic list --domain environment
+python -m cli.nexus semantic show --dataset openaq_measurements
+python -m cli.nexus semantic export --kind openmetadata --domain environment
+python -m cli.nexus semantic export --kind glossary --domain transport
+```
+
+Create canonical entity IDs and crosswalk output:
+
+```bash
+python -m cli.nexus semantic match-entities \
+  --dataset openaq_measurements \
+  --source assets/samples/openaq_measurements.csv
+```
+
+Entity matching supports exact, rule-based, fuzzy, and probabilistic local
+matching. Config may list Splink or LLM-assisted review, but those are deferred
+methods unless explicitly integrated.
+
+## Medallion Processing
+
+Spark jobs:
+
+```bash
+python processing/bronze/raw_to_bronze.py --help
+python processing/silver/bronze_to_silver.py --help
+python processing/gold/silver_to_gold.py --help
+```
+
+Bronze keeps raw envelope payloads and metadata. Silver flattens payloads,
+trims strings, adds contract-based missing-field flags, and writes idempotently
+using semantic dedup keys. Gold is primarily dbt-driven under
+`transform/dbt/models/gold/`, with `processing/gold/silver_to_gold.py` kept for
+generic backfills.
+
+dbt assets:
+
+```bash
+cd transform/dbt
+dbt --version
+dbt parse --profiles-dir .
+```
+
+Running dbt models requires a reachable Trino/Iceberg profile.
+
+## Ingestion And Downloads
+
+Download source groups are configured in `config/download_defaults.yml`.
+
+Common commands:
+
+```bash
+python scripts/download_data.py --source-group core_historical --mode small_demo
+python scripts/download_data.py --source tfl_line_status --source tfl_arrivals --mode small_demo
+python scripts/download_data.py --poll --source-group realtime_polling --duration-days 0.1 --interval-minutes 1
+```
+
+Streaming examples:
+
+```bash
+python ingestion/streaming/producer.py --source transport --events 5
+python -m cli.nexus quality stream --source transport --sample-events 25 --no-exit-on-fail
+```
+
+Operational failures go to the DLQ. Invalid data records go to quarantine.
+
+## Runtime Outputs
+
+`runtime/` is generated and should not be committed. Important locations:
 
 ```text
-runtime/
-├── lake/                                    # DATA LAKE - Nơi lưu trữ chính
-│   ├── bronze/                              # BRONZE - Raw data gốc (append-only)
-│   │   └── {dataset}/
-│   │       └── run_id={run_id}/
-│   │           ├── metadata/                # Checkpoint, profile, request log
-│   │           ├── published/               # Published manifest
-│   │           ├── raw/                     # Downloaded raw files (same as Bronze raw/)
-│   │           └── staging/                  # Temporary files during download
-│   │
-│   ├── silver/                              # SILVER - Đã clean, validate, envelope
-│   │   └── {domain}/
-│   │       └── {dataset}/
-│   │           └── year={YYYY}/month={MM}/
-│   │               └── {dataset}_{run_id}.jsonl
-│   │
-│   ├── gold/                               # GOLD - Business aggregates (optional)
-│   │   └── {domain}/
-│   │       └── {dataset}/
-│   │           └── year={YYYY}/month={MM}/
-│   │
-│   └── schemas/                           # SCHEMAS - JSON schemas cho mỗi dataset
-│       └── {domain}/
-│           └── {dataset}.schema.json
-│
-├── warehouse/                              # ANALYTICAL ENGINE - Query engines
-│   ├── trino/                             # Trino (distributed SQL engine)
-│   │   └── catalogs/
-│   │       ├── lake.properties            # Bronze/Silver/Gold catalogs
-│   │       └── system.properties
-│   │
-│   ├── minio/                            # MinIO (S3-compatible object store)
-│   │   └── data/                         # Optional: nếu dùng object storage
-│   │       ├── bronze/
-│   │       ├── silver/
-│   │       └── gold/
-│   │
-│   └── postgres/                         # PostgreSQL (metadata catalog)
-│       └── data/                         # PostgreSQL data directory
-│
-├── pipeline/                               # ORCHESTRATION - Pipeline definitions
-│   ├── airflow/                          # Apache Airflow
-│   │   ├── dags/
-│   │   ├── logs/
-│   │   └── config/
-│   │
-│   └── spark/                            # Apache Spark
-│       ├── conf/
-│       ├── jars/
-│       └── logs/
-│
-├── staging/                               # STAGING - Files đang download
-│   └── {dataset}/
-│       └── {run_id}/
-│           └── (temporary files)
-│
-├── tmp/                                  # TMP - Temp files (dọn tự động)
-│
-├── logs/                                 # LOGS - Application logs
-│   └── {service}/
-│       ├── downloader/
-│       ├── pipeline/
-│       └── airflow/
-│
-├── metrics/                              # METRICS - Prometheus metrics
-│
-├── dlq/                                  # DLQ - Dead Letter Queue (shared)
-│   └── {domain}/
-│       └── {dataset}/
-│           └── {error_type}/
-│               └── {timestamp}.json
-│
-└── quarantine/                           # QUARANTINE - Invalid records (shared)
-    └── {domain}/
-        └── {dataset}/
-            └── {batch_id}/
-                └── records.jsonl
+runtime/raw/                 Local raw JSONL from batch CLI
+runtime/lake/bronze/         Download/streaming Bronze landing
+runtime/lake/silver/         Silver outputs
+runtime/lake/gold/           Gold outputs
+runtime/quarantine/          Invalid records for triage
+runtime/dlq/                 Operational dead-letter events
+runtime/metrics/             Quality metrics
+runtime/logs/                Audit, lineage, OpenMetadata DQ logs
+runtime/schemas/history/     Schema snapshots
 ```
 
-### Layer Descriptions
+## Docker Stack
 
-| Layer | Purpose | Transform? | Schema? |
-| --- | --- | --- | --- |
-| **Bronze** | Lưu raw gốc từ source | Không | Không |
-| **Silver** | Envelope wrap, validate, clean | Có | Có |
-| **Gold** | Business aggregates | Có | Có |
+The Docker stack is optional for local development.
 
-### BRONZE Layer - Raw Data Structure
+Prepare `.env`:
 
-```
-runtime/lake/bronze/{dataset}/
-└── run_id={run_id}/
-    ├── metadata/                    # Metadata của run này
-    │   ├── run_manifest.json     # Tổng hợp: profile + checkpoint + source config + coverage
-    │   ├── checkpoint.json       # Resume state: chunks completed/failed/skipped
-    │   ├── request_log.jsonl    # Audit log: từng HTTP request (append-only)
-    │   └── inferred_schema.json # Schema được infer từ data (optional)
-    │
-    ├── published/                   # Published manifest
-    │   └── published_manifest.json  # Mark đã publish với checksums
-    │
-    ├── raw/                        # FILES GỐC TẢI VỀ - Source format
-    │   ├── entity=average_annual_daily_flow/   # Partitioned by entity
-    │   │   └── year=2024/
-    │   │       └── *.csv, *.json          # Files gốc từ API
-    │   │
-    │   ├── group=latest_final_year/        # Partitioned by data group
-    │   │   └── table=collisions/
-    │   │       └── period=2024/
-    │   │           └── stats19_collisions_2024.csv
-    │   │
-    │   ├── date=2026-05-27/               # Partitioned by date (realtime data)
-    │   │   └── hour=14/
-    │   │       └── status.json
-    │   │
-    │   ├── snapshot=current/               # Snapshot data (không có date partition)
-    │   │   └── london_journeys.csv
-    │   │
-    │   └── metadata/                      # Metadata files riêng (site lists, species)
-    │       ├── health_advice.json
-    │       └── species.json
-    │
-    └── staging/                    # FILES ĐANG XỬ LÝ - Tạm thời
-        ├── entity=average_annual_daily_flow/
-        ├── group=latest_final_year/
-        └── date=2026-05-27/
+```bash
+cp .env.example .env
 ```
 
-**BRONZE File Types:**
+Validate compose config:
 
-| File/Folder | Mục đích |
-|-------------|----------|
-| `run_manifest.json` | **Tổng hợp**: profile + checkpoint + source config + coverage (thay thế 4 file cũ) |
-| `checkpoint.json` | Resume state: chunks đã completed/failed/skipped |
-| `request_log.jsonl` | Audit log: từng HTTP request (append-only) |
-| `inferred_schema.json` | Schema được tự động infer từ dữ liệu thực tế |
-| `published_manifest.json` | Mark data đã publish với checksums |
-| `raw/*.csv, *.json` | Files gốc từ API - giữ nguyên format, không transform |
-| `staging/*` | Files đang download - sẽ move sang `raw/` khi complete |
-| `raw/metadata/*` | Metadata riêng của source (site lists, species codes) |
-
-**BRONZE Partitioning Patterns:**
-
-| Pattern | Dùng cho | Ví dụ |
-|---------|----------|-------|
-| `entity=X/` | Multiple entity types trong 1 dataset | DFT: count_points, average_annual_daily_flow |
-| `group=X/` + `table=Y/` | Stats19: final/provisional groups, collisions/vehicles/casualties | |
-| `date=X/` + `hour=Y/` | Realtime data (refresh mỗi giờ) | TfL, LondonAir, WAQI |
-| `year=X/` | Yearly data files | DFT, Stats19 |
-| `site=X/` | Multiple monitoring sites | LondonAir species per site |
-| `snapshot=current/` | Single snapshot không có time partition | London Journeys, NaPTAN |
-
-### SILVER Layer - Normalized Data Structure
-
-```
-runtime/lake/silver/{dataset}/
-└── {dataset}_{run_id}.jsonl    # 1 FILE CHÍNH chứa tất cả records
+```bash
+docker compose --env-file .env -f infra/docker/docker-compose.yml config --quiet
 ```
 
-**Ví dụ:** `silver/stats19_collisions/stats19_collisions_test011.jsonl` (1.2 GB)
+Start the default stack:
 
-**SILVER Record Structure (Envelope Format):**
-
-```json
-{
-  // === NEXUS METADATA HEADERS (prefix _nexus_) ===
-  "_nexus_ingestion_type": "download",      // download | api | stream | csv
-  "_nexus_source_id": "stats19_collisions",   // Dataset ID
-  "_nexus_source_key": "stats19",             // Source key (short name)
-  "_nexus_source_type": null,                 // Source type
-  "_nexus_dataset_id": "stats19_collisions",  // Dataset ID (same as source_id)
-  "_nexus_run_id": "test011",                 // Run ID - để track lineage
-  "_nexus_chunk_id": "stats19:latest_final_year:casualties:2024", // Chunk ID - partition info
-  "_nexus_record_id": "1fecd06205817ef...",   // SHA256 hash - deduplication key
-  "_nexus_entity_key": null,                  // Entity key (optional grouping)
-  "_nexus_event_time": null,                  // Event timestamp (nullable)
-  "_nexus_ingested_at": "2026-05-27T11:24:37.385855+00:00",  // Ingest timestamp
-  "_nexus_published_at": "2026-05-27T11:24:37.348067Z",      // Publish timestamp
-  "_nexus_schema_version": null,              // Schema version
-  "_nexus_trace_id": "08a3275a-...",         // Trace ID cho debugging
-  "_nexus_runtime_version": "raw-envelope-v1", // Envelope version
-  "_nexus_source_path": "D:\\...\\stats19_casualties_2024.csv", // Original file path
-  "_nexus_source": "stats19_collisions",     // Source name
-  "_nexus_dataset": "stats19_collisions",    // Dataset name
-  
-  // === PAYLOAD - DỮ LIỆU GỐC ===
-  "payload": {
-    // Các fields gốc từ source file
-    "collision_index": "2024991534042",
-    "collision_year": "2024",
-    "casualty_severity": "3",
-    ...
-  }
-}
-```
-
-**SILVER Fields Explained:**
-
-| Field Group | Field | Mục đích |
-|-------------|-------|----------|
-| **Ingestion** | `_nexus_ingestion_type` | Loại ingestion: download, api, stream, csv |
-| **Identity** | `_nexus_source_id`, `_nexus_source_key` | Identifiers của source |
-| **Lineage** | `_nexus_run_id`, `_nexus_chunk_id` | Track data từ đâu đến |
-| **Deduplication** | `_nexus_record_id` | SHA256 hash của record - tránh duplicate |
-| **Timestamps** | `_nexus_ingested_at`, `_nexus_published_at` | Khi nào được ingest/publish |
-| **Traceability** | `_nexus_trace_id`, `_nexus_source_path` | Debugging và audit |
-| **Data** | `payload` | Dữ liệu gốc được wrap trong envelope |
-
-**Tại sao dùng Envelope Pattern?**
-
-1. **Lineage đầy đủ**: Biết record đến từ source nào, run nào, chunk nào
-2. **Deduplication**: `_nexus_record_id` cho phép deduplicate chính xác
-3. **Audit**: Timestamps và trace_id cho debugging
-4. **Schema Evolution**: `_nexus_schema_version` track schema changes
-5. **Multi-source**: Một file có thể chứa data từ nhiều sources
-
-### So sánh Bronze vs Silver
-
-| Aspect | Bronze | Silver |
-|--------|--------|--------|
-| **Format** | Source format (CSV, JSON) | JSONL với envelope |
-| **Transform** | Không | Normalize, clean, wrap |
-| **Schema** | Không (raw) | Có (inferred + validated) |
-| **Partitioning** | Multiple files/folders | 1 file chính + partitions |
-| **Metadata** | Limited | Full lineage headers |
-| **Deduplication** | Không | Có (_nexus_record_id) |
-| **Use case** | Audit, reprocess | Analytics, serving |
-
-### Directory Purposes
-
-- **`lake/bronze/`**: Raw files gốc từ downloader, không transform, append-only
-  - `metadata/`: Checkpoint, profile, request log
-  - `published/`: Published manifest
-  - `raw/`: Downloaded files (source format)
-  - `staging/`: Temporary files during download
-- **`lake/silver/`**: Records đã được wrap envelope với metadata, validated
-- **`lake/gold/`**: Business-level aggregates cho analytics/BI
-- **`lake/schemas/`**: JSON Schema definitions cho từng dataset
-- **`warehouse/`**: Query engines (Trino, MinIO, PostgreSQL) configs
-- **`pipeline/`**: Orchestration (Airflow DAGs, Spark configs)
-- **`staging/`**: Temporary files đang trong quá trình download
-- **`dlq/`**: Dead Letter Queue cho operational failures
-- **`quarantine/`**: Invalid records cần triage
-
-## Local Setup
-
-```powershell
-Copy-Item .env.example .env
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+```bash
 docker compose --env-file .env -f infra/docker/docker-compose.yml up -d
 ```
 
-Local service URLs:
+Start with metadata services:
+
+```bash
+docker compose --env-file .env -f infra/docker/docker-compose.yml --profile metadata up -d
+```
+
+Local URLs:
 
 | Service | URL |
 | --- | --- |
@@ -325,347 +336,113 @@ Local service URLs:
 | Trino | <http://localhost:8085> |
 | Superset | <http://localhost:8088> |
 | MinIO Console | <http://localhost:9001> |
-| Kafka bootstrap | `localhost:29092` |
+| OpenMetadata, metadata profile | <http://localhost:8585> |
+| Marquez UI, metadata profile | <http://localhost:3000> |
 
-Optional metadata stack URLs after starting the `metadata` profile:
+Stop services:
 
-| Service | URL |
-| --- | --- |
-| OpenMetadata | <http://localhost:8585> |
-| OpenMetadata Ingestion Airflow | <http://localhost:8090> |
-| Marquez UI | <http://localhost:3000> |
-| Marquez OpenLineage API | <http://localhost:5000/api/v1/lineage> |
-
-## Source Registry & Data Contracts
-
-The Source Registry exposes every dataset together with derived ingestion method
-and update frequency. Data Contracts bundle the schema, required columns,
-primary keys, freshness column and quality thresholds for one dataset.
-
-```powershell
-python -m cli.nexus registry list
-python -m cli.nexus registry show --dataset us_accidents
-python -m cli.nexus contract show --dataset openaq_measurements
+```bash
+docker compose --env-file .env -f infra/docker/docker-compose.yml down
 ```
 
-The registry derives `ingestion_method` from `source_type` and
-`update_frequency` from `poll_seconds`/`freshness_hours`. Override either field
-on a dataset entry in `domains/<domain>/datasets.yml` when needed.
+## OpenLineage
 
-## Data Source Catalog
+Lineage is local by default and can be emitted to Marquez/OpenLineage when
+configured:
 
-The current source set is split by how the pipeline should operate on it:
+```bash
+export OPENLINEAGE_URL="http://localhost:5000"
+export OPENLINEAGE_ENDPOINT="/api/v1/lineage"
+export OPENLINEAGE_NAMESPACE="nexus"
 
-- **Batch**: one-off or slow-changing files/snapshots. Good for backfill,
-  reference tables, and historical fact tables.
-- **Mini-batch**: API pulls over bounded windows, pages, sensors, stations, or
-  grid cells. Good for incremental Bronze loads and Silver normalization.
-- **Stream / polling**: frequent snapshots from live APIs. These land as raw
-  snapshots/events and need event-time, deduplication, and watermark handling in
-  later phases.
-- **Reference / fallback**: sample or synthetic datasets retained for local
-  demos, compatibility, or tests.
-
-### Implemented Sources
-
-These sources have downloader and/or producer code in this repository and can be
-selected with `python scripts/download_data.py --source <source_key>` unless the
-notes say they are producer-only.
-
-| Source key | Dataset / output | Domain | Mode | Access and raw format | Cadence | Meaning for downstream phases |
-| --- | --- | --- | --- | --- | --- | --- |
-| `stats19` | `stats19_collisions` plus raw `collisions`, `vehicles`, `casualties` files | Transport | Batch | GOV.UK / DfT CSV downloads discovered from the road-safety open-data page | Yearly or ad hoc backfill | Historical road-collision facts. Use as the main road-safety base for Silver collision/vehicle/casualty tables and Gold safety summaries. |
-| `naptan` | `naptan_stops` | Transport | Batch reference | DfT NaPTAN API CSV for ATCO area `490` | Slow-changing snapshot | Public-transport stop reference data. Join TfL arrivals and transport events by stop / NaPTAN identifiers. |
-| `london_journeys` | `london_journeys` | Transport | Batch aggregate | London Datastore CSV | Periodic snapshot | Aggregate passenger journeys by mode and period. Use for long-term demand context, not event-level movement. |
-| `dft` | `dft_road_traffic` | Transport | Mini-batch API | DfT Road Traffic REST API, paginated JSONL | Historical backfill by year | London count points and AADF traffic volumes. Join with road safety and noise/road exposure work. |
-| `tfl_line_status` | `tfl_line_status` | Transport | Stream / polling | TfL Unified API JSON (`/Line/{ids}/Status`, plus route/disruption endpoints), optional `TFL_API_KEY` | 300s | Operational status per TfL line, severity code, and disruption reason. Useful for real-time service health and disruption features. |
-| `tfl_arrivals` | `tfl_arrivals` | Transport | Stream / polling | TfL Unified API JSON (`/StopPoint/{stopId}/Arrivals`), optional `TFL_API_KEY` | 60s | Vehicle arrival predictions at selected stops. Deduplicate downstream on `vehicleId + lineId + expectedArrival`. |
-| `tfl` | `tfl_transport` raw combined snapshot | Transport | Stream / polling wrapper | TfL Unified API JSON for line status and arrivals | Mixed 60s/300s depending on caller | Convenience wrapper for combined TfL snapshots; prefer `tfl_line_status` and `tfl_arrivals` for explicit phase work. |
-| `openaq` | `openaq_measurements` | Environment | Mini-batch API | OpenAQ v3 API JSON/JSONL, requires `OPENAQ_API_KEY` | Sensor/date-window backfill | Air-quality locations, sensors, parameters, and hourly measurements. Strong source for pollutant time series and station metadata. |
-| `londonair` | `londonair_monitoring` | Environment | Hybrid mini-batch + polling | LondonAir JSON endpoints, no key | Metadata + hourly/daily latest + historical site windows | London-specific monitoring sites, species metadata, AQI indexes, health advice, and site time series. Good local authority/station context. |
-| `openmeteo` | `openmeteo_air_quality` | Environment | Batch / mini-batch API | Open-Meteo air-quality and archive APIs, JSON | Date-range backfill by borough centroid | Historical weather and air-quality features for each London borough centroid. Useful as exogenous features for transport and air-quality models. |
-| `openmeteo_historical_weather` | `openmeteo_historical_weather` | Environment | Batch / mini-batch API | Open-Meteo archive API CSV over generated bbox grid points | Date-range backfill by grid batch | High-coverage weather history over Greater London grid cells. Useful for spatial feature engineering before Silver/Gold joins. |
-| `ukair_air_quality_archive` | `ukair_air_quality_archive` | Environment | Batch archive | UK-AIR flat-file site pages, discovered CSV downloads | Annual/site archive | DEFRA UK-AIR historical site pollutant CSVs. Useful for long-range air-quality backfill and cross-checking LondonAir/OpenAQ coverage. |
-| `ncei` | `ncei_cdo_climate` | Environment | Mini-batch API | NOAA/NCEI CDO API JSON, requires `NCEI_API_TOKEN` | Monthly windows by station | Daily climate observations for selected London-area stations. Useful for weather/climate enrichment and validation. |
-| `waqi` | `waqi_air_quality` | Environment | Stream / polling | WAQI API JSON, requires `WAQI_API_TOKEN` | 300s | Live AQI station feed. Use for current air-quality snapshots and streaming quality checks. |
-| `openweather` | `openweather_current` | Environment | Stream / polling | OpenWeather API JSON, requires `OPENWEATHER_API_KEY` | 300s | Current weather, forecast, day summary, and air-pollution snapshots by borough centroid. Useful for live context features. |
-| `transport` | `transport_events` | Transport | Reference / producer-only fallback | Synthetic producer events unless `TRANSPORT_EVENTS_API_URL` is configured; no downloader source | Demo stream | Local streaming fallback for Kafka, DLQ, and quality checks when no real transport API is configured. |
-| `gtfs` | `gtfs_realtime_events` | Transport | Reference / producer-only | GTFS Realtime URL from `GTFS_REALTIME_URL` when configured | 30s target | Placeholder wrapper for a future GTFS Realtime feed. Not in default London download groups. |
-
-### New Sources Traced From The Uncommitted Worktree
-
-`git status` currently shows the following newly added or expanded source work:
-
-| Source | Evidence in files | Current status | Notes |
-| --- | --- | --- | --- |
-| `ukair_air_quality_archive` | `ingestion/sources/ukair.py`, downloader registry, `config/download_defaults.yml` | Implemented downloader | Discovers UK-AIR site CSV links and downloads archive files without reshaping. |
-| `openmeteo_historical_weather` | `ingestion/sources/openmeteo_historical_weather.py`, downloader registry, `config/download_defaults.yml` | Implemented downloader | Generates bbox grid points and downloads Open-Meteo archive CSV batches. |
-| `tfl_line_status` | `ingestion/sources/tfl.py`, streaming config, transport dataset/schema/quality/semantic files | Implemented downloader + producer config | TfL API key is optional; default line ids match current TfL line naming. |
-| `tfl_arrivals` | `ingestion/sources/tfl.py`, streaming config, transport dataset/schema/quality/semantic files | Implemented downloader + producer config | Default stops are verified live: King's Cross, Waterloo, and Trafalgar Square bus stop. |
-| `tfl_live_traffic_disruptions` | `config/download_defaults.yml` | Planned only | Config captures candidate TfL road-disruption endpoints; no adapter is wired into `SOURCE_REGISTRY` yet. |
-| `tfl_bikepoint_occupancy` | `config/download_defaults.yml` | Planned only | Candidate BikePoint/cycle-hire source; no downloader yet. |
-| `ea_hydrology_rainfall_river` | `config/download_defaults.yml` | Planned only | Candidate Environment Agency hydrology/rainfall source; no downloader yet. |
-| `defra_noise_mapping` | `config/download_defaults.yml` | Planned only | Candidate batch geospatial noise source; no downloader yet. |
-
-### Source Groups
-
-The default source groups in `config/download_defaults.yml` are:
-
-| Group | Sources | Intended use |
-| --- | --- | --- |
-| `core_historical` | `openmeteo`, `naptan`, `london_journeys`, `dft`, `ncei`, `stats19`, `openaq`, `londonair` | Main historical/reference lake bootstrap. |
-| `latest_update` | `openmeteo`, `naptan`, `london_journeys`, `dft`, `ncei`, `openaq`, `londonair` | Smaller refresh-oriented historical pull. |
-| `realtime_snapshot` | `waqi`, `openweather`, `tfl_line_status`, `tfl_arrivals` | One-shot current snapshot for live sources. |
-| `realtime_polling` | `tfl_line_status`, `tfl_arrivals` | Repeated TfL polling jobs. |
-| `expanded_historical` | `londonair`, `ukair_air_quality_archive`, `openmeteo`, `openmeteo_historical_weather`, `openaq`, `ncei`, `dft`, `stats19` | Wider batch/mini-batch backfill set for data expansion work. |
-
-## Dead Letter Queue
-
-The DLQ stores operational failures (Kafka publish/consume failures, job
-crashes, timeouts). Bad data records continue to flow to `runtime/quarantine/`.
-
-```powershell
-python -m cli.nexus dlq list
-python -m cli.nexus dlq replay --target stdout --category streaming_publish_failed
-python -m cli.nexus dlq replay --target kafka --topic transport-events
+python -m cli.nexus lineage record \
+  --job-name demo \
+  --inputs raw.demo \
+  --outputs silver.demo
 ```
 
-Local DLQ files live under `runtime/dlq/`; when
-`NEXUS_GOVERNANCE_STORAGE=postgres`, events stream into the governance Postgres
-table instead. Airflow exposes the same flow via the `nexus_dlq_replay` DAG.
+Spark jobs use `infra/spark/spark-submit-wrapper.sh` to inject OpenLineage
+settings when the environment variables are present.
 
-## Streaming Consumer & Reprocessing
+## Governance Agent
 
-- `ingestion/streaming/consumer.py` reads Kafka events, lands them in `runtime/lake/bronze/<dataset>/run_id=<run_id>/raw/`, and auto-converts to Silver. Decode/operational failures are routed to the DLQ.
-- `nexus_streaming_pipeline` runs producer → consumer → quality → lineage.
-- `nexus_reprocess_pipeline` replays raw landing files through Bronze, Silver and Gold for backfill/recovery (parameters: `dataset`, `raw_glob`, target tables).
-- `nexus_dlq_replay` re-emits DLQ events to a Kafka topic (or stdout for inspection).
+The governance agent can run without external services using deterministic
+rules:
 
-## OpenLineage Integration
-
-When `OPENLINEAGE_URL` is set, the Spark wrapper at
-`infra/spark/spark-submit-wrapper.sh` injects the OpenLineage Spark listener
-with the configured namespace and endpoint. dbt tasks fall back to `dbt-ol`
-automatically when both `OPENLINEAGE_URL` and `dbt-ol` are available, otherwise
-they run plain `dbt`. Audit-emitted lineage events from `cli.nexus lineage record`
-still land alongside Spark/dbt events in Marquez/OpenMetadata.
-## Useful Commands
-
-```powershell
-python ingestion/batch/csv_ingestion.py --dataset us_accidents --source assets/samples/us_accidents_sample.csv
-python -m cli.nexus batch run --dataset us_accidents --batch-id latest
-python -m cli.nexus agent review --dataset us_accidents --batch-id latest
-python -m cli.nexus quality stream --source transport --sample-events 25
-python scripts/download_data.py --source-group core_historical --mode small_demo
-python scripts/download_data.py --source tfl_line_status --source tfl_arrivals --mode small_demo
-python scripts/download_data.py --poll --source-group realtime_polling --duration-days 0.1 --interval-minutes 1
-python ingestion/streaming/producer.py --source tfl_arrivals --events 5
-python -m pytest
+```bash
+python -m cli.nexus agent review --dataset openaq_measurements --batch-id manual
 ```
 
-Quality check against a local CSV:
-
-```powershell
-python -m cli.nexus quality check `
-  --dataset us_accidents `
-  --source assets/samples/us_accidents_sample.csv `
-  --required-columns ID Severity Start_Time Start_Lat Start_Lng State `
-  --primary-keys ID `
-  --freshness-column Start_Time `
-  --max-age-hours 24
-```
+Set `GEMINI_API_KEY` only if you want optional LLM-backed review. Without it,
+the agent stays local and deterministic.
 
 ## Source Discovery
 
-`assets/source_discovery/` is a normal tracked directory containing the generated
-source catalog, endpoint verification report, and schema JSON files used by
-Nexus. Collector scripts are not kept in this repo.
+Inspect generated source inventory:
 
-Inspect the integrated inventory:
-
-```powershell
+```bash
 python -m cli.nexus source-discovery summary
 python -m cli.nexus source-discovery schemas
 python -m cli.nexus source-discovery coverage
 ```
 
-Sync selected discovery schemas into `runtime/source_discovery/`:
+Sync selected schemas into generated runtime metadata:
 
-```powershell
-python -m cli.nexus source-discovery sync `
-  --schema OpenAQ_OpenAQ_Location `
+```bash
+python -m cli.nexus source-discovery sync \
+  --schema OpenAQ_OpenAQ_Location \
   --schema TfL_Unified_API_Tfl.Api.Presentation.Entities.LineStatus
 ```
 
-The sync output is generated runtime data and is ignored by Git.
-The coverage command writes `assets/source_discovery/ingestion_coverage_map.json`.
-
-Regenerate local CSV samples after updating source discovery or domain schemas:
+Regenerate local CSV samples after schema or discovery changes:
 
 ```bash
 python scripts/regenerate_sample_datasets.py
 ```
 
-The generator reads `assets/source_discovery/all_schemas.json`, verifies mapped
-discovery schema names, and rewrites `assets/samples/*.csv` with deterministic
-10-row samples aligned to domain JSON Schemas.
+## Troubleshooting
 
-## Data Flow
+Use `.venv`; system Python may have older dependencies:
 
-Batch flow:
-
-1. Read local CSV/API records.
-2. Apply configured auto-fix rules and JSON Schema coercion.
-3. Write raw JSONL envelopes under `runtime/raw/<dataset>/`.
-4. Run Great Expectations plus missing-value, duplicate, schema, freshness, and readiness checks.
-5. Quarantine invalid records under `runtime/quarantine/`.
-6. Write audit, quality metric, schema-history, and lineage events.
-7. Let the governance agent return `PASS`, `WARNING`, or `FAIL`.
-8. Continue to Bronze/Silver/Gold Spark jobs when the batch is allowed.
-
-Streaming flow:
-
-1. Produce normalized events from a real API when configured.
-2. Fall back to simulated events when an API URL/token is missing.
-3. Run streaming quality checks against sampled events.
-4. Record metadata and quarantine invalid samples.
-
-Supported producer sources:
-
-| Source | Dataset/topic target | Real API behavior |
-| --- | --- | --- |
-| `transport` | `transport_events` | Uses `TRANSPORT_EVENTS_API_URL` when configured; otherwise synthetic fallback. |
-| `tfl` | `transport-tfl` / line-status events | TfL line status JSON; optional `TFL_API_KEY`. |
-| `tfl_line_status` | `transport-tfl-line-status` | TfL line status JSON every 300s; optional `TFL_API_KEY`. |
-| `tfl_arrivals` | `transport-tfl-arrivals` | TfL StopPoint arrivals JSON every 60s; optional `TFL_API_KEY`. |
-| `gtfs` | `gtfs_realtime_events` | Requires `GTFS_REALTIME_URL`; otherwise no real events. |
-| `openaq` | `openaq_measurements` | Uses OpenAQ API when `OPENAQ_API_KEY` and URL are configured; otherwise simulated environment fallback. |
-| `waqi` | `waqi_air_quality` | Uses WAQI API when `WAQI_API_TOKEN`/URL are configured; otherwise simulated environment fallback. |
-| `londonair` | `environment-londonair` | Pulls LondonAir hourly monitoring index JSON. |
-| `openmeteo` | `environment-openmeteo` | Pulls current Open-Meteo air-quality JSON for London. |
-| `openweather` | `environment-openweather` | Pulls OpenWeather JSON when `OPENWEATHER_API_KEY` is configured. |
-
-## Governance
-
-NEXUS governance is metadata-driven and safe to run locally:
-
-- `governance/quality/checks.py`: quality checks and readiness scoring.
-- `governance/quality/gx_validation.py`: GX Core validation using the existing domain quality rules.
-- `governance/quality/schema.py`: JSON Schema validation and type coercion.
-- `governance/quality/quarantine.py`: invalid-record quarantine.
-- `governance/audit.py`: auditable pipeline events.
-- `governance/lineage.py`: OpenLineage-compatible events.
-- `governance/schema_history.py`: schema snapshots and fingerprints.
-- `governance/agents/governance_agent.py`: deterministic or optional LLM-backed decisions.
-- `config/semantic_defaults.yml` and `domains/<domain>/semantic_rules.yml`: semantic contracts for glossary mappings, units, time roles, CRS, grain, definitions, and entity matching.
-
-Set `GEMINI_API_KEY` only if you want the governance agent to call an LLM.
-Without it, the agent uses deterministic rules.
-
-Great Expectations is installed as a Python dependency, not as a separate
-service. Airflow quality tasks run GX Core in-process and record the validation
-summary in audit and quality metrics. Set `NEXUS_GX_ENABLED=false` to disable
-GX locally while keeping the rest of the quality gate active.
-
-Semantic contracts can be inspected from the CLI:
-
-```powershell
-python -m cli.nexus semantic list --domain environment
-python -m cli.nexus semantic show --dataset openaq_measurements
-python -m cli.nexus semantic export --kind openmetadata --domain environment
-python -m cli.nexus semantic export --kind glossary --domain transport
-python -m cli.nexus semantic match-entities `
-  --dataset openaq_measurements `
-  --source assets/samples/openaq_measurements.csv
+```bash
+source .venv/bin/activate
+python -m pip show pytest great_expectations jsonschema
 ```
 
-The dbt seed `transform/dbt/seeds/unit_mapping.csv` is the canonical unit
-mapping table. Gold models use it for deterministic conversions such as miles
-to kilometers and pollutant readings to canonical concentration units. See
-`docs/semantic_issues.md` for the full semantic checklist.
+If Great Expectations is too slow or unavailable in a constrained shell:
 
-## Metadata Stack
-
-OpenMetadata and OpenLineage are installed as an optional Docker Compose
-profile so the default Nexus stack stays smaller.
-
-Start Nexus with OpenMetadata and Marquez:
-
-```powershell
-docker compose --env-file .env -f infra/docker/docker-compose.yml --profile metadata up -d
+```bash
+export NEXUS_GX_ENABLED=false
 ```
 
-OpenLineage emission is opt-in. For Docker-based Airflow runs, set this in
-`.env` before starting the stack:
+If quality commands fail because of old `jsonschema`, confirm the active
+interpreter:
+
+```bash
+which python
+python -c "import jsonschema; print(jsonschema.__version__)"
+```
+
+Expected version is `4.23.0` or newer.
+
+## Development Checks
+
+Run before handing off changes:
+
+```bash
+source .venv/bin/activate
+python -m compileall -q cli common governance ingestion processing tests
+python -m pytest -q
+python -m cli.nexus quality gx-suite --dataset openaq_measurements >/tmp/nexus_gx_suite.json
+python -m cli.nexus quality bronze-validate --dataset openaq_measurements --source assets/samples/openaq_measurements.csv --no-exit-on-fail
+```
+
+Current expected result:
 
 ```text
-OPENLINEAGE_URL=http://marquez:5000
-OPENLINEAGE_ENDPOINT=/api/v1/lineage
-OPENLINEAGE_NAMESPACE=nexus
+94 passed
 ```
 
-For a lineage event recorded from the host shell, use `http://localhost:5000`
-instead:
-
-```powershell
-$env:OPENLINEAGE_URL = "http://localhost:5000"
-python -m cli.nexus lineage record --job-name demo --inputs raw.demo --outputs silver.demo
-```
-
-OpenMetadata requires an Elasticsearch service for its internal search index.
-That service lives only in the `metadata` profile and is separate from the old
-docker/elk stack.
-
-Reset only the OpenMetadata/Marquez state:
-
-```powershell
-docker compose --env-file .env -f infra/docker/docker-compose.yml --profile metadata down
-docker volume rm nexus_openmetadata-postgres-data nexus_openmetadata-es-data nexus_openmetadata-ingestion-dag-airflow nexus_openmetadata-ingestion-dags nexus_openmetadata-ingestion-tmp nexus_marquez-db-data
-```
-
-## Adding A Dataset
-
-1. Add metadata to `domains/<domain>/datasets.yml`.
-2. Add quality rules to `domains/<domain>/quality_rules.yml`.
-3. Add a JSON Schema under `domains/<domain>/schemas/`.
-4. Add ingestion code under `ingestion/batch/` or `ingestion/streaming/`.
-5. Add Spark transformations only when the dataset needs medallion outputs.
-6. Add focused tests for schema, quality, and transformation behavior.
-
-## GCP VM Cluster
-
-Terraform for optional GCP VMs lives in `infra/terraform/gcp/`. It now
-provisions Nexus infrastructure only:
-
-- 1 public master VM.
-- Private worker VMs.
-- Docker and Docker Compose plugin.
-- Nexus repo checkout at `/opt/nexus/nexus` when `nexus_repo_url` is set.
-- Helper scripts on the master:
-  - `start-nexus-compose`
-  - `stop-nexus-compose`
-
-Apply from the Terraform directory:
-
-```bash
-cd infra/terraform/gcp
-cp terraform.tfvars.example terraform.tfvars
-terraform init
-terraform plan -var-file="terraform.tfvars"
-terraform apply -var-file="terraform.tfvars"
-```
-
-Start Nexus on the master VM:
-
-```bash
-ssh ubuntu@<MASTER_PUBLIC_IP>
-start-nexus-compose
-```
-
-See `infra/terraform/gcp/README.md` for VM details.
-
-## Notes
-
-- Keep `.env` and real `terraform.tfvars` out of Git.
-- `.env.example` intentionally contains placeholders only.
-- Do not commit real API tokens, service keys, raw source datasets, or generated runtime outputs.
+Warnings in `tests/test_heterogeneity_adaptability.py` about tests returning
+`True` are non-blocking today, but should eventually be converted to `assert`
+statements.

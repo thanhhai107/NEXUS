@@ -56,13 +56,17 @@ from governance.quality.auto_fix import (
     normalize_field_names,
 )
 from governance.quality.checks import evaluate_quality_status, run_quality_checks
+from governance.quality.bronze_validator import validate_bronze_file
+from governance.quality.gx_suite import generate_expectation_suite
 from governance.quality.metrics import write_quality_metric
+from governance.quality.openmetadata import publish_quality_result
 from governance.quality.quarantine import quarantine_records
 from governance.quality.schema import (
     coerce_records_to_schema,
     normalize_json_schema,
     records_failing_json_schema,
 )
+from governance.schema_drift import compare_schema_drift
 from governance.schema_history import save_schema_snapshot
 from ingestion.batch.api_ingestion import ingest_api_records
 from ingestion.batch.common import read_csv_records, write_jsonl
@@ -222,6 +226,7 @@ def quality_details(
     schema_coercion_summary: dict[str, Any],
     thresholds: dict[str, Any],
     threshold_violations: list[str],
+    schema_drift: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         **result.__dict__,
@@ -229,6 +234,7 @@ def quality_details(
         "schema_coercion": schema_coercion_summary,
         "thresholds": thresholds,
         "threshold_violations": threshold_violations,
+        "schema_drift": dict(schema_drift or {}),
     }
 
 
@@ -267,6 +273,13 @@ def run_batch(args: argparse.Namespace) -> None:
         freshness_column=freshness_column,
         max_age_hours=int(dataset_config.get("freshness_hours", 24)),
         json_schema=json_schema,
+    )
+    drift_result = compare_schema_drift(
+        json_schema,
+        records,
+        required_fields=required_columns,
+        primary_keys=primary_keys,
+        downstream_fields=load_data_contract(args.dataset).semantic_dedup_keys,
     )
 
     if json_schema:
@@ -309,12 +322,16 @@ def run_batch(args: argparse.Namespace) -> None:
 
     thresholds = dict(quality_config.get("default_rules", {}))
     status, threshold_violations = evaluate_quality_status(result, thresholds)
+    if drift_result.status == "failed":
+        status = "failed"
+        threshold_violations = [*threshold_violations, "Schema drift policy failed."]
     details = quality_details(
         result,
         auto_fix_result.summary,
         schema_coercion_result.summary,
         thresholds,
         threshold_violations,
+        drift_result.to_dict(),
     )
     write_audit_event(
         event_type="quality_check",
@@ -339,6 +356,15 @@ def run_batch(args: argparse.Namespace) -> None:
         source_path=source_label,
         actor=args.actor,
     )
+    openmetadata_result = publish_quality_result(
+        dataset=args.dataset,
+        status=status,
+        quality=details,
+        batch_id=args.batch_id,
+        run_id=args.run_id,
+        source_path=source_label,
+        actor=args.actor,
+    )
 
     decision = None if args.skip_agent else review_batch(args.dataset, args.batch_id)
     output = {
@@ -347,6 +373,10 @@ def run_batch(args: argparse.Namespace) -> None:
         "raw_path": str(raw_path),
         "quality_status": status,
         "quality": details,
+        "openmetadata": {
+            "published": openmetadata_result.get("published"),
+            "publish_target": openmetadata_result.get("publish_target"),
+        },
         "agent_decision": decision.to_dict() if decision else None,
     }
     print(json.dumps(output, indent=2))
@@ -376,6 +406,14 @@ def check_quality(args: argparse.Namespace) -> None:
         freshness_column=freshness_column,
         max_age_hours=args.max_age_hours,
         json_schema=json_schema,
+    )
+    contract = load_data_contract(args.dataset) if dataset_config else None
+    drift_result = compare_schema_drift(
+        json_schema,
+        records,
+        required_fields=required_columns,
+        primary_keys=primary_keys,
+        downstream_fields=contract.semantic_dedup_keys if contract else (),
     )
 
     if json_schema:
@@ -419,12 +457,16 @@ def check_quality(args: argparse.Namespace) -> None:
     thresholds = dict(quality_config.get("default_rules", {}))
     thresholds["min_readiness_score"] = args.min_readiness_score
     status, threshold_violations = evaluate_quality_status(result, thresholds)
+    if drift_result.status == "failed":
+        status = "failed"
+        threshold_violations = [*threshold_violations, "Schema drift policy failed."]
     details = quality_details(
         result,
         auto_fix_result.summary,
         schema_coercion_result.summary,
         thresholds,
         threshold_violations,
+        drift_result.to_dict(),
     )
     write_audit_event(
         event_type="quality_check",
@@ -445,6 +487,15 @@ def check_quality(args: argparse.Namespace) -> None:
         schema_coercion=schema_coercion_result.summary,
         thresholds=thresholds,
         threshold_violations=threshold_violations,
+        run_id=args.run_id,
+        source_path=args.source,
+        actor=args.actor,
+    )
+    publish_quality_result(
+        dataset=args.dataset,
+        status=status,
+        quality=details,
+        batch_id=args.batch_id,
         run_id=args.run_id,
         source_path=args.source,
         actor=args.actor,
@@ -492,6 +543,14 @@ def check_stream_quality(args: argparse.Namespace) -> None:
         max_age_hours=int(dataset_config.get("freshness_hours", 1)),
         json_schema=json_schema,
     )
+    contract = load_data_contract(dataset) if dataset_config else None
+    drift_result = compare_schema_drift(
+        json_schema,
+        records,
+        required_fields=required_columns,
+        primary_keys=primary_keys,
+        downstream_fields=contract.semantic_dedup_keys if contract else (),
+    )
 
     if json_schema:
         save_schema_snapshot(
@@ -533,12 +592,16 @@ def check_stream_quality(args: argparse.Namespace) -> None:
 
     thresholds = dict(quality_config.get("default_rules", {}))
     status, threshold_violations = evaluate_quality_status(result, thresholds)
+    if drift_result.status == "failed":
+        status = "failed"
+        threshold_violations = [*threshold_violations, "Schema drift policy failed."]
     details = quality_details(
         result,
         auto_fix_result.summary,
         schema_coercion_result.summary,
         thresholds,
         threshold_violations,
+        drift_result.to_dict(),
     )
     write_audit_event(
         event_type="streaming_quality_check",
@@ -568,6 +631,15 @@ def check_stream_quality(args: argparse.Namespace) -> None:
         source_path=args.events_jsonl or args.api_url or args.source,
         actor=args.actor,
     )
+    publish_quality_result(
+        dataset=dataset,
+        status=status,
+        quality=details,
+        batch_id=args.batch_id,
+        run_id=args.run_id,
+        source_path=args.events_jsonl or args.api_url or args.source,
+        actor=args.actor,
+    )
 
     print(json.dumps({
         "dataset": dataset,
@@ -583,6 +655,37 @@ def check_stream_quality(args: argparse.Namespace) -> None:
 def review_agent(args: argparse.Namespace) -> None:
     decision = review_batch(args.dataset, args.batch_id)
     print(decision.to_json())
+
+
+def generate_quality_suite(args: argparse.Namespace) -> None:
+    contract = load_data_contract(args.dataset)
+    suite = generate_expectation_suite(
+        dataset=args.dataset,
+        required_columns=contract.required_columns,
+        primary_keys=contract.primary_keys,
+        freshness_column=contract.freshness_column,
+        semantic_rules=contract.semantic.get("dataset_rules"),
+    )
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(suite, indent=2) + "\n", encoding="utf-8")
+        print(json.dumps({"dataset": args.dataset, "output_path": str(args.output)}, indent=2))
+    else:
+        print(json.dumps(suite, indent=2))
+
+
+def validate_bronze(args: argparse.Namespace) -> None:
+    result = validate_bronze_file(
+        dataset=args.dataset,
+        source=args.source,
+        batch_id=args.batch_id,
+        run_id=args.run_id,
+        actor=args.actor,
+        no_exit_on_fail=args.no_exit_on_fail,
+    )
+    print(json.dumps(result, indent=2))
+    if result["exit_code"]:
+        raise SystemExit(result["exit_code"])
 
 
 def record_lineage_event(args: argparse.Namespace) -> None:
@@ -791,6 +894,26 @@ def build_parser() -> argparse.ArgumentParser:
     stream_check.add_argument("--actor")
     stream_check.add_argument("--no-exit-on-fail", action="store_true")
     stream_check.set_defaults(func=check_stream_quality)
+
+    bronze_validate = quality_subcommands.add_parser(
+        "bronze-validate",
+        help="Validate a Bronze/source file using its configured data contract",
+    )
+    bronze_validate.add_argument("--dataset", required=True)
+    bronze_validate.add_argument("--source", required=True, type=Path)
+    bronze_validate.add_argument("--batch-id", default="manual")
+    bronze_validate.add_argument("--run-id")
+    bronze_validate.add_argument("--actor")
+    bronze_validate.add_argument("--no-exit-on-fail", action="store_true")
+    bronze_validate.set_defaults(func=validate_bronze)
+
+    gx_suite = quality_subcommands.add_parser(
+        "gx-suite",
+        help="Generate a Great Expectations suite from a dataset contract",
+    )
+    gx_suite.add_argument("--dataset", required=True)
+    gx_suite.add_argument("--output", type=Path)
+    gx_suite.set_defaults(func=generate_quality_suite)
 
     agent = subcommands.add_parser("agent", help="Governance agent commands")
     agent_subcommands = agent.add_subparsers(dest="agent_command", required=True)

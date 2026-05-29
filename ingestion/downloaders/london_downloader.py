@@ -19,7 +19,8 @@ if __package__ in {None, ""}:
 
 from dotenv import load_dotenv
 
-from ingestion.base.core import DownloadContext, SourceRun, SourceSpec
+from ingestion.base.contracts import SourceSpec
+from ingestion.base.core import DownloadContext, SourceRun
 from ingestion.base.utils import (
     DEFAULT_CONFIG_PATH,
     DEFAULT_ENV_PATH,

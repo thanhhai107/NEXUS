@@ -32,7 +32,7 @@ def run(
 
     Replace the sample flattening logic with dataset-specific normalization rules.
     """
-    from pyspark.sql.functions import col, current_timestamp, trim
+    from pyspark.sql.functions import col, current_timestamp, lit, trim, when
 
     spark = build_spark()
     bronze_df = spark.table(bronze_table)
@@ -60,10 +60,21 @@ def run(
         if field.dataType.simpleString() == "string":
             silver_df = silver_df.withColumn(field.name, trim(col(field.name)))
 
-    if dataset and not dedup_keys:
+    if dataset:
         from common.data_contract import load_data_contract
+        from governance.quality.auto_fix import clean_column_name
 
-        dedup_keys = list(load_data_contract(dataset).semantic_dedup_keys)
+        contract = load_data_contract(dataset)
+        for required_column in contract.required_columns:
+            if required_column not in silver_df.columns:
+                silver_df = silver_df.withColumn(required_column, lit(None).cast("string"))
+            flag_name = f"is_missing_{clean_column_name(required_column)}"
+            silver_df = silver_df.withColumn(
+                flag_name,
+                when(col(required_column).isNull() | (trim(col(required_column).cast("string")) == ""), lit(True)).otherwise(lit(False)),
+            )
+        if not dedup_keys:
+            dedup_keys = list(contract.semantic_dedup_keys)
     silver_df = silver_df.withColumn("_nexus_silver_loaded_at", current_timestamp())
     write_idempotent_iceberg(
         spark,
