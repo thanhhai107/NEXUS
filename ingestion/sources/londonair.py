@@ -194,6 +194,7 @@ def download_londonair(run: SourceRun, context: DownloadContext) -> None:
                     f"historical_wide/site={sanitize_segment(site_code)}"
                     f"/year={start.year}/month={start.month:02d}.json"
                 ),
+                skip_on_400=True,
             )
 
     for site_code, species_code in selected_pairs:
@@ -239,6 +240,7 @@ def download_londonair_json_chunk(
     relative_path: str,
     path_values: dict[str, Any] | None = None,
     critical: bool = False,
+    skip_on_400: bool = False,
 ) -> Any | None:
     if run.should_skip(chunk_id):
         existing_path = run.raw_dir / relative_path
@@ -256,7 +258,11 @@ def download_londonair_json_chunk(
         run.mark_complete(chunk_id, {"record_count": record_count, "path": str(path)})
         return payload
     except Exception as exc:
-        run.mark_failed(chunk_id, str(exc))
+        exc_str = str(exc)
+        if skip_on_400 and "400" in exc_str:
+            run.mark_skipped(chunk_id, {"reason": "site_no_data_for_period", "error": exc_str})
+            return None
+        run.mark_failed(chunk_id, exc_str)
         if critical:
             raise
         return None

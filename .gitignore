@@ -18,6 +18,7 @@ htmlcov/
 env/
 .venv/
 venv/
+docs/
 
 # Runtime outputs
 runtime/
