@@ -114,7 +114,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - minio-data:/data
+      - ${NEXUS_MINIO_VOLUME:-minio-data}:/data
 
   minio-init:
     image: minio/mc:RELEASE.2025-04-16T18-13-26Z
@@ -151,7 +151,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://${KAFKA_ADVERTISED_HOST:-localhost}:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -180,11 +180,13 @@ services:
       LOGNAME: spark
       PYSPARK_PYTHON: /opt/bitnami/python/bin/python3.12
       PYSPARK_DRIVER_PYTHON: /opt/bitnami/python/bin/python3.12
+      SPARK_LOCAL_DIRS: ${SPARK_LOCAL_DIRS:-/data/spark}
     ports:
       - "7077:7077"
       - "8081:8080"
     volumes:
       - ../../:/opt/nexus
+      - ${NEXUS_RUNTIME_DIR:-../../runtime}:/data
 
   spark-worker:
     image: nexus-spark:3.5
@@ -196,9 +198,10 @@ services:
       - minio-init
     environment:
       SPARK_MODE: worker
-      SPARK_MASTER_URL: spark://spark:7077
-      SPARK_WORKER_MEMORY: 2G
-      SPARK_WORKER_CORES: 2
+      SPARK_MASTER_URL: ${SPARK_MASTER_URL:-spark://spark:7077}
+      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-2G}
+      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-2}
+      SPARK_LOCAL_DIRS: ${SPARK_LOCAL_DIRS:-/data/spark}
       HOME: /tmp/nexus-spark-home
       HADOOP_USER_NAME: spark
       USER: spark
@@ -207,6 +210,7 @@ services:
       PYSPARK_DRIVER_PYTHON: /opt/bitnami/python/bin/python3.12
     volumes:
       - ../../:/opt/nexus
+      - ${NEXUS_RUNTIME_DIR:-../../runtime}:/data
 
   trino:
     image: trinodb/trino:451
@@ -231,7 +235,7 @@ services:
       POSTGRES_PASSWORD: hive
       POSTGRES_DB: metastore_db
     volumes:
-      - hive-metastore-db-data:/var/lib/postgresql/data
+      - ${NEXUS_HIVE_METASTORE_DB_VOLUME:-hive-metastore-db-data}:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hive -d metastore_db"]
       interval: 10s
@@ -272,7 +276,7 @@ services:
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     volumes:
-      - airflow-db-data:/var/lib/postgresql/data
+      - ${NEXUS_AIRFLOW_DB_VOLUME:-airflow-db-data}:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
       interval: 10s
@@ -288,7 +292,7 @@ services:
       POSTGRES_PASSWORD: nexus_governance
       POSTGRES_DB: nexus_governance
     volumes:
-      - governance-db-data:/var/lib/postgresql/data
+      - ${NEXUS_GOVERNANCE_DB_VOLUME:-governance-db-data}:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nexus_governance -d nexus_governance"]
       interval: 10s
@@ -339,6 +343,15 @@ services:
       OPENLINEAGE_NAMESPACE: ${OPENLINEAGE_NAMESPACE:-nexus}
       OPENLINEAGE_TIMEOUT_SECONDS: ${OPENLINEAGE_TIMEOUT_SECONDS:-5}
       OPENLINEAGE_STRICT: ${OPENLINEAGE_STRICT:-false}
+      SPARK_MASTER: ${SPARK_MASTER:-spark://spark:7077}
+      SPARK_PROPERTIES_FILE: ${SPARK_PROPERTIES_FILE:-/opt/airflow/config/spark-defaults.conf}
+      SPARK_DRIVER_HOST: ${SPARK_DRIVER_HOST:-}
+      SPARK_DRIVER_BIND_ADDRESS: ${SPARK_DRIVER_BIND_ADDRESS:-0.0.0.0}
+      SPARK_DRIVER_PORT: ${SPARK_DRIVER_PORT:-}
+      SPARK_BLOCKMANAGER_PORT: ${SPARK_BLOCKMANAGER_PORT:-}
+      SPARK_EXECUTOR_CORES: ${SPARK_EXECUTOR_CORES:-}
+      SPARK_EXECUTOR_MEMORY: ${SPARK_EXECUTOR_MEMORY:-}
+      SPARK_DEFAULT_PARALLELISM: ${SPARK_DEFAULT_PARALLELISM:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
       NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
@@ -362,7 +375,7 @@ services:
       - ../../governance:/opt/airflow/governance
       - ../../cli:/opt/airflow/cli
       - ../../assets:/opt/airflow/assets
-      - ../../runtime:/opt/airflow/runtime
+      - ${NEXUS_RUNTIME_DIR:-../../runtime}:/opt/airflow/runtime
 
   airflow-scheduler:
     image: nexus-airflow:2.9.1-python3.11
@@ -400,6 +413,15 @@ services:
       OPENLINEAGE_NAMESPACE: ${OPENLINEAGE_NAMESPACE:-nexus}
       OPENLINEAGE_TIMEOUT_SECONDS: ${OPENLINEAGE_TIMEOUT_SECONDS:-5}
       OPENLINEAGE_STRICT: ${OPENLINEAGE_STRICT:-false}
+      SPARK_MASTER: ${SPARK_MASTER:-spark://spark:7077}
+      SPARK_PROPERTIES_FILE: ${SPARK_PROPERTIES_FILE:-/opt/airflow/config/spark-defaults.conf}
+      SPARK_DRIVER_HOST: ${SPARK_DRIVER_HOST:-}
+      SPARK_DRIVER_BIND_ADDRESS: ${SPARK_DRIVER_BIND_ADDRESS:-0.0.0.0}
+      SPARK_DRIVER_PORT: ${SPARK_DRIVER_PORT:-}
+      SPARK_BLOCKMANAGER_PORT: ${SPARK_BLOCKMANAGER_PORT:-}
+      SPARK_EXECUTOR_CORES: ${SPARK_EXECUTOR_CORES:-}
+      SPARK_EXECUTOR_MEMORY: ${SPARK_EXECUTOR_MEMORY:-}
+      SPARK_DEFAULT_PARALLELISM: ${SPARK_DEFAULT_PARALLELISM:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
       NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
@@ -416,7 +438,7 @@ services:
       - ../../governance:/opt/airflow/governance
       - ../../cli:/opt/airflow/cli
       - ../../assets:/opt/airflow/assets
-      - ../../runtime:/opt/airflow/runtime
+      - ${NEXUS_RUNTIME_DIR:-../../runtime}:/opt/airflow/runtime
 
   superset:
     image: apache/superset:4.0.2
@@ -430,7 +452,7 @@ services:
       - "8088:8088"
     volumes:
       - ../../serving/dashboards/superset:/app/pythonpath
-      - superset-home:/app/superset_home
+      - ${NEXUS_SUPERSET_HOME_VOLUME:-superset-home}:/app/superset_home
     command: >
       bash -c "superset db upgrade &&
       (superset fab create-admin --username ${SUPERSET_ADMIN_USERNAME:-admin}
@@ -460,7 +482,7 @@ services:
       - ../../common:/app/common
       - ../../config:/app/config
       - ../../domains:/app/domains
-      - ../../runtime:/app/runtime
+      - ${NEXUS_RUNTIME_DIR:-../../runtime}:/app/runtime
       - ../../governance:/app/governance
 
   openmetadata-postgresql:

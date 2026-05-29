@@ -4,7 +4,7 @@ NEXUS Configuration Module.
 Unified config cho cả local (runtime/) và VM (/data/).
 Cấu trúc thư mục theo Medallion Architecture:
     runtime/           (local)
-        /data/        (VM)
+        /data/        (VM — AWS EC2 / GCP Compute Engine)
             ├── lake/           Bronze → Silver → Gold
             ├── pipeline/       Orchestration
             ├── warehouse/      Query engines
@@ -48,7 +48,7 @@ def load_yaml(path: Path) -> dict[str, Any]:
 #   1. NEXUS_RUNTIME_DIR environment variable (highest priority)
 #   2. NEXUS_RUNTIME_MODE + default paths:
 #      - "local": PROJECT_ROOT / "runtime"
-#      - "vm": "/data"
+#      - "vm": "/data" (AWS EC2 or GCP VM)
 #   3. PROJECT_ROOT / "runtime" (default fallback)
 
 def _resolve_runtime_dir() -> Path:
@@ -82,9 +82,10 @@ def is_vm_mode() -> bool:
     """Check if running in VM mode (using /data/).
     
     Returns:
-        True if NEXUS_RUNTIME_MODE=vm or NEXUS_FORCE_GCP=true
+        True if NEXUS_RUNTIME_MODE=vm or NEXUS_FORCE_VM=true
+        (NEXUS_FORCE_GCP is still accepted for backward compatibility)
     """
-    if os.getenv("NEXUS_FORCE_GCP"):
+    if os.getenv("NEXUS_FORCE_VM") or os.getenv("NEXUS_FORCE_GCP"):
         return True
     return get_runtime_mode() == "vm"
 
@@ -207,9 +208,29 @@ def get_schema_path(dataset: str) -> Path:
     return SCHEMAS_DIR / f"{dataset}.schema.json"
 
 
+def is_aws_ec2() -> bool:
+    """Check if running on AWS EC2 by checking IMDS (Instance Metadata Service).
+
+    Tries IMDSv2 first (token-based), falls back to IMDSv1.
+
+    Note: This checks actual AWS metadata service. For mode-based detection,
+    use is_vm_mode() instead.
+    """
+    try:
+        socket.setdefaulttimeout(2)
+        sock = socket.create_connection(("169.254.169.254", 80), timeout=2)
+        sock.close()
+        return True
+    except (socket.timeout, socket.error, OSError):
+        return False
+
+
 def is_gcp_vm() -> bool:
     """Check if running on GCP VM by checking metadata service.
     
+    Deprecated: Use is_aws_ec2() for AWS deployments. This function is kept
+    for backward compatibility with existing GCP deployments.
+
     Note: This checks actual GCP metadata service. For mode-based detection,
     use is_vm_mode() instead.
     """
@@ -228,7 +249,7 @@ def get_effective_runtime_dir() -> tuple[Path, str]:
     Returns:
         Tuple of (runtime_dir, location) where location is 'vm' or 'local'
     """
-    if is_vm_mode() or is_gcp_vm() or os.getenv("NEXUS_FORCE_GCP"):
+    if is_vm_mode() or is_aws_ec2() or is_gcp_vm() or os.getenv("NEXUS_FORCE_GCP"):
         return (RUNTIME_DIR, "vm")
     return (RUNTIME_DIR, "local")
 

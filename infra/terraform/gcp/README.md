@@ -47,6 +47,17 @@ nexus_repo_ref = "master"
 
 Use `allowed_admin_cidrs = ["0.0.0.0/0"]` only for a short demo.
 
+For a distributed Spark shape, size the master and workers separately:
+
+```hcl
+master_machine_type = "e2-custom-8-32768"
+worker_machine_type = "e2-custom-4-16384"
+worker_count        = 4
+```
+
+Leave `master_machine_type` or `worker_machine_type` empty to fall back to
+`machine_type`.
+
 ## Apply
 
 ```bash
@@ -72,6 +83,23 @@ Start the local Nexus Docker Compose stack on the master:
 start-nexus-compose
 ```
 
+Workers start a host-network Spark worker automatically on boot. To restart one
+manually, SSH to the worker and run:
+
+```bash
+start-nexus-worker
+stop-nexus-worker
+```
+
+Submit Spark jobs from the master with the host-network helper so private
+worker executors can connect back to the driver:
+
+```bash
+nexus-spark-submit processing/bronze/raw_to_bronze.py \
+  --raw-path s3a://nexus-lakehouse/raw/example/*.jsonl \
+  --bronze-table nexus.bronze.example
+```
+
 Stop it:
 
 ```bash
@@ -88,6 +116,7 @@ Terraform exposes only Nexus-facing ports on the master, restricted by
 | 22 | SSH |
 | 8000 | FastAPI |
 | 8080 | Airflow |
+| 8081 | Spark Master UI |
 | 8085 | Trino |
 | 8088 | Superset |
 | 9001 | MinIO Console |

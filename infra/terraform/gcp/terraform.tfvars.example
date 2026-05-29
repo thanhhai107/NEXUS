@@ -12,7 +12,9 @@ worker_zones = [
 cluster_name = "nexus"
 
 network_name       = "default"
-machine_type       = "e2-custom-12-16384"
+machine_type       = "e2-custom-12-16384" # Fallback when role-specific types are empty.
+master_machine_type = "e2-custom-8-32768"
+worker_machine_type = "e2-custom-4-16384"
 worker_count       = 4
 boot_disk_size_gb  = 75
 boot_disk_type     = "pd-balanced"

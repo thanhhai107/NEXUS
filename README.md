@@ -321,6 +321,11 @@ Start the default stack:
 docker compose --env-file .env -f infra/docker/docker-compose.yml up -d
 ```
 
+On Terraform VMs, run `start-nexus-compose` on the master. Worker VMs start a
+host-network Spark worker with `start-nexus-worker`, and Spark jobs should be
+submitted from the master with `nexus-spark-submit` so remote executors can
+connect back to the driver.
+
 Start with metadata services:
 
 ```bash

@@ -66,9 +66,21 @@ variable "network_name" {
 }
 
 variable "machine_type" {
-  description = "Machine type for all nodes."
+  description = "Fallback machine type for all nodes when role-specific types are not set."
   type        = string
   default     = "e2-custom-12-16384"
+}
+
+variable "master_machine_type" {
+  description = "Machine type for the master node. Leave empty to use machine_type."
+  type        = string
+  default     = ""
+}
+
+variable "worker_machine_type" {
+  description = "Machine type for worker nodes. Leave empty to use machine_type."
+  type        = string
+  default     = ""
 }
 
 variable "worker_count" {
@@ -148,6 +160,9 @@ locals {
   cluster_tag = "${var.cluster_name}-cluster"
   master_tag  = "${var.cluster_name}-master"
   worker_tag  = "${var.cluster_name}-worker"
+
+  master_machine_type = var.master_machine_type != "" ? var.master_machine_type : var.machine_type
+  worker_machine_type = var.worker_machine_type != "" ? var.worker_machine_type : var.machine_type
 
   common_metadata = {
     nexus-cluster-name = var.cluster_name
@@ -248,7 +263,7 @@ resource "google_compute_firewall" "master_ui" {
 
   allow {
     protocol = "tcp"
-    ports    = ["8000", "8080", "8085", "8088", "9001"]
+    ports    = ["8000", "8080", "8081", "8085", "8088", "9001"]
   }
 }
 
@@ -315,7 +330,7 @@ resource "google_compute_router_nat" "workers" {
 
 resource "google_compute_instance" "master" {
   name         = "${var.cluster_name}-master-1"
-  machine_type = var.machine_type
+  machine_type = local.master_machine_type
   zone         = var.master_zone
   tags         = [local.cluster_tag, local.master_tag]
 
@@ -355,7 +370,7 @@ resource "google_compute_instance" "master" {
 resource "google_compute_instance" "workers" {
   count        = var.worker_count
   name         = "${var.cluster_name}-worker-${count.index + 1}"
-  machine_type = var.machine_type
+  machine_type = local.worker_machine_type
   zone         = local.worker_zones[count.index]
   tags         = [local.cluster_tag, local.worker_tag]
 
@@ -378,8 +393,9 @@ resource "google_compute_instance" "workers" {
   }
 
   metadata = merge(local.common_metadata, local.optional_ssh_metadata, {
-    nexus-node-role  = "worker"
-    nexus-node-index = tostring(count.index + 1)
+    nexus-node-role         = "worker"
+    nexus-node-index        = tostring(count.index + 1)
+    nexus-master-private-ip = google_compute_instance.master.network_interface[0].network_ip
   })
 
   metadata_startup_script = file("${path.module}/scripts/startup.sh")
@@ -425,6 +441,7 @@ output "service_urls" {
   value = {
     nexus_api           = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8000/docs"
     nexus_airflow       = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8080"
+    nexus_spark_master  = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8081"
     nexus_trino         = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8085"
     nexus_superset      = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8088"
     nexus_minio_console = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:9001"
@@ -433,5 +450,5 @@ output "service_urls" {
 
 output "nexus_tunnel_command" {
   description = "Use this when you need local access to Nexus services without exposing them publicly."
-  value       = "ssh -L 8000:127.0.0.1:8000 -L 8080:127.0.0.1:8080 -L 8085:127.0.0.1:8085 -L 8088:127.0.0.1:8088 -L 9000:127.0.0.1:9000 -L 9001:127.0.0.1:9001 ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}"
+  value       = "ssh -L 8000:127.0.0.1:8000 -L 8080:127.0.0.1:8080 -L 8081:127.0.0.1:8081 -L 8085:127.0.0.1:8085 -L 8088:127.0.0.1:8088 -L 9000:127.0.0.1:9000 -L 9001:127.0.0.1:9001 ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}"
 }

@@ -1,0 +1,36 @@
+region      = "ap-southeast-1"
+master_zone = "ap-southeast-1a"
+worker_zones = [
+  "ap-southeast-1a",
+  "ap-southeast-1a",
+  "ap-southeast-1a",
+  "ap-southeast-1a"
+]
+
+cluster_name = "nexus"
+
+vpc_cidr = "10.0.0.0/16"
+use_default_vpc      = false
+instance_type        = "m7i.xlarge" # Fallback when role-specific types are empty.
+master_instance_type = "m5zn.3xlarge"
+worker_instance_type = "m7i.xlarge"
+worker_count         = 4
+ebs_root_size_gb     = 75
+ebs_root_type        = "gp3"
+
+allowed_admin_cidrs = [
+  "0.0.0.0/0"
+]
+
+ssh_user       = "ubuntu"
+ssh_public_key = ""
+
+enable_master_worker_ssh = true
+
+enable_ssh_password_login = true
+ssh_password              = "CHANGE_ME_TO_A_STRONG_PASSWORD"
+
+create_elastic_ip = true
+
+nexus_repo_url = "https://github.com/thanhhai107/NEXUS.git"
+nexus_repo_ref = "master"
