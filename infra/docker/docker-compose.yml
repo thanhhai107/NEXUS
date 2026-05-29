@@ -105,6 +105,7 @@ services:
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: nexus-minio
+    restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
@@ -115,9 +116,26 @@ services:
     volumes:
       - minio-data:/data
 
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    container_name: nexus-minio-init
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      NEXUS_BUCKET: ${NEXUS_BUCKET:-nexus-lakehouse}
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set nexus http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do sleep 2; done;
+      mc mb --ignore-existing nexus/$${NEXUS_BUCKET};
+      mc anonymous set none nexus/$${NEXUS_BUCKET};
+      "
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
     container_name: nexus-zookeeper
+    restart: unless-stopped
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -127,6 +145,7 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: nexus-kafka
+    restart: unless-stopped
     depends_on:
       - zookeeper
     environment:
@@ -141,8 +160,14 @@ services:
       - "29092:29092"
 
   spark:
-    image: bitnamilegacy/spark:3.5
+    build:
+      context: spark
+    image: nexus-spark:3.5
     container_name: nexus-spark
+    restart: unless-stopped
+    depends_on:
+      - hive-metastore
+      - minio-init
     environment:
       SPARK_MODE: master
       SPARK_RPC_AUTHENTICATION_ENABLED: "no"
@@ -151,6 +176,8 @@ services:
       SPARK_SSL_ENABLED: "no"
       HOME: /tmp/nexus-spark-home
       HADOOP_USER_NAME: spark
+      USER: spark
+      LOGNAME: spark
       PYSPARK_PYTHON: /opt/bitnami/python/bin/python3.12
       PYSPARK_DRIVER_PYTHON: /opt/bitnami/python/bin/python3.12
     ports:
@@ -160,10 +187,13 @@ services:
       - ../../:/opt/nexus
 
   spark-worker:
-    image: bitnamilegacy/spark:3.5
+    image: nexus-spark:3.5
     container_name: nexus-spark-worker
+    restart: unless-stopped
     depends_on:
       - spark
+      - hive-metastore
+      - minio-init
     environment:
       SPARK_MODE: worker
       SPARK_MASTER_URL: spark://spark:7077
@@ -171,6 +201,8 @@ services:
       SPARK_WORKER_CORES: 2
       HOME: /tmp/nexus-spark-home
       HADOOP_USER_NAME: spark
+      USER: spark
+      LOGNAME: spark
       PYSPARK_PYTHON: /opt/bitnami/python/bin/python3.12
       PYSPARK_DRIVER_PYTHON: /opt/bitnami/python/bin/python3.12
     volumes:
@@ -179,8 +211,10 @@ services:
   trino:
     image: trinodb/trino:451
     container_name: nexus-trino
+    restart: unless-stopped
     depends_on:
-      - minio
+      - hive-metastore
+      - minio-init
     ports:
       - "8085:8080"
     volumes:
@@ -188,25 +222,78 @@ services:
       - ../../serving/query/trino/access-control.properties:/etc/trino/access-control.properties
       - ../../serving/query/trino/rules.json:/etc/trino/rules.json
 
+  hive-metastore-db:
+    image: postgres:16
+    container_name: nexus-hive-metastore-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hive
+      POSTGRES_DB: metastore_db
+    volumes:
+      - hive-metastore-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hive -d metastore_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  hive-metastore:
+    build:
+      context: hive-metastore
+    image: nexus-hive-metastore:4.0.0
+    container_name: nexus-hive-metastore
+    restart: unless-stopped
+    depends_on:
+      hive-metastore-db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      SERVICE_NAME: metastore
+      DB_DRIVER: postgres
+      SERVICE_OPTS: >-
+        -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver
+        -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://hive-metastore-db:5432/metastore_db
+        -Djavax.jdo.option.ConnectionUserName=hive
+        -Djavax.jdo.option.ConnectionPassword=hive
+        -Dhive.metastore.warehouse.dir=s3a://${NEXUS_BUCKET:-nexus-lakehouse}/warehouse
+        -Dmetastore.warehouse.dir=s3a://${NEXUS_BUCKET:-nexus-lakehouse}/warehouse
+        -Dmetastore.try.direct.sql.ddl=false
+    ports:
+      - "9083:9083"
+
   airflow-db:
     image: postgres:16
     container_name: nexus-airflow-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     volumes:
       - airflow-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   governance-db:
     image: postgres:16
     container_name: nexus-governance-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: nexus_governance
       POSTGRES_PASSWORD: nexus_governance
       POSTGRES_DB: nexus_governance
     volumes:
       - governance-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus_governance -d nexus_governance"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   airflow:
     build:
@@ -214,11 +301,13 @@ services:
       dockerfile: infra/docker/airflow/Dockerfile
     image: nexus-airflow:2.9.1-python3.11
     container_name: nexus-airflow
+    restart: unless-stopped
     depends_on:
       - airflow-db
       - governance-db
+      - hive-metastore
       - kafka
-      - minio
+      - minio-init
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
@@ -278,9 +367,11 @@ services:
   airflow-scheduler:
     image: nexus-airflow:2.9.1-python3.11
     container_name: nexus-airflow-scheduler
+    restart: unless-stopped
     depends_on:
       - airflow
       - governance-db
+      - hive-metastore
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
@@ -330,6 +421,7 @@ services:
   superset:
     image: apache/superset:4.0.2
     container_name: nexus-superset
+    restart: unless-stopped
     depends_on:
       - trino
     environment:
@@ -352,6 +444,7 @@ services:
       context: ../..
       dockerfile: serving/api/Dockerfile
     container_name: nexus-api
+    restart: unless-stopped
     depends_on:
       - trino
       - governance-db
@@ -529,6 +622,7 @@ services:
 
 volumes:
   minio-data:
+  hive-metastore-db-data:
   airflow-db-data:
   governance-db-data:
   superset-home:

@@ -12,7 +12,7 @@ DEFAULT_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 with DAG(
     dag_id="nexus_dlq_replay",
     description="Replay events from the Dead Letter Queue back to their source topic or stdout.",
-    start_date=datetime(2026, 1, 1),
+    start_date=datetime(2025, 1, 1),
     schedule=None,
     catchup=False,
     tags=["nexus", "dlq", "replay"],

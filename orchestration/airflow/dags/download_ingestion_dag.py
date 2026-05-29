@@ -54,7 +54,7 @@ def assert_published_outputs(run_id: str, expected_count: int) -> list[str]:
 with DAG(
     dag_id="nexus_download_ingestion_pipeline",
     description="Download external API/open-data sources with timeout, retry, pools and published-manifest gate.",
-    start_date=datetime(2026, 1, 1),
+    start_date=datetime(2025, 1, 1),
     schedule=None,
     catchup=False,
     tags=["nexus", "download", "ingestion"],

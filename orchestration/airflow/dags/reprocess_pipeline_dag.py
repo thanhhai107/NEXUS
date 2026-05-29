@@ -16,7 +16,7 @@ DEFAULT_RAW_GLOB = os.getenv("NEXUS_REPROCESS_RAW_GLOB", "/opt/airflow/runtime/r
 with DAG(
     dag_id="nexus_reprocess_pipeline",
     description="Replay raw landing files through Bronze, Silver and Gold for recovery or backfill.",
-    start_date=datetime(2026, 1, 1),
+    start_date=datetime(2025, 1, 1),
     schedule=None,
     catchup=False,
     tags=["nexus", "reprocess", "recovery"],

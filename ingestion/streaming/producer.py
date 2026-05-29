@@ -149,7 +149,8 @@ def fetch_api_events(
             if hasattr(request_json, '__wrapped__')
             else _raw_request(resolved_url, headers)
         )
-    except Exception:
+    except Exception as exc:
+        print(f"Warning: API fetch failed for {source}: {exc}")
         return []
 
     return _normalize_payload(source, payload, limit)

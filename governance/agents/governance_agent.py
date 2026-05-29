@@ -99,7 +99,9 @@ def _llm_decision(evidence: dict[str, Any]) -> AgentDecision | None:
         parsed.setdefault("recommended_fixes", remediation["recommended_fixes"])
         parsed.setdefault("reprocess_required", remediation["reprocess_required"])
         return AgentDecision.from_dict(parsed)
-    except Exception:
+    except Exception as exc:
+        import sys
+        print(f"Warning: LLM decision parsing failed: {exc}", file=sys.stderr)
         return None
 
 

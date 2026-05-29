@@ -336,6 +336,7 @@ Local URLs:
 | Trino | <http://localhost:8085> |
 | Superset | <http://localhost:8088> |
 | MinIO Console | <http://localhost:9001> |
+| Hive Metastore thrift | `localhost:9083` |
 | OpenMetadata, metadata profile | <http://localhost:8585> |
 | Marquez UI, metadata profile | <http://localhost:3000> |
 

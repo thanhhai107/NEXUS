@@ -14,7 +14,7 @@ DEFAULT_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 with DAG(
     dag_id="nexus_streaming_pipeline",
     description="Produce events to Kafka, consume into raw layer, validate and emit lineage.",
-    start_date=datetime(2026, 1, 1),
+    start_date=datetime(2025, 1, 1),
     schedule=None,
     catchup=False,
     tags=["nexus", "streaming", "kafka"],

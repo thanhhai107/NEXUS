@@ -59,7 +59,7 @@ def check_ollama_running() -> bool:
     try:
         response = requests.get("http://localhost:11434/", timeout=2)
         return response.status_code == 200
-    except:
+    except (OSError, ConnectionError):
         return False
 
 

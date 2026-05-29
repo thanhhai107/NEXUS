@@ -174,8 +174,8 @@ def resolve_records(
                 records = ingest_api_records(url, api_key, auth_style=auth_style)
                 if records:
                     return records, url
-            except Exception:
-                pass
+            except Exception as exc:
+                print(f"Warning: API ingestion failed for {dataset}: {exc}", file=sys.stderr)
         local_path = dataset_config.get("local_sample_uri")
         if local_path:
             source_path = PROJECT_ROOT / str(local_path)

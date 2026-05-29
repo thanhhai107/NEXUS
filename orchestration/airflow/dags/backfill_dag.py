@@ -245,7 +245,7 @@ def verify_backfill(results: list[dict[str, Any]]) -> dict[str, Any]:
 with DAG(
     dag_id="nexus_backfill",
     description="Backfill missing data for polling sources",
-    start_date=datetime(2026, 1, 1),
+    start_date=datetime(2025, 1, 1),
     schedule_interval=None,  # Manual trigger only
     catchup=False,
     max_active_runs=1,
@@ -265,7 +265,7 @@ def create_source_backfill_dag(source: str) -> DAG:
 
     default_args_source = {
         **default_args,
-        "start_date": datetime(2026, 1, 1),
+        "start_date": datetime(2025, 1, 1),
     }
 
     dag_id = f"nexus_backfill_{source}"
@@ -273,7 +273,7 @@ def create_source_backfill_dag(source: str) -> DAG:
     with DAG(
         dag_id=dag_id,
         description=f"Backfill for {source}",
-        start_date=datetime(2026, 1, 1),
+        start_date=datetime(2025, 1, 1),
         schedule_interval=None,
         catchup=False,
         max_active_runs=1,

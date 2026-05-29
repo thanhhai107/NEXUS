@@ -267,8 +267,8 @@ def consume_to_raw(
     finally:
         try:
             consumer.commit()
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"Warning: consumer commit failed for topic {topic}: {exc}")
         consumer.close()
 
     raw_path = None
@@ -371,8 +371,8 @@ def consume_events(
         # Commit offsets (confluent-kafka)
         try:
             consumer.commit(asynchronous=False)
-        except Exception:
-            pass  # Best effort
+        except Exception as exc:
+            print(f"Warning: consumer async commit failed: {exc}")
         consumer.close()
 
     # Write to raw layer

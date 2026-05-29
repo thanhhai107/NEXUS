@@ -34,7 +34,7 @@ def branch_on_agent_decision(dataset_name: str) -> str:
 with DAG(
     dag_id="nexus_batch_ingestion_pipeline",
     description="Batch CSV/API ingestion through quality gates and medallion Spark jobs.",
-    start_date=datetime(2026, 1, 1),
+    start_date=datetime(2025, 1, 1),
     schedule="@daily",
     catchup=False,
     tags=["nexus", "batch", "lakehouse"],

@@ -11,6 +11,11 @@
       "allow": "read-only"
     },
     {
+      "user": "admin",
+      "catalog": "iceberg|system",
+      "allow": "all"
+    },
+    {
       "user": "nexus",
       "catalog": "iceberg",
       "allow": "read-only"
@@ -38,6 +43,12 @@
       "catalog": "iceberg",
       "schema": "gold",
       "owner": false
+    },
+    {
+      "user": "admin",
+      "catalog": "iceberg|system",
+      "schema": ".*",
+      "owner": true
     },
     {
       "user": "nexus",
@@ -69,6 +80,13 @@
       "privileges": ["SELECT"]
     },
     {
+      "user": "admin",
+      "catalog": "iceberg|system",
+      "schema": ".*",
+      "table": ".*",
+      "privileges": ["SELECT", "INSERT", "DELETE", "UPDATE", "OWNERSHIP", "GRANT_SELECT"]
+    },
+    {
       "user": "nexus",
       "catalog": "iceberg",
       "schema": "gold",
@@ -82,6 +100,10 @@
       "allow": ["execute", "view", "kill"]
     },
     {
+      "user": "admin",
+      "allow": ["execute", "view", "kill"]
+    },
+    {
       "user": "nexus",
       "allow": ["execute", "view"]
     }
@@ -89,6 +111,10 @@
   "system_information": [
     {
       "role": "admin|steward",
+      "allow": ["read", "write"]
+    },
+    {
+      "user": "admin",
       "allow": ["read", "write"]
     }
   ]
