@@ -1,0 +1,11 @@
+event_id,source,event_type,event_time,camera_id,image_url,latitude,longitude
+sg-001,lta,TRAFFIC_SNAPSHOT,2026-05-28 07:00:00,1701,https://d1u3d3z2deqsha.cloudfront.net/1701.jpg,1.3039,103.8318
+sg-002,lta,TRAFFIC_SNAPSHOT,2026-05-28 07:05:00,2701,https://d1u3d3z2deqsha.cloudfront.net/2701.jpg,1.2839,103.8518
+sg-003,lta,TRAFFIC_SNAPSHOT,2026-05-28 07:10:00,3701,https://d1u3d3z2deqsha.cloudfront.net/3701.jpg,1.3339,103.9618
+sg-004,lta,TRAFFIC_SNAPSHOT,2026-05-28 07:15:00,4701,https://d1u3d3z2deqsha.cloudfront.net/4701.jpg,1.2939,103.7818
+sg-005,lta,CONGESTION_ALERT,2026-05-28 08:00:00,5701,https://d1u3d3z2deqsha.cloudfront.net/5701.jpg,1.3139,103.8918
+sg-006,lta,TRAFFIC_SNAPSHOT,2026-05-28 08:30:00,6701,https://d1u3d3z2deqsha.cloudfront.net/6701.jpg,1.3539,103.9418
+sg-007,lta,ACCIDENT_DETECTED,2026-05-28 09:00:00,7701,https://d1u3d3z2deqsha.cloudfront.net/7701.jpg,1.3239,103.8018
+sg-008,lta,TRAFFIC_SNAPSHOT,2026-05-28 09:30:00,8701,https://d1u3d3z2deqsha.cloudfront.net/8701.jpg,1.3439,103.8618
+sg-009,lta,ROAD_WORKS,2026-05-28 10:00:00,9701,https://d1u3d3z2deqsha.cloudfront.net/9701.jpg,1.3039,103.9118
+sg-010,lta,TRAFFIC_SNAPSHOT,2026-05-28 10:30:00,1070,https://d1u3d3z2deqsha.cloudfront.net/1070.jpg,1.3639,103.7518
