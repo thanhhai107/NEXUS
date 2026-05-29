@@ -1,5 +1,5 @@
 default_mode: full_demo
-default_source_group: core_historical
+default_source_group: full_demo
 polling_source_group: realtime_polling
 
 output_dir: runtime/datasets
@@ -302,6 +302,23 @@ sources:
   - naptan
   - london_journeys
   - dft
+  - tfl
+  - tfl_line_status
+  - tfl_arrivals
+  full_demo:
+  - openmeteo
+  - openmeteo_historical_weather
+  - ukair_air_quality_archive
+  - londonair
+  - openaq
+  - ncei
+  - waqi
+  - openweather
+  - stats19
+  - naptan
+  - london_journeys
+  - dft
+  - tfl
   - tfl_line_status
   - tfl_arrivals
   core_historical:
@@ -976,3 +993,57 @@ naptan:
 london_journeys:
   url: https://data.london.gov.uk/download/ep8ow/06a805f6-77c6-481a-8b08-ddef56afffdd/tfl-journeys-type.csv
   max_bytes: 50000000
+
+tfl_gis:
+  enabled: true
+  base_url: https://services1.arcgis.com/YswvgzOodUvqkoCN/arcgis/rest/services
+  datasets:
+    tfl_gis_boroughs:
+      service: Boroughs_London
+      layer: 10
+      description: London borough boundary polygons
+      page_size: 100
+    tfl_gis_cycle_routes:
+      service: Cycle_Routes
+      layer: 11
+      description: London cycle route polylines
+      page_size: 100
+    tfl_gis_road_network:
+      service: TLRN
+      layer: 0
+      description: Transport for London Road Network
+      page_size: 100
+    tfl_gis_stations:
+      service: TfL_stations
+      layer: 1
+      description: London transport station points
+      page_size: 100
+  rate_limit:
+    requests_per_minute: 60
+    backoff: exponential_on_429
+  backfill_policy:
+    mode: full_refresh
+    schedule: "@monthly"
+
+overture:
+  enabled: false
+  description: Overture Maps Foundation transportation theme (GeoParquet).
+    Free and open (CDLA Permissive v2.0). Supersedes OS Open Roads.
+  base_url: https://overturemaps-us-west-2.s3.amazonaws.com/release
+  version: "2026-05-20.0"
+  theme: transportation
+  type: segment
+  london_bbox:
+    minx: -0.55
+    miny: 51.28
+    maxx: 0.35
+    maxy: 51.7
+  datasets:
+    overture_transportation:
+      description: London road network segments
+      parquet_prefix: theme=transportation/type=segment/
+      estimated_size_gb: 0.3
+      row_count: ~50000
+  download_method: duckdb_httpfs
+  rate_limit:
+    requests_per_minute: 300

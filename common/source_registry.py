@@ -7,13 +7,12 @@ from common.config import load_dataset_catalog
 
 
 INGESTION_METHOD_BY_SOURCE_TYPE: dict[str, str] = {
-    "kaggle_csv": "batch_csv",
     "csv_download": "batch_csv_download",
     "parquet_batch": "batch_parquet",
     "rest_api": "batch_api",
     "api_stream": "stream_api",
+    "arcgis_hub": "batch_api",
     "gtfs_realtime": "stream_gtfs_realtime",
-    "kafka_topic": "stream_kafka",
 }
 
 

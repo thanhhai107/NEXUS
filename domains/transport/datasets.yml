@@ -1,63 +1,6 @@
 datasets:
-  us_accidents:
-    domain: transport
-    description: Primary Transport batch dataset based on Kaggle US Accidents.
-    nexus_demo:
-      status: deprecated_out_of_scope
-      default_download: false
-      reason: Not in Greater London; retained only as a reference/sample dataset.
-    source_type: kaggle_csv
-    source_uri: https://www.kaggle.com/datasets/sobhanmoosavi/us-accidents
-    local_sample_uri: assets/samples/us_accidents_sample.csv
-    schema_path: domains/transport/schemas/us_accidents.schema.json
-    freshness_hours: 24
-    primary_keys:
-    - ID
-    governance:
-      owner: transport-data-platform
-      steward: transport-data-steward
-      sensitivity: public
-      retention:
-        policy: open-data-standard
-        days: 365
-      access_policy:
-        allowed_roles:
-        - admin
-        - steward
-        - analyst
-        - public
-        denied_roles: []
-        api_access: true
-        trino_access: true
-        superset_access: true
-    target:
-      raw_path: s3a://nexus-lakehouse/raw/us_accidents/
-      bronze_table: nexus.bronze.us_accidents
-      silver_table: nexus.silver.us_accidents
-      gold_table: nexus.gold.us_accidents_summary
-  nyc_tlc_trips:
-    domain: transport
-    description: Secondary Transport batch dataset based on NYC TLC trip records.
-    nexus_demo:
-      status: deprecated_out_of_scope
-      default_download: false
-      reason: Not in Greater London; retained only as a reference/sample dataset.
-    source_type: parquet_batch
-    source_uri: https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
-    local_sample_uri: assets/samples/nyc_tlc_trips.csv
-    schema_path: domains/transport/schemas/nyc_tlc_trips.schema.json
-    freshness_hours: 4320
-    primary_keys:
-    - VendorID
-    - tpep_pickup_datetime
-    - tpep_dropoff_datetime
-    - PULocationID
-    - DOLocationID
-    target:
-      raw_path: s3a://nexus-lakehouse/raw/nyc_tlc_trips/
-      bronze_table: nexus.bronze.nyc_tlc_trips
-      silver_table: nexus.silver.nyc_tlc_trips
-      gold_table: nexus.gold.nyc_tlc_trips_summary
+
+
   transport_events:
     domain: transport
     description: Transport streaming events from a real-time API, with simulated producer
@@ -204,9 +147,8 @@ datasets:
     description: Industry-standard GTFS Realtime feed wrapper for vehicle positions,
       trip updates, or service alerts.
     nexus_demo:
-      status: out_of_scope_until_feed_configured
-      default_download: false
-      reason: No London GTFS Realtime feed URL is configured for the default demo.
+      status: primary_realtime_stream
+      default_download: true
     source_type: gtfs_realtime
     source_uri: ${GTFS_REALTIME_URL}
     local_sample_uri: assets/samples/gtfs_realtime_events.csv
@@ -222,28 +164,7 @@ datasets:
       bronze_table: nexus.bronze.gtfs_realtime_events
       silver_table: nexus.silver.gtfs_realtime_events
       gold_table: nexus.gold.gtfs_realtime_events_hourly
-  sg_traffic:
-    domain: transport
-    description: Singapore Data.gov.sg traffic images stream.
-    nexus_demo:
-      status: deprecated_out_of_scope
-      default_download: false
-      reason: Not in Greater London; retained only as a reference/sample dataset.
-    source_type: api_stream
-    source_uri: https://api-open.data.gov.sg/v2/real-time/api/traffic-images
-    local_sample_uri: assets/samples/sg_traffic.csv
-    docs_uri: https://data.gov.sg/collections/traffic-images/view
-    topic: transport-sg-traffic
-    poll_seconds: 20
-    schema_path: domains/transport/schemas/sg_traffic.schema.json
-    freshness_hours: 1
-    primary_keys:
-    - event_id
-    target:
-      raw_path: s3a://nexus-lakehouse/raw/sg_traffic/
-      bronze_table: nexus.bronze.sg_traffic
-      silver_table: nexus.silver.sg_traffic
-      gold_table: nexus.gold.sg_traffic_hourly
+
   stats19_collisions:
     domain: transport
     description: UK road collision records from DfT STATS19 open data (last 5 years).
@@ -444,3 +365,106 @@ datasets:
       bronze_table: nexus.bronze.dft_road_traffic
       silver_table: nexus.silver.dft_road_traffic
       gold_table: nexus.gold.dft_road_traffic_summary
+
+  tfl_gis_boroughs:
+    domain: transport
+    description: London borough boundaries from TfL GIS Open Data Hub (ArcGIS REST).
+    nexus_demo:
+      status: primary_reference
+      default_download: true
+    source_type: arcgis_hub
+    source_uri: https://services1.arcgis.com/YswvgzOodUvqkoCN/arcgis/rest/services/Boroughs_London/FeatureServer/10/query
+    docs_uri: https://gis-tfl.opendata.arcgis.com
+    poll_seconds: 2592000
+    schema_path: domains/transport/schemas/tfl_gis_boroughs.schema.json
+    freshness_hours: 720
+    primary_keys:
+    - OBJECTID
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/tfl_gis_boroughs/
+      bronze_table: nexus.bronze.tfl_gis_boroughs
+      silver_table: nexus.silver.tfl_gis_boroughs
+      gold_table: nexus.gold.tfl_gis_boroughs
+
+  tfl_gis_cycle_routes:
+    domain: transport
+    description: London cycle routes from TfL GIS Open Data Hub (ArcGIS REST).
+    nexus_demo:
+      status: primary_reference
+      default_download: true
+    source_type: arcgis_hub
+    source_uri: https://services1.arcgis.com/YswvgzOodUvqkoCN/arcgis/rest/services/Cycle_Routes/FeatureServer/11/query
+    docs_uri: https://gis-tfl.opendata.arcgis.com
+    poll_seconds: 2592000
+    schema_path: domains/transport/schemas/tfl_gis_cycle_routes.schema.json
+    freshness_hours: 720
+    primary_keys:
+    - OBJECTID
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/tfl_gis_cycle_routes/
+      bronze_table: nexus.bronze.tfl_gis_cycle_routes
+      silver_table: nexus.silver.tfl_gis_cycle_routes
+      gold_table: nexus.gold.tfl_gis_cycle_routes
+
+  tfl_gis_road_network:
+    domain: transport
+    description: London road network (TLRN) from TfL GIS Open Data Hub (ArcGIS REST).
+    nexus_demo:
+      status: primary_reference
+      default_download: true
+    source_type: arcgis_hub
+    source_uri: https://services1.arcgis.com/YswvgzOodUvqkoCN/arcgis/rest/services/TLRN/FeatureServer/0/query?returnGeometry=false
+    docs_uri: https://gis-tfl.opendata.arcgis.com
+    poll_seconds: 2592000
+    schema_path: domains/transport/schemas/tfl_gis_road_network.schema.json
+    freshness_hours: 720
+    primary_keys:
+    - OBJECTID
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/tfl_gis_road_network/
+      bronze_table: nexus.bronze.tfl_gis_road_network
+      silver_table: nexus.silver.tfl_gis_road_network
+      gold_table: nexus.gold.tfl_gis_road_network
+
+  tfl_gis_stations:
+    domain: transport
+    description: London transport stations from TfL GIS Open Data Hub (ArcGIS REST).
+    nexus_demo:
+      status: primary_reference
+      default_download: true
+    source_type: arcgis_hub
+    source_uri: https://services1.arcgis.com/YswvgzOodUvqkoCN/arcgis/rest/services/TfL_stations/FeatureServer/1/query
+    docs_uri: https://gis-tfl.opendata.arcgis.com
+    poll_seconds: 2592000
+    schema_path: domains/transport/schemas/tfl_gis_stations.schema.json
+    freshness_hours: 720
+    primary_keys:
+    - OBJECTID
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/tfl_gis_stations/
+      bronze_table: nexus.bronze.tfl_gis_stations
+      silver_table: nexus.silver.tfl_gis_stations
+      gold_table: nexus.gold.tfl_gis_stations
+  overture_transportation:
+    domain: transport
+    description: London road network from Overture Maps Foundation transportation
+      theme (GeoParquet format). Free and open data under CDLA Permissive v2.0. Includes
+      road segments, paths, tracks with classification, surface, and speed attributes.
+      Supersedes OS Open Roads for NEXUS demo purposes.
+    nexus_demo:
+      status: primary_reference
+      default_download: false
+    source_type: parquet_batch
+    source_uri: https://overturemaps-us-west-2.s3.amazonaws.com/release/2026-05-20.0/theme=transportation/type=segment/
+    local_sample_uri: assets/samples/overture_transportation.csv
+    docs_uri: https://docs.overturemaps.org/
+    poll_seconds: 2592000
+    schema_path: domains/transport/schemas/overture_transportation.schema.json
+    freshness_hours: 720
+    primary_keys:
+    - id
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/overture_transportation/
+      bronze_table: nexus.bronze.overture_transportation
+      silver_table: nexus.silver.overture_transportation
+      gold_table: nexus.gold.overture_transportation_segments

@@ -101,6 +101,7 @@ SOURCE_POLICIES: dict[str, dict[str, Any]] = {
         "rate_limit": {"requests_per_minute": 60, "backoff": "exponential_on_429"},
         "backfill_policy": {"mode": "latest_snapshot", "schedule": "30min", "cursor_field": "event_time"},
     },
+    # NOTE: Deprecated in favor of Overture Maps transportation (GeoParquet, no API key needed).
     "OS_Open_Roads": {
         "domain": "transport",
         "default_dataset": "os_open_roads",
@@ -763,11 +764,11 @@ def _connector(policy: dict[str, Any], dataset: str, dataset_catalog: dict[str, 
         module = "ingestion.batch.csv_download_ingestion"
         mode = "batch"
         status = "implemented"
-    elif source_type in {"rest_api", "openapi_rest"}:
+    elif source_type in {"rest_api", "openapi_rest", "arcgis_hub"}:
         module = "ingestion.batch.api_ingestion"
         mode = "batch"
         status = "implemented"
-    elif source_type in {"kaggle_csv", "parquet_batch"}:
+    elif source_type == "parquet_batch":
         module = "ingestion.batch.csv_ingestion"
         mode = "batch"
         status = "implemented"

@@ -310,3 +310,31 @@ datasets:
     definitions:
       european_aqi: European AQI metric; do not mix with US AQI in the same semantic metric.
       us_aqi: US AQI metric; do not mix with European AQI in the same semantic metric.
+
+  ukair_air_quality_archive:
+    glossary_terms:
+      - term: event_id
+        definition: Unique event identifier for each downloaded file manifest.
+      - term: site_id
+        definition: DEFRA UK-AIR monitoring site code.
+      - term: pollutant
+        definition: Measured pollutant code (e.g. NO2, PM10).
+      - term: year
+        definition: Measurement year.
+    grain: per_site_per_year_per_pollutant
+    timestamp_column: event_time
+
+  openmeteo_historical_weather:
+    glossary_terms:
+      - term: event_id
+        definition: Unique event identifier for each grid-point download.
+      - term: latitude
+        definition: Decimal latitude of grid point.
+      - term: longitude
+        definition: Decimal longitude of grid point.
+      - term: temperature_2m
+        definition: Air temperature at 2 metres in Celsius.
+      - term: precipitation
+        definition: Total precipitation in millimetres.
+    grain: per_grid_point_per_hour
+    timestamp_column: event_time

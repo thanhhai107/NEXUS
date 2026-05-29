@@ -285,12 +285,10 @@ def test_ingestion_methods():
     from common.source_registry import derive_ingestion_method
     
     test_cases = [
-        {"source_type": "kaggle_csv", "expected": "batch_csv"},
         {"source_type": "csv_download", "expected": "batch_csv_download"},
         {"source_type": "rest_api", "expected": "batch_api"},
         {"source_type": "api_stream", "expected": "stream_api"},
         {"source_type": "gtfs_realtime", "expected": "stream_gtfs_realtime"},
-        {"source_type": "kafka_topic", "expected": "stream_kafka"},
         {"ingestion_method": "custom_mode", "expected": "custom_mode"},  # Override
     ]
     

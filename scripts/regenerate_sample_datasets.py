@@ -65,15 +65,11 @@ SAMPLE_SPECS = [
     SampleSpec("openweather_current", "openweather_current.csv", "domains/environment/schemas/openweather_current.schema.json", "OpenWeather_OpenWeather_Current"),
     SampleSpec("tfl_transport_status", "tfl_transport_status.csv", "domains/transport/schemas/tfl_transport_status.schema.json", "TfL_Unified_API_Tfl.Api.Presentation.Entities.LineStatus"),
     SampleSpec("gtfs_realtime_events", "gtfs_realtime_events.csv", "domains/transport/schemas/gtfs_realtime_events.schema.json"),
-    SampleSpec("sg_traffic", "sg_traffic.csv", "domains/transport/schemas/sg_traffic.schema.json"),
     SampleSpec("stats19_collisions", "stats19_collisions.csv", "domains/transport/schemas/stats19_collisions.schema.json", "STATS19_STATS19_Collision"),
     SampleSpec("naptan_stops", "naptan_stops.csv", "domains/transport/schemas/naptan_stops.schema.json", "NaPTAN_NPTG_NaPTAN_AccessNode"),
     SampleSpec("london_journeys", "london_journeys.csv", "domains/transport/schemas/london_journeys.schema.json", "London_Datastore_London_TfLJourneys"),
     SampleSpec("dft_road_traffic", "dft_road_traffic.csv", "domains/transport/schemas/dft_road_traffic.schema.json", "DfT_Road_Traffic_DfT_TrafficCount"),
     SampleSpec("transport_events", "transport_events.csv", "domains/transport/schemas/transport_events.schema.json"),
-    SampleSpec("nyc_tlc_trips", "nyc_tlc_trips.csv", "domains/transport/schemas/nyc_tlc_trips.schema.json"),
-    SampleSpec("us_accidents", "us_accidents.csv", "domains/transport/schemas/us_accidents.schema.json"),
-    SampleSpec("us_accidents", "us_accidents_sample.csv", "domains/transport/schemas/us_accidents.schema.json"),
 ]
 
 
@@ -211,8 +207,6 @@ def _value_for(
         "date": date,
         "start_time": iso,
         "end_time": iso,
-        "tpep_pickup_datetime": iso,
-        "tpep_dropoff_datetime": iso,
         "period_beginning": date,
         "period_ending": (timestamp + timedelta(days=27)).date().isoformat(),
         "modificationdatetime": iso,

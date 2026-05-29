@@ -1,0 +1,28 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "title": "Overture Maps Transportation Segments",
+    "description": "London road network segments from Overture Maps Foundation transportation theme (GeoParquet format). Includes road segments, paths, tracks, and connectors with classification, surface, and speed attributes. Free and open data under CDLA Permissive v2.0 license. Supersedes OS Open Roads for NEXUS demo purposes.",
+    "required": ["id", "subtype", "class"],
+    "properties": {
+        "id": {"type": "string", "description": "Overture Maps unique feature identifier (GERS ID)."},
+        "geometry": {"type": "string", "description": "WKB or WKT geometry of the road segment."},
+        "subtype": {"type": "string", "description": "Feature subtype: road, path, track, unknown."},
+        "class": {"type": "string", "description": "Road class: primary, secondary, tertiary, residential, unclassified, motorway, trunk, living_street, pedestrian, etc."},
+        "names_primary": {"type": "string", "description": "Primary road name (e.g. Oxford Street, M25)."},
+        "road": {"type": "string", "description": "Road designation/number (e.g. A40, B512)."},
+        "level": {"type": "integer", "description": "Z-level for bridges (+1, +2) and tunnels (-1, -2). 0 = surface."},
+        "connector_ids": {"type": "string", "description": "Serialized JSON array of connector node IDs at segment endpoints. Native array type in GeoParquet source; serialized as string in CSV samples."},
+        "surface": {"type": "string", "description": "Road surface: paved, asphalt, concrete, unpaved, gravel, etc."},
+        "max_speed": {"type": "integer", "description": "Speed limit in km/h where known."},
+        "is_bridge": {"type": "boolean", "description": "True if segment is part of a bridge."},
+        "is_tunnel": {"type": "boolean", "description": "True if segment is part of a tunnel."},
+        "width": {"type": "number", "description": "Road width in metres where known."},
+        "length_m": {"type": "number", "description": "Segment length in metres."},
+        "bbox_xmin": {"type": "number", "description": "Bounding box minimum longitude."},
+        "bbox_ymin": {"type": "number", "description": "Bounding box minimum latitude."},
+        "bbox_xmax": {"type": "number", "description": "Bounding box maximum longitude."},
+        "bbox_ymax": {"type": "number", "description": "Bounding box maximum latitude."},
+        "version": {"type": "string", "description": "Overture Maps release version (e.g. 2026-05-20.0)."}
+    }
+}

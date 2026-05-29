@@ -84,7 +84,7 @@ def derive_late_data_policy(
 ) -> dict[str, Any]:
     configured = dict(dataset.get("late_data_policy") or {})
     source_type = str(dataset.get("source_type") or "").lower()
-    default_watermark = "2 hours" if source_type in {"api_stream", "gtfs_realtime", "kafka_topic"} else "24 hours"
+    default_watermark = "2 hours" if source_type in {"api_stream", "gtfs_realtime"} else "24 hours"
     return {
         "event_time_field": configured.get("event_time_field") or freshness_column or "_nexus_event_time",
         "watermark": configured.get("watermark") or default_watermark,

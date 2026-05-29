@@ -47,3 +47,26 @@ datasets:
     - event_time
     freshness_column: event_time
 
+  ukair_air_quality_archive:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    - site_id
+    freshness_column: event_time
+    primary_keys:
+    - event_id
+
+  openmeteo_historical_weather:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    - latitude
+    - longitude
+    freshness_column: event_time
+    primary_keys:
+    - event_id
+

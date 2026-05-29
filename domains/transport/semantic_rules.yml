@@ -56,81 +56,6 @@ datasets:
         - probabilistic
         - splink
         - llm_assisted_review
-  us_accidents:
-    glossary:
-      dataset_term: Road Accident Event
-      field_terms:
-        ID: Accident Identifier
-        Start_Time: Accident Start Event Time
-        Start_Lat: Accident Latitude
-        Start_Lng: Accident Longitude
-        Distance(mi): Affected Road Distance
-    standards:
-      units:
-        dimension_type: distance
-        value_field: distance_mi
-        canonical_unit: km
-        converted_value_field: distance_km
-        implicit_source_unit: mi
-        expected_range:
-          min: 0
-          max: 1000
-      time:
-        event_time_field: start_time
-        ingestion_time_field: _nexus_ingested_at
-        source_timezone: America/Los_Angeles
-        storage_timezone: UTC
-        timezone_standard: IANA
-        timestamp_format: ISO 8601
-      spatial:
-        latitude_field: start_lat
-        longitude_field: start_lng
-        source_crs: EPSG:4326
-        storage_crs: EPSG:4326
-        render_crs: EPSG:3857
-    grain:
-      entity_grain:
-        - id
-      time_grain: accident_start_timestamp
-      spatial_grain: accident_point
-      aggregation_level: raw_event
-      compatible_gold_grains:
-        - state_severity
-  nyc_tlc_trips:
-    glossary:
-      dataset_term: Taxi Trip
-      field_terms:
-        VendorID: Taxi Vendor
-        tpep_pickup_datetime: Trip Pickup Event Time
-        tpep_dropoff_datetime: Trip Dropoff Event Time
-        trip_distance: Trip Distance
-    standards:
-      units:
-        dimension_type: distance
-        value_field: trip_distance
-        canonical_unit: km
-        converted_value_field: trip_distance_km
-        implicit_source_unit: mi
-        expected_range:
-          min: 0
-          max: 1000
-      time:
-        event_time_field: tpep_pickup_datetime
-        ingestion_time_field: _nexus_ingested_at
-        source_timezone: America/New_York
-        storage_timezone: UTC
-        timezone_standard: IANA
-        timestamp_format: ISO 8601
-    grain:
-      entity_grain:
-        - VendorID
-        - tpep_pickup_datetime
-        - tpep_dropoff_datetime
-        - PULocationID
-        - DOLocationID
-      time_grain: trip_event
-      spatial_grain: taxi_zone_pair
-      aggregation_level: raw_trip
   naptan_stops:
     glossary:
       dataset_term: Public Transport Stop
@@ -371,41 +296,6 @@ datasets:
       time_grain: feed_poll
       spatial_grain: feed
       aggregation_level: feed_snapshot
-  sg_traffic:
-    glossary:
-      dataset_term: Singapore Traffic Camera Snapshot
-      field_terms:
-        camera_id: Traffic Camera Identifier
-        image_url: Camera Image URL
-        event_time: Observation Event Time
-    field_mappings:
-      - source_field: camera_id
-        canonical_field: camera_id
-        issue: same_name_different_meaning
-      - source_field: event_time
-        canonical_field: event_time
-        issue: different_timestamp_timezone_grain
-        time_role: event_time
-    standards:
-      time:
-        event_time_field: event_time
-        ingestion_time_field: _nexus_ingested_at
-        source_timezone: Asia/Singapore
-        storage_timezone: UTC
-        timezone_standard: IANA
-        timestamp_format: ISO 8601
-      spatial:
-        latitude_field: latitude
-        longitude_field: longitude
-        source_crs: EPSG:4326
-        storage_crs: EPSG:4326
-        render_crs: EPSG:3857
-    grain:
-      entity_grain:
-        - camera_id
-      time_grain: snapshot
-      spatial_grain: camera_location
-      aggregation_level: realtime_snapshot
   stats19_collisions:
     glossary:
       dataset_term: Road Collision Record
@@ -499,3 +389,73 @@ datasets:
       time_grain: year
       spatial_grain: count_point
       aggregation_level: annual_count
+
+  tfl_gis_boroughs:
+    glossary_terms:
+      - term: OBJECTID
+        definition: ArcGIS unique feature identifier.
+      - term: BOROUGH
+        definition: London borough name.
+      - term: CODE
+        definition: GSS borough code.
+    grain: per_borough
+    timestamp_column: null
+    crs: EPSG:27700
+
+  tfl_gis_cycle_routes:
+    glossary_terms:
+      - term: OBJECTID
+        definition: ArcGIS unique feature identifier.
+      - term: Route_Name
+        definition: Cycle route name.
+      - term: Status
+        definition: Route operational status.
+    grain: per_route_segment
+    timestamp_column: null
+    crs: EPSG:27700
+
+  tfl_gis_road_network:
+    glossary_terms:
+      - term: OBJECTID
+        definition: ArcGIS unique feature identifier.
+      - term: ROAD_NAME
+        definition: Road name.
+      - term: ROAD_CLASS
+        definition: Road classification.
+    grain: per_road_segment
+    timestamp_column: null
+    crs: EPSG:27700
+
+  tfl_gis_stations:
+    glossary_terms:
+      - term: OBJECTID
+        definition: ArcGIS unique feature identifier.
+      - term: NAME
+        definition: Station name.
+      - term: MODE
+        definition: Transport mode.
+      - term: LATITUDE
+        definition: WGS84 latitude.
+      - term: LONGITUDE
+        definition: WGS84 longitude.
+    grain: per_station
+    timestamp_column: null
+    crs: EPSG:4326
+
+  overture_transportation:
+    glossary_terms:
+      - term: id
+        definition: Overture Maps GERS unique feature identifier.
+      - term: subtype
+        definition: Feature subtype (road, path, track).
+      - term: class
+        definition: Road classification (primary, secondary, motorway, etc.).
+      - term: names_primary
+        definition: Primary street or road name.
+      - term: road
+        definition: Road number or designation (e.g. A40, M25).
+      - term: surface
+        definition: Road surface material.
+    grain: per_road_segment
+    timestamp_column: null
+    crs: EPSG:4326

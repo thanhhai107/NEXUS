@@ -284,3 +284,46 @@ datasets:
       bronze_table: nexus.bronze.openweather_current
       silver_table: nexus.silver.openweather_current
       gold_table: nexus.gold.openweather_current_summary
+  ukair_air_quality_archive:
+    domain: environment
+    description: DEFRA UK-AIR air quality monitoring archive. Downloads CSV measurement
+      files (hourly and daily) from London monitoring sites for pollutants including
+      NO2, PM10, PM2.5, O3, SO2, and CO.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: csv_download
+    source_uri: https://uk-air.defra.gov.uk/data/flat_files
+    docs_uri: https://uk-air.defra.gov.uk/data/
+    poll_seconds: 86400
+    schema_path: domains/environment/schemas/ukair_air_quality_archive.schema.json
+    freshness_hours: 24
+    primary_keys:
+    - event_id
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/ukair_air_quality_archive/
+      bronze_table: nexus.bronze.ukair_air_quality_archive
+      silver_table: nexus.silver.ukair_air_quality_archive
+      gold_table: nexus.gold.ukair_air_quality_archive_daily
+
+  openmeteo_historical_weather:
+    domain: environment
+    description: Historical weather and air quality data from Open-Meteo Archive API
+      across a London bbox grid (10 km spacing). Includes hourly and daily aggregates
+      of temperature, precipitation, wind, pressure, radiation, and air quality.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: csv_download
+    source_uri: https://archive-api.open-meteo.com/v1/archive
+    docs_uri: https://open-meteo.com/en/docs/historical-weather-api
+    poll_seconds: 86400
+    schema_path: domains/environment/schemas/openmeteo_historical_weather.schema.json
+    freshness_hours: 24
+    primary_keys:
+    - event_id
+    target:
+      raw_path: s3a://nexus-lakehouse/raw/openmeteo_historical_weather/
+      bronze_table: nexus.bronze.openmeteo_historical_weather
+      silver_table: nexus.silver.openmeteo_historical_weather
+      gold_table: nexus.gold.openmeteo_historical_weather_daily
