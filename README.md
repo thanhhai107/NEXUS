@@ -500,6 +500,16 @@ python -m cli.nexus source-discovery sync `
 The sync output is generated runtime data and is ignored by Git.
 The coverage command writes `assets/source_discovery/ingestion_coverage_map.json`.
 
+Regenerate local CSV samples after updating source discovery or domain schemas:
+
+```bash
+python scripts/regenerate_sample_datasets.py
+```
+
+The generator reads `assets/source_discovery/all_schemas.json`, verifies mapped
+discovery schema names, and rewrites `assets/samples/*.csv` with deterministic
+10-row samples aligned to domain JSON Schemas.
+
 ## Data Flow
 
 Batch flow:

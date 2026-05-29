@@ -1,11 +1,11 @@
-count_point_id,year,road_name,all_motor_vehicles
-1000,2025,A1,10000
-1001,2025,A2,10250
-1002,2025,A3,10500
-1003,2025,A4,10750
-1004,2025,A5,11000
-1005,2025,A6,11250
-1006,2025,A7,11500
-1007,2025,A8,11750
-1008,2025,A9,12000
-1009,2025,A10,12250
+id,count_point_id,aadf_year,region_id,local_authority_id,road_name,road_category,road_type,easting,northing,latitude,longitude,link_length_km,link_length_miles,year,direction,pedal_cycles,two_wheeled_motor_vehicles,cars_and_taxis,buses_and_coaches,light_goods_vehicles,heavy_goods_vehicles_rigid,heavy_goods_vehicles_articulated,all_heavy_goods_vehicles,all_motor_vehicles,estimation_method
+dft_road_traffic-1,900000,2026,regionid-001,localauthorityid-001,A1,A Road,road_type_1,1.5,1.5,51.5074,-0.1278,1.5,1.5,2026,direction_1,1,10,1,1,10,heavygoodsvehiclesrigid-001,10,10,10000,estimation_method_1
+dft_road_traffic-2,900001,2026,regionid-002,localauthorityid-002,A2,A Road,road_type_2,2.25,2.25,51.5155,-0.0922,2.25,2.25,2026,direction_2,2,11,2,2,11,heavygoodsvehiclesrigid-002,11,11,10250,estimation_method_2
+dft_road_traffic-3,900002,2026,regionid-003,localauthorityid-003,A3,A Road,road_type_3,3.0,3.0,51.5416,-0.143,3.0,3.0,2026,direction_3,3,12,3,3,12,heavygoodsvehiclesrigid-003,12,12,10500,estimation_method_3
+dft_road_traffic-4,900003,2026,regionid-004,localauthorityid-004,A4,A Road,road_type_4,3.75,3.75,51.4893,-0.0882,3.75,3.75,2026,direction_4,4,13,4,4,13,heavygoodsvehiclesrigid-004,13,13,10750,estimation_method_4
+dft_road_traffic-5,900004,2026,regionid-005,localauthorityid-005,A5,A Road,road_type_5,4.5,4.5,51.4653,-0.214,4.5,4.5,2026,direction_5,5,14,5,5,14,heavygoodsvehiclesrigid-005,14,14,11000,estimation_method_5
+dft_road_traffic-6,900005,2026,regionid-006,localauthorityid-006,A6,A Road,road_type_6,5.25,5.25,51.5465,-0.1058,5.25,5.25,2026,direction_6,6,15,6,6,15,heavygoodsvehiclesrigid-006,15,15,11250,estimation_method_6
+dft_road_traffic-7,900006,2026,regionid-007,localauthorityid-007,A7,A Road,road_type_7,6.0,6.0,51.4746,-0.0357,6.0,6.0,2026,direction_7,7,16,7,7,16,heavygoodsvehiclesrigid-007,16,16,11500,estimation_method_7
+dft_road_traffic-8,900007,2026,regionid-008,localauthorityid-008,A8,A Road,road_type_8,6.75,6.75,51.4014,-0.1958,6.75,6.75,2026,direction_8,8,17,8,8,17,heavygoodsvehiclesrigid-008,17,17,11750,estimation_method_8
+dft_road_traffic-9,900008,2026,regionid-009,localauthorityid-009,A9,A Road,road_type_9,7.5,7.5,51.5761,-0.1458,7.5,7.5,2026,direction_9,9,18,9,9,18,heavygoodsvehiclesrigid-009,18,18,12000,estimation_method_9
+dft_road_traffic-10,900009,2026,regionid-010,localauthorityid-010,A10,A Road,road_type_10,8.25,8.25,51.6029,-0.194,8.25,8.25,2026,direction_10,10,19,10,10,19,heavygoodsvehiclesrigid-010,19,19,12250,estimation_method_10

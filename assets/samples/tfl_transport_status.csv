@@ -1,11 +1,11 @@
-event_id,line_id,line_name,status,observed_at
-tfl-0,0,Central,Minor Delays,2026-05-19T12:00:00Z
-tfl-1,1,Jubilee,Good Service,2026-05-19T11:55:00Z
-tfl-2,2,District,Good Service,2026-05-19T11:50:00Z
-tfl-3,3,Piccadilly,Minor Delays,2026-05-19T11:45:00Z
-tfl-4,4,Victoria,Good Service,2026-05-19T11:40:00Z
-tfl-5,0,Central,Good Service,2026-05-19T11:35:00Z
-tfl-6,1,Jubilee,Minor Delays,2026-05-19T11:30:00Z
-tfl-7,2,District,Good Service,2026-05-19T11:25:00Z
-tfl-8,3,Piccadilly,Good Service,2026-05-19T11:20:00Z
-tfl-9,4,Victoria,Minor Delays,2026-05-19T11:15:00Z
+event_id,source,event_type,event_time,line_id,line_name,status,severity,reason,id,status_severity,status_severity_description,created,modified,validity_periods,disruption
+tfl_transport_status-001,tfl-transport-status,transport_status,2026-05-29T12:00:00Z,bakerloo,Bakerloo,Minor Delays,6,Minor delays on the Bakerloo line,tfl_transport_status-1,6,Minor Delays,2026-05-29T12:00:00Z,2026-05-29T12:00:00Z,[],{}
+tfl_transport_status-002,tfl-transport-status,transport_status,2026-05-29T11:00:00Z,central,Central,Good Service,10,No disruptions,tfl_transport_status-2,10,Good Service,2026-05-29T11:00:00Z,2026-05-29T11:00:00Z,[],{}
+tfl_transport_status-003,tfl-transport-status,transport_status,2026-05-29T10:00:00Z,district,District,Good Service,10,No disruptions,tfl_transport_status-3,10,Good Service,2026-05-29T10:00:00Z,2026-05-29T10:00:00Z,[],{}
+tfl_transport_status-004,tfl-transport-status,transport_status,2026-05-29T09:00:00Z,elizabeth,Elizabeth line,Good Service,10,No disruptions,tfl_transport_status-4,10,Good Service,2026-05-29T09:00:00Z,2026-05-29T09:00:00Z,[],{}
+tfl_transport_status-005,tfl-transport-status,transport_status,2026-05-29T08:00:00Z,jubilee,Jubilee,Minor Delays,6,Minor delays on the Jubilee line,tfl_transport_status-5,6,Minor Delays,2026-05-29T08:00:00Z,2026-05-29T08:00:00Z,[],{}
+tfl_transport_status-006,tfl-transport-status,transport_status,2026-05-29T07:00:00Z,northern,Northern,Good Service,10,No disruptions,tfl_transport_status-6,10,Good Service,2026-05-29T07:00:00Z,2026-05-29T07:00:00Z,[],{}
+tfl_transport_status-007,tfl-transport-status,transport_status,2026-05-29T06:00:00Z,piccadilly,Piccadilly,Good Service,10,No disruptions,tfl_transport_status-7,10,Good Service,2026-05-29T06:00:00Z,2026-05-29T06:00:00Z,[],{}
+tfl_transport_status-008,tfl-transport-status,transport_status,2026-05-29T05:00:00Z,victoria,Victoria,Good Service,10,No disruptions,tfl_transport_status-8,10,Good Service,2026-05-29T05:00:00Z,2026-05-29T05:00:00Z,[],{}
+tfl_transport_status-009,tfl-transport-status,transport_status,2026-05-29T04:00:00Z,waterloo-city,Waterloo & City,Minor Delays,6,Minor delays on the Waterloo & City line,tfl_transport_status-9,6,Minor Delays,2026-05-29T04:00:00Z,2026-05-29T04:00:00Z,[],{}
+tfl_transport_status-010,tfl-transport-status,transport_status,2026-05-29T03:00:00Z,dlr,DLR,Good Service,10,No disruptions,tfl_transport_status-10,10,Good Service,2026-05-29T03:00:00Z,2026-05-29T03:00:00Z,[],{}

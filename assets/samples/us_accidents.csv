@@ -1,11 +1,11 @@
-ID,Severity,Start_Time,Start_Lat,Start_Lng,State
-A0000,1,2026-05-19T12:00:00Z,40.100,-73.100,NY
-A0001,2,2026-05-19T11:00:00Z,40.101,-73.101,NY
-A0002,3,2026-05-19T10:00:00Z,40.102,-73.102,NY
-A0003,4,2026-05-19T09:00:00Z,40.103,-73.103,NY
-A0004,1,2026-05-19T08:00:00Z,40.104,-73.104,NY
-A0005,2,2026-05-19T07:00:00Z,40.105,-73.105,NY
-A0006,3,2026-05-19T06:00:00Z,40.106,-73.106,NY
-A0007,4,2026-05-19T05:00:00Z,40.107,-73.107,NY
-A0008,1,2026-05-19T04:00:00Z,40.108,-73.108,NY
-A0009,2,2026-05-19T03:00:00Z,40.109,-73.109,NY
+ID,Severity,Start_Time,End_Time,Start_Lat,Start_Lng,Distance(mi),Description,City,County,State,Weather_Timestamp,Weather_Condition
+us_accidents-1,6,2026-05-29T12:00:00Z,2026-05-29T12:00:00Z,51.5074,-0.1278,1.5,Description_1,Westminster,Westminster,Westminster,2026-05-29T12:00:00Z,Weather_Condition_1
+us_accidents-2,10,2026-05-29T11:00:00Z,2026-05-29T11:00:00Z,51.5155,-0.0922,2.25,Description_2,City of London,City of London,City of London,2026-05-29T11:00:00Z,Weather_Condition_2
+us_accidents-3,10,2026-05-29T10:00:00Z,2026-05-29T10:00:00Z,51.5416,-0.143,3.0,Description_3,Camden,Camden,Camden,2026-05-29T10:00:00Z,Weather_Condition_3
+us_accidents-4,10,2026-05-29T09:00:00Z,2026-05-29T09:00:00Z,51.4893,-0.0882,3.75,Description_4,Southwark,Southwark,Southwark,2026-05-29T09:00:00Z,Weather_Condition_4
+us_accidents-5,6,2026-05-29T08:00:00Z,2026-05-29T08:00:00Z,51.4653,-0.214,4.5,Description_5,Wandsworth,Wandsworth,Wandsworth,2026-05-29T08:00:00Z,Weather_Condition_5
+us_accidents-6,10,2026-05-29T07:00:00Z,2026-05-29T07:00:00Z,51.5465,-0.1058,5.25,Description_6,Islington,Islington,Islington,2026-05-29T07:00:00Z,Weather_Condition_6
+us_accidents-7,10,2026-05-29T06:00:00Z,2026-05-29T06:00:00Z,51.4746,-0.0357,6.0,Description_7,Lewisham,Lewisham,Lewisham,2026-05-29T06:00:00Z,Weather_Condition_7
+us_accidents-8,10,2026-05-29T05:00:00Z,2026-05-29T05:00:00Z,51.4014,-0.1958,6.75,Description_8,Merton,Merton,Merton,2026-05-29T05:00:00Z,Weather_Condition_8
+us_accidents-9,6,2026-05-29T04:00:00Z,2026-05-29T04:00:00Z,51.5761,-0.1458,7.5,Description_9,Haringey,Haringey,Haringey,2026-05-29T04:00:00Z,Weather_Condition_9
+us_accidents-10,10,2026-05-29T03:00:00Z,2026-05-29T03:00:00Z,51.6029,-0.194,8.25,Description_10,Barnet,Barnet,Barnet,2026-05-29T03:00:00Z,Weather_Condition_10
