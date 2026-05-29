@@ -211,7 +211,7 @@ data "google_compute_network" "selected" {
 }
 
 data "google_compute_image" "ubuntu" {
-  family  = "ubuntu-2204-lts"
+  name    = "ubuntu-2204-jammy-v20260517"
   project = "ubuntu-os-cloud"
 
   depends_on = [
