@@ -151,38 +151,78 @@ spatial_scope:
 modes:
   small_demo:
     core_start: '2024-01-01'
-    core_end: '2024-01-31'
+    core_end: '2024-01-01'
     transport_start: '2024-01-01'
-    transport_end: '2024-12-31'
+    transport_end: '2024-01-01'
     transport_start_year: 2024
     transport_end_year: 2024
-    borough_limit: 3
-    londonair_site_limit: 3
+    borough_limit: 1
+    londonair_site_limit: 1
     londonair_species:
     - NO2
-    openaq_location_limit: 5
-    openaq_sensor_limit: 2
-    waqi_station_limit: 5
-    openweather_borough_limit: 3
+    openaq_location_limit: 1
+    openaq_sensor_limit: 1
+    waqi_station_limit: 1
+    openweather_borough_limit: 1
     ncei_station_limit: 1
-    dft_page_limit: 2
+    dft_page_limit: 1
+    openmeteo_options:
+      air_quality_hourly:
+      - pm10
+      weather_hourly:
+      - temperature_2m
     openmeteo_historical_weather_options:
       start_date: '2024-01-01'
-      end_date: '2024-01-31'
+      end_date: '2024-01-01'
+      bbox:
+        lat_min: 51.5074
+        lat_max: 51.5074
+        lon_min: -0.1278
+        lon_max: -0.1278
+      grid_spacing_km: 100
+      max_locations_per_request: 1
       hourly:
       - temperature_2m
-      - relative_humidity_2m
-      - precipitation
-      - rain
-      - cloud_cover
-      - pressure_msl
-      - wind_speed_10m
-      - wind_direction_10m
+    londonair_options:
+      health_advice_indexes:
+      - 1
     ukair_air_quality_archive_options:
-      site_limit: 3
+      site_limit: 1
       year_start: 2025
       year_end: 2025
       max_files_per_site: 1
+      path_groups:
+      - site_data
+    openaq_options:
+      page_limit: 10
+      include_parameters: false
+      include_sensor_details: false
+    ncei_options:
+      page_limit: 10
+      reference_endpoints: []
+      datatypes:
+      - TAVG
+    openweather_options:
+      include_one_call: false
+      include_weather_overview: false
+      include_day_summary: false
+      include_history: false
+      include_current_weather_fallback: true
+      include_air_pollution_current: true
+      include_air_pollution_forecast: false
+    stats19_options:
+      selected_groups:
+      - latest_final_year
+      selected_tables:
+      - collisions
+    dft_road_traffic_options:
+      page_size: 50
+    tfl_line_status_options:
+      selected_line_ids:
+      - bakerloo
+    tfl_arrivals_options:
+      selected_stop_ids:
+      - 940GZZLUKSX
   full_demo:
     core_start: '2020-01-01'
     core_end: '2025-12-31'
@@ -262,7 +302,6 @@ sources:
   - naptan
   - london_journeys
   - dft
-  - tfl
   - tfl_line_status
   - tfl_arrivals
   core_historical:
