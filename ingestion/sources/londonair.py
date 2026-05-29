@@ -214,6 +214,7 @@ def download_londonair(run: SourceRun, context: DownloadContext) -> None:
                     f"index_days/site={sanitize_segment(site_code)}"
                     f"/species={sanitize_segment(species_code)}/period={sanitize_segment(period)}.json"
                 ),
+                skip_on_400=True,
             )
 
 def londonair_endpoint(opts: dict[str, Any], env_name: str, option_key: str, default: str) -> str:
