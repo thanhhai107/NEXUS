@@ -1,11 +1,11 @@
-station_uid,observed_at,aqi,dominant_pollutant,city
-700,2026-05-19T12:00:00Z,40,pm25,London
-701,2026-05-19T11:00:00Z,43,o3,London
-702,2026-05-19T10:00:00Z,46,no2,London
-703,2026-05-19T09:00:00Z,49,pm25,London
-704,2026-05-19T08:00:00Z,52,o3,London
-705,2026-05-19T07:00:00Z,55,no2,London
-706,2026-05-19T06:00:00Z,58,pm25,London
-707,2026-05-19T05:00:00Z,61,o3,London
-708,2026-05-19T04:00:00Z,64,no2,London
-709,2026-05-19T03:00:00Z,67,pm25,London
+station_uid,station_name,aqi,observed_at,city,latitude,longitude,dominant_pollutant,idx,time,station,dominentpol,iaqi,forecast,weather
+waqi-london-001,London Westminster,35,2026-05-29T12:00:00Z,Westminster,51.5074,-0.1278,pm25,1,12:00,GHCND:UKM00003770,dominentpol_1,{},{},weather_1
+waqi-london-002,London City of London,39,2026-05-29T11:00:00Z,City of London,51.5155,-0.0922,pm10,2,11:00,GHCND:UKM00003771,dominentpol_2,{},{},weather_2
+waqi-london-003,London Camden,43,2026-05-29T10:00:00Z,Camden,51.5416,-0.143,no2,3,10:00,GHCND:UKM00003772,dominentpol_3,{},{},weather_3
+waqi-london-004,London Southwark,47,2026-05-29T09:00:00Z,Southwark,51.4893,-0.0882,o3,4,09:00,GHCND:UKM00003773,dominentpol_4,{},{},weather_4
+waqi-london-005,London Wandsworth,51,2026-05-29T08:00:00Z,Wandsworth,51.4653,-0.214,so2,5,08:00,GHCND:UKM00003774,dominentpol_5,{},{},weather_5
+waqi-london-006,London Islington,55,2026-05-29T07:00:00Z,Islington,51.5465,-0.1058,co,6,07:00,GHCND:UKM00003770,dominentpol_6,{},{},weather_6
+waqi-london-007,London Lewisham,59,2026-05-29T06:00:00Z,Lewisham,51.4746,-0.0357,pm25,7,06:00,GHCND:UKM00003771,dominentpol_7,{},{},weather_7
+waqi-london-008,London Merton,63,2026-05-29T05:00:00Z,Merton,51.4014,-0.1958,pm10,8,05:00,GHCND:UKM00003772,dominentpol_8,{},{},weather_8
+waqi-london-009,London Haringey,67,2026-05-29T04:00:00Z,Haringey,51.5761,-0.1458,no2,9,04:00,GHCND:UKM00003773,dominentpol_9,{},{},weather_9
+waqi-london-010,London Barnet,71,2026-05-29T03:00:00Z,Barnet,51.6029,-0.194,o3,10,03:00,GHCND:UKM00003774,dominentpol_10,{},{},weather_10
