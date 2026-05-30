@@ -534,6 +534,19 @@ $DOCKER run --rm \
   /opt/nexus/infra/spark/spark-submit-wrapper.sh "$@"
 EOF
   chmod 0755 /usr/local/bin/nexus-spark-submit
+
+  # Deploy nexus-run-workers helper
+  if [ -f "$${NEXUS_APP_DIR}/infra/terraform/aws/scripts/nexus-run-workers.sh" ]; then
+    cp "$${NEXUS_APP_DIR}/infra/terraform/aws/scripts/nexus-run-workers.sh" /usr/local/bin/nexus-run-workers
+    chmod 0755 /usr/local/bin/nexus-run-workers
+  fi
+  if [ ! -f /etc/nexus-workers ] && [ -n "$${NEXUS_MINIO_PEER_IPS}" ]; then
+    for ip in $${NEXUS_MINIO_PEER_IPS}; do
+      if [ "$${ip}" != "$${NEXUS_MASTER_PRIVATE_IP}" ] && [ "$${ip}" != "$${NEXUS_NODE_IP}" ]; then
+        echo "$${ip}" >> /etc/nexus-workers
+      fi
+    done
+  fi
 }
 
 # ===========================================================================
