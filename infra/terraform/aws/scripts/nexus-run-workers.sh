@@ -5,7 +5,14 @@
 set -euo pipefail
 
 CONFIG_FILE="/etc/nexus-workers"
-SSH_KEY="${HOME}/.ssh/id_ed25519_nexus_cluster"
+
+# When run with sudo, HOME points to /root; resolve the actual user's home
+if [ -n "${SUDO_USER:-}" ]; then
+  REAL_HOME="$(getent passwd "${SUDO_USER}" | cut -d: -f6)"
+else
+  REAL_HOME="${HOME}"
+fi
+SSH_KEY="${REAL_HOME}/.ssh/id_ed25519_nexus_cluster"
 SSH_USER="${SSH_USER:-ubuntu}"
 REMOTE_CMD="${1:-}"
 
