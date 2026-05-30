@@ -502,6 +502,153 @@ class S3StorageBackend(StorageBackend):
 
 
 # =============================================================================
+# S3/MINIO BACKEND - ADVANCED FEATURES
+# =============================================================================
+
+    def write_multipart_jsonl(
+        self,
+        path: str,
+        records: Iterable[dict[str, Any]],
+        chunk_size: int = 5 * 1024 * 1024,  # 5MB chunks for S3 multipart
+    ) -> str:
+        """Write large JSONL data using S3 multipart upload.
+        
+        Args:
+            path: S3 path
+            records: Iterator of records
+            chunk_size: Size per chunk in bytes
+            
+        Returns:
+            S3 URL of written file
+        """
+        self._ensure_client()
+        
+        # Use streaming upload for efficiency
+        import io
+        
+        buffer = io.BytesIO()
+        total_size = 0
+        
+        for record in records:
+            line = json.dumps(record, ensure_ascii=False) + "\n"
+            line_bytes = line.encode("utf-8")
+            buffer.write(line_bytes)
+            total_size += len(line_bytes)
+        
+        buffer.seek(0)
+        
+        # For files under 5MB, use regular put_object
+        if total_size < chunk_size:
+            return self.write_bytes(path, buffer.getvalue())
+        
+        # Use multipart upload for larger files
+        multipart = self._client.create_multipart_upload(
+            Bucket=self._bucket,
+            Key=path,
+            ContentType="application/jsonl",
+        )
+        
+        upload_id = multipart["UploadId"]
+        parts = []
+        part_number = 1
+        
+        try:
+            while True:
+                chunk = buffer.read(chunk_size)
+                if not chunk:
+                    break
+                
+                part = self._client.upload_part(
+                    Bucket=self._bucket,
+                    Key=path,
+                    UploadId=upload_id,
+                    PartNumber=part_number,
+                    Body=chunk,
+                )
+                parts.append({
+                    "PartNumber": part_number,
+                    "ETag": part["ETag"],
+                })
+                part_number += 1
+            
+            # Complete multipart upload
+            self._client.complete_multipart_upload(
+                Bucket=self._bucket,
+                Key=path,
+                UploadId=upload_id,
+                MultipartUpload={"Parts": parts},
+            )
+            
+        except Exception as e:
+            # Abort on failure
+            self._client.abort_multipart_upload(
+                Bucket=self._bucket,
+                Key=path,
+                UploadId=upload_id,
+            )
+            raise
+        
+        return f"s3://{self._bucket}/{path}"
+    
+    def read_streaming(
+        self,
+        path: str,
+        chunk_size: int = 64 * 1024,
+    ) -> Iterator[bytes]:
+        """Read file as streaming chunks.
+        
+        Args:
+            path: S3 path
+            chunk_size: Size per chunk
+            
+        Yields:
+            Chunks of bytes
+        """
+        self._ensure_client()
+        
+        response = self._client.get_object(
+            Bucket=self._bucket,
+            Key=path,
+            StreamingBody=True,
+        )
+        
+        stream = response["Body"]
+        while True:
+            chunk = stream.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+    
+    def list_partitions(
+        self,
+        base_path: str,
+        partition_key: str = "partition",
+    ) -> list[int]:
+        """List available partition numbers.
+        
+        Args:
+            base_path: Base path containing partitions
+            partition_key: Partition key name
+            
+        Returns:
+            List of partition numbers
+        """
+        prefix = f"{base_path}/{partition_key}="
+        paths = self.list(prefix)
+        
+        partitions = set()
+        for path in paths:
+            # Extract partition number from path like "base/partition=0/file.json"
+            try:
+                part = path.split(f"{partition_key}=")[1].split("/")[0]
+                partitions.add(int(part))
+            except (IndexError, ValueError):
+                continue
+        
+        return sorted(partitions)
+
+
+# =============================================================================
 # STORAGE FACTORY & SINGLETON
 # =============================================================================
 
