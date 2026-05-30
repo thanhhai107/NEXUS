@@ -29,11 +29,23 @@ def main() -> int:
     project_root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(project_root))
 
-    from dotenv import load_dotenv
+    # Load .env file (try dotenv first, fallback to manual parsing)
     env_path = project_root / ".env"
     if env_path.exists():
-        load_dotenv(env_path, override=False)
-        print(f"\n[*] Loaded .env from: {env_path}")
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(env_path, override=False)
+            print(f"\n[*] Loaded .env from: {env_path}")
+        except ImportError:
+            # Manual fallback: read .env file
+            print(f"\n[*] Loading .env manually (dotenv not installed)...")
+            with open(env_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        key, _, value = line.partition("=")
+                        if os.getenv(key) is None:
+                            os.environ[key] = value.strip('"').strip("'")
     else:
         print(f"\n[!] No .env found at: {env_path}")
 
