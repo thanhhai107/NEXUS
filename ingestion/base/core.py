@@ -103,19 +103,12 @@ class SourceRun:
         self.staging_dir = self.base_dir / "staging"
         self.published_dir = self.base_dir / "published"
         self.metadata_dir = self.base_dir / "metadata"
-        
-        # Create directories (local filesystem needs explicit creation)
-        # S3 handles this implicitly, but VM uses local filesystem
-        from common.storage import S3StorageBackend
-        storage = get_storage()
-        is_s3 = isinstance(storage, S3StorageBackend)
 
-        if not is_s3:
-            # Local filesystem (including VM mode with /data/) needs directories created
-            self.raw_dir.mkdir(parents=True, exist_ok=True)
-            self.staging_dir.mkdir(parents=True, exist_ok=True)
-            self.published_dir.mkdir(parents=True, exist_ok=True)
-            self.metadata_dir.mkdir(parents=True, exist_ok=True)
+        # Create directories for all storage backends
+        # Local filesystem needs explicit mkdir
+        # S3 doesn't need it, but doesn't hurt either
+        for dir_path in [self.raw_dir, self.staging_dir, self.published_dir, self.metadata_dir]:
+            dir_path.mkdir(parents=True, exist_ok=True)
         
         # File paths
         self.request_log_path = self.metadata_dir / "request_log.jsonl"

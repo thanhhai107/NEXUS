@@ -140,6 +140,17 @@ class StorageBackend(ABC):
             Raw bytes
         """
         pass
+
+    def mkdir(self, path: str) -> None:
+        """Create a directory/path prefix.
+        
+        For S3, this creates an empty object with trailing slash marker.
+        For local filesystem, this creates actual directory.
+        
+        Args:
+            path: Directory path to create
+        """
+        pass
     
     @abstractmethod
     def exists(self, path: str) -> bool:
@@ -323,7 +334,11 @@ class LocalStorageBackend(StorageBackend):
     
     def exists(self, path: str) -> bool:
         return self._resolve(path).exists()
-    
+
+    def mkdir(self, path: str) -> None:
+        """Create a directory."""
+        self._resolve(path).mkdir(parents=True, exist_ok=True)
+
     def list(self, prefix: str = "") -> list[str]:
         base = self._resolve(prefix) if prefix else self.base_path
         
@@ -347,10 +362,7 @@ class LocalStorageBackend(StorageBackend):
             file_path.unlink()
             return True
         return False
-    
-    def mkdir(self, path: str) -> None:
-        self._resolve(path).mkdir(parents=True, exist_ok=True)
-    
+
     def get_full_path(self, path: str) -> str:
         return str(self._resolve(path))
 
