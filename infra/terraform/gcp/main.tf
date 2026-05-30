@@ -156,6 +156,12 @@ variable "nexus_repo_ref" {
   default     = "master"
 }
 
+variable "create_static_ip" {
+  description = "Allocate and attach a static external IP to the master instance."
+  type        = bool
+  default     = true
+}
+
 locals {
   cluster_tag = "${var.cluster_name}-cluster"
   master_tag  = "${var.cluster_name}-master"
@@ -193,6 +199,29 @@ locals {
   worker_zones = [
     for index in range(var.worker_count) : var.worker_zones[index % length(var.worker_zones)]
   ]
+
+  startup_vars = {
+    cluster_name                  = var.cluster_name
+    worker_count                  = var.worker_count
+    nexus_repo_url                = var.nexus_repo_url
+    nexus_repo_ref                = var.nexus_repo_ref
+    ssh_user                      = var.ssh_user
+    enable_ssh_password_login     = var.enable_ssh_password_login
+    ssh_password                  = var.ssh_password
+    enable_master_worker_ssh      = var.enable_master_worker_ssh
+    master_worker_private_key_b64 = var.enable_master_worker_ssh ? base64encode(tls_private_key.master_worker[0].private_key_openssh) : ""
+    minio_peer_ips = join(" ", compact([
+      google_compute_instance.master.network_interface[0].network_ip,
+      try(google_compute_instance.workers[0].network_interface[0].network_ip, ""),
+      try(google_compute_instance.workers[1].network_interface[0].network_ip, ""),
+      try(google_compute_instance.workers[2].network_interface[0].network_ip, ""),
+    ]))
+    zk_peer_ips = join(" ", compact([
+      google_compute_instance.master.network_interface[0].network_ip,
+      try(google_compute_instance.workers[0].network_interface[0].network_ip, ""),
+      try(google_compute_instance.workers[1].network_interface[0].network_ip, ""),
+    ]))
+  }
 }
 
 resource "tls_private_key" "master_worker" {
@@ -263,7 +292,18 @@ resource "google_compute_firewall" "master_ui" {
 
   allow {
     protocol = "tcp"
-    ports    = ["8000", "8080", "8081", "8085", "8088", "9001"]
+    ports    = [
+      "8000",   # Nexus API
+      "8080",   # Airflow
+      "8081",   # Spark Master UI
+      "8085",   # Trino
+      "8088",   # Superset
+      "9001",   # MinIO Console
+      "9002",   # MinIO API node 2
+      "29092",  # Kafka broker 1
+      "29093",  # Kafka broker 2
+      "29094",  # Kafka broker 3
+    ]
   }
 }
 
@@ -351,7 +391,7 @@ resource "google_compute_instance" "master" {
   network_interface {
     network = data.google_compute_network.selected.self_link
     access_config {
-      nat_ip = google_compute_address.master_ip.address
+      nat_ip = var.create_static_ip ? google_compute_address.master_ip[0].address : null
     }
   }
 
@@ -359,7 +399,11 @@ resource "google_compute_instance" "master" {
     nexus-node-role = "master"
   })
 
-  metadata_startup_script = file("${path.module}/scripts/startup.sh")
+  metadata_startup_script = templatefile("${path.module}/scripts/startup.sh", merge(local.startup_vars, {
+    nexus_node_role   = "master"
+    nexus_node_index  = ""
+    master_private_ip = ""
+  }))
 
   service_account {
     email  = google_service_account.vm.email
@@ -398,7 +442,11 @@ resource "google_compute_instance" "workers" {
     nexus-master-private-ip = google_compute_instance.master.network_interface[0].network_ip
   })
 
-  metadata_startup_script = file("${path.module}/scripts/startup.sh")
+  metadata_startup_script = templatefile("${path.module}/scripts/startup.sh", merge(local.startup_vars, {
+    nexus_node_role   = "worker"
+    nexus_node_index  = tostring(count.index + 1)
+    master_private_ip = google_compute_instance.master.network_interface[0].network_ip
+  }))
 
   service_account {
     email  = google_service_account.vm.email
@@ -407,12 +455,14 @@ resource "google_compute_instance" "workers" {
 }
 
 resource "google_compute_address" "master_ip" {
+  count  = var.create_static_ip ? 1 : 0
   name   = "nexus-master-ip"
   region = var.region
 }
 
 output "master_static_ip" {
-  value = google_compute_address.master_ip.address
+  description = "Master node public IP address."
+  value       = var.create_static_ip ? google_compute_address.master_ip[0].address : google_compute_instance.master.network_interface[0].access_config[0].nat_ip
 }
 
 output "master" {
@@ -420,8 +470,8 @@ output "master" {
     name       = google_compute_instance.master.name
     zone       = google_compute_instance.master.zone
     private_ip = google_compute_instance.master.network_interface[0].network_ip
-    public_ip  = google_compute_instance.master.network_interface[0].access_config[0].nat_ip
-    ssh        = "ssh ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}"
+    public_ip  = var.create_static_ip ? google_compute_address.master_ip[0].address : google_compute_instance.master.network_interface[0].access_config[0].nat_ip
+    ssh        = "ssh ${var.ssh_user}@${var.create_static_ip ? google_compute_address.master_ip[0].address : google_compute_instance.master.network_interface[0].access_config[0].nat_ip}"
   }
 }
 
@@ -432,23 +482,23 @@ output "workers" {
       zone       = worker.zone
       private_ip = worker.network_interface[0].network_ip
       public_ip  = ""
-      ssh        = "ssh -J ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip} ${var.ssh_user}@${worker.network_interface[0].network_ip}"
+      ssh        = "ssh -J ${var.ssh_user}@${var.create_static_ip ? google_compute_address.master_ip[0].address : google_compute_instance.master.network_interface[0].access_config[0].nat_ip} ${var.ssh_user}@${worker.network_interface[0].network_ip}"
     }
   ]
 }
 
 output "service_urls" {
   value = {
-    nexus_api           = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8000/docs"
-    nexus_airflow       = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8080"
-    nexus_spark_master  = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8081"
-    nexus_trino         = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8085"
-    nexus_superset      = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8088"
-    nexus_minio_console = "http://${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:9001"
+    nexus_api           = "http://${var.create_static_ip ? google_compute_address.master_ip[0].address : google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8000/docs"
+    nexus_airflow       = "http://${var.create_static_ip ? google_compute_address.master_ip[0].address : google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8080"
+    nexus_spark_master  = "http://${var.create_static_ip ? google_compute_address.master_ip[0].address : google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8081"
+    nexus_trino         = "http://${var.create_static_ip ? google_compute_address.master_ip[0].address : google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8085"
+    nexus_superset      = "http://${var.create_static_ip ? google_compute_address.master_ip[0].address : google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:8088"
+    nexus_minio_console = "http://${var.create_static_ip ? google_compute_address.master_ip[0].address : google_compute_instance.master.network_interface[0].access_config[0].nat_ip}:9001"
   }
 }
 
 output "nexus_tunnel_command" {
   description = "Use this when you need local access to Nexus services without exposing them publicly."
-  value       = "ssh -L 8000:127.0.0.1:8000 -L 8080:127.0.0.1:8080 -L 8081:127.0.0.1:8081 -L 8085:127.0.0.1:8085 -L 8088:127.0.0.1:8088 -L 9000:127.0.0.1:9000 -L 9001:127.0.0.1:9001 ${var.ssh_user}@${google_compute_instance.master.network_interface[0].access_config[0].nat_ip}"
+  value       = "ssh -L 8000:127.0.0.1:8000 -L 8080:127.0.0.1:8080 -L 8081:127.0.0.1:8081 -L 8085:127.0.0.1:8085 -L 8088:127.0.0.1:8088 -L 9000:127.0.0.1:9000 -L 9001:127.0.0.1:9001 -L 29092:127.0.0.1:29092 ${var.ssh_user}@${var.create_static_ip ? google_compute_address.master_ip[0].address : google_compute_instance.master.network_interface[0].access_config[0].nat_ip}"
 }
