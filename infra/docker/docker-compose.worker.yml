@@ -16,6 +16,7 @@ services:
       ZOOKEEPER_INIT_LIMIT: 5
       ZOOKEEPER_SYNC_LIMIT: 2
       ZOOKEEPER_SERVERS: ${ZK_SERVERS}
+      ZOOKEEPER_ADMIN_SERVER_PORT: 8089
 
   zookeeper-3:
     image: confluentinc/cp-zookeeper:7.6.1
@@ -29,6 +30,7 @@ services:
       ZOOKEEPER_INIT_LIMIT: 5
       ZOOKEEPER_SYNC_LIMIT: 2
       ZOOKEEPER_SERVERS: ${ZK_SERVERS}
+      ZOOKEEPER_ADMIN_SERVER_PORT: 8089
 
   # =========================================================================
   # Kafka broker (worker-1: id=2, worker-2: id=3)
@@ -192,7 +194,7 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW_DB_URL}
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CELERY__BROKER_URL: ${AIRFLOW_CELERY_BROKER_URL}
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@${NEXUS_MASTER_PRIVATE_IP}:5432/airflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@${NEXUS_MASTER_PRIVATE_IP}:5433/airflow
       AIRFLOW__WEBSERVER__SECRET_KEY: nexus-local-secret
       NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
       NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DB_URL}
@@ -207,6 +209,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
       NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
+      HOSTNAME: worker-remote
     command: celery worker
     volumes:
       - ../../orchestration/airflow/dags:/opt/airflow/dags

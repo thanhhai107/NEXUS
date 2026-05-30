@@ -255,11 +255,16 @@ for ip in "$${zk_ips[@]}"; do
 done
 
 # Build MinIO peer command
-minio_cmd=""
-for ip in $minio_peers; do
-  if [ -n "$minio_cmd" ]; then minio_cmd+=" "; fi
-  minio_cmd+="http://$${ip}:9000/data"
-done
+IFS=' ' read -r -a minio_ips <<< "$minio_peers"
+if [ "$${#minio_ips[@]}" -le 1 ]; then
+  minio_cmd="/data"
+else
+  minio_cmd=""
+  for ip in "$${minio_ips[@]}"; do
+    if [ -n "$minio_cmd" ]; then minio_cmd+=" "; fi
+    minio_cmd+="http://$${ip}:9000/data"
+  done
+fi
 
 # Build Kafka bootstrap servers
 kafka_servers=""
@@ -299,7 +304,7 @@ set_env_value .env SUPERSET_ADMIN_USERNAME "$${SUPERSET_ADMIN_USERNAME:-admin}"
 set_env_value .env SUPERSET_ADMIN_PASSWORD "$${SUPERSET_ADMIN_PASSWORD:-admin}"
 set_env_value .env AIRFLOW_ADMIN_USERNAME "$${AIRFLOW_ADMIN_USERNAME:-admin}"
 set_env_value .env AIRFLOW_ADMIN_PASSWORD "$${AIRFLOW_ADMIN_PASSWORD:-admin}"
-set_env_value .env AIRFLOW_DB_URL "postgresql+psycopg2://airflow:airflow@$${master_ip}:5432/airflow"
+set_env_value .env AIRFLOW_DB_URL "postgresql+psycopg2://airflow:airflow@$${master_ip}:5433/airflow"
 set_env_value .env AIRFLOW_CELERY_BROKER_URL "redis://:@$${master_ip}:6379/0"
 set_env_value .env NEXUS_GOVERNANCE_DATABASE_URL "postgresql://nexus_governance:nexus_governance@governance-db-primary:5432/nexus_governance"
 set_env_value .env NEXUS_GOVERNANCE_DB_URL "postgresql://nexus_governance:nexus_governance@$${master_ip}:5432/nexus_governance"
@@ -334,7 +339,7 @@ worker_count="${NEXUS_WORKER_COUNT:-4}"
 if [ "$worker_count" -ge 1 ]; then
   for peer_ip in $minio_peers; do
     if [ "$peer_ip" != "$master_ip" ]; then
-      echo "        server ${peer_ip}:8002;" >> "${NEXUS_APP_DIR}/runtime/nginx-api-lb.conf"
+      echo "        server ${peer_ip}:8000;" >> "${NEXUS_APP_DIR}/runtime/nginx-api-lb.conf"
       break
     fi
   done
@@ -345,7 +350,7 @@ if [ "$worker_count" -ge 2 ]; then
     if [ "$peer_ip" != "$master_ip" ]; then
       count=$((count + 1))
       if [ "$count" -eq 2 ]; then
-        echo "        server ${peer_ip}:8003;" >> "${NEXUS_APP_DIR}/runtime/nginx-api-lb.conf"
+        echo "        server ${peer_ip}:8000;" >> "${NEXUS_APP_DIR}/runtime/nginx-api-lb.conf"
         break
       fi
     fi
@@ -529,6 +534,19 @@ $DOCKER run --rm \
   /opt/nexus/infra/spark/spark-submit-wrapper.sh "$@"
 EOF
   chmod 0755 /usr/local/bin/nexus-spark-submit
+
+  # Deploy nexus-run-workers helper
+  if [ -f "$${NEXUS_APP_DIR}/infra/terraform/aws/scripts/nexus-run-workers.sh" ]; then
+    cp "$${NEXUS_APP_DIR}/infra/terraform/aws/scripts/nexus-run-workers.sh" /usr/local/bin/nexus-run-workers
+    chmod 0755 /usr/local/bin/nexus-run-workers
+  fi
+  if [ ! -f /etc/nexus-workers ] && [ -n "$${NEXUS_MINIO_PEER_IPS}" ]; then
+    for ip in $${NEXUS_MINIO_PEER_IPS}; do
+      if [ "$${ip}" != "$${NEXUS_MASTER_PRIVATE_IP}" ] && [ "$${ip}" != "$${NEXUS_NODE_IP}" ]; then
+        echo "$${ip}" >> /etc/nexus-workers
+      fi
+    done
+  fi
 }
 
 # ===========================================================================

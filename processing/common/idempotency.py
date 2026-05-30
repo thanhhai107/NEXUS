@@ -127,3 +127,4 @@ def write_idempotent_iceberg(
         """
     )
     return keys
+``
