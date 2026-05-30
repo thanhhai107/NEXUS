@@ -96,7 +96,7 @@ def get_runtime_mode() -> str:
 
 def is_vm_mode() -> bool:
     """Check if running in VM mode (using /data/).
-    
+
     Returns:
         True if NEXUS_RUNTIME_MODE=vm or NEXUS_FORCE_VM=true
         (NEXUS_FORCE_GCP is still accepted for backward compatibility)
@@ -104,6 +104,90 @@ def is_vm_mode() -> bool:
     if os.getenv("NEXUS_FORCE_VM") or os.getenv("NEXUS_FORCE_GCP"):
         return True
     return get_runtime_mode() == "vm"
+
+
+def is_distributed_mode() -> bool:
+    """Check if running in distributed execution mode (worker cluster).
+
+    Unlike is_vm_mode() which only checks data storage location,
+    this checks if work is being distributed across multiple workers.
+
+    Returns:
+        True if:
+        - NEXUS_DISTRIBUTED_MODE=true|1|yes|on
+        - AIRFLOW_WORKER_NUMBER is set (Airflow CeleryExecutor)
+        - KUBERNETES_SERVICE_HOST is set (K8s)
+        - SPARK_EXECUTOR_ID is set (Spark)
+    """
+    # Explicit config
+    val = os.getenv("NEXUS_DISTRIBUTED_MODE", "").lower()
+    if val in {"1", "true", "yes", "on"}:
+        return True
+    if val in {"0", "false", "no", "off"}:
+        return False
+
+    # Auto-detect from orchestration environment
+    if os.getenv("AIRFLOW_WORKER_NUMBER") is not None:
+        return True
+    if os.getenv("KUBERNETES_SERVICE_HOST"):
+        return True
+    if os.getenv("SPARK_EXECUTOR_ID") is not None:
+        return True
+
+    return False
+
+
+def get_worker_count() -> int:
+    """Get total number of workers available.
+
+    Returns:
+        Number of workers (from environment or local config)
+    """
+    # Try Airflow
+    if os.getenv("AIRFLOW_WORKERS"):
+        return int(os.getenv("AIRFLOW_WORKERS", "1"))
+    # Try Kubernetes
+    if os.getenv("REPLICAS"):
+        return int(os.getenv("REPLICAS", "1"))
+    # Try Spark
+    if os.getenv("SPARK_EXECUTOR_INSTANCES"):
+        return int(os.getenv("SPARK_EXECUTOR_INSTANCES", "1"))
+    # Default from config
+    return int(os.getenv("NEXUS_LOCAL_WORKERS", "1"))
+
+
+def get_execution_mode() -> str:
+    """Get detailed execution mode description.
+
+    Returns:
+        One of:
+        - "local_single" - Single process, local data
+        - "local_multi" - Multiple workers, local data
+        - "distributed_single" - Single worker in distributed cluster
+        - "distributed_multi" - Multiple workers in distributed cluster
+    """
+    import os as _os
+
+    distributed = is_distributed_mode()
+
+    # Get worker count
+    if _os.getenv("AIRFLOW_WORKERS"):
+        workers = int(_os.getenv("AIRFLOW_WORKERS", "1"))
+    elif _os.getenv("REPLICAS"):
+        workers = int(_os.getenv("REPLICAS", "1"))
+    elif _os.getenv("SPARK_EXECUTOR_INSTANCES"):
+        workers = int(_os.getenv("SPARK_EXECUTOR_INSTANCES", "1"))
+    else:
+        workers = int(_os.getenv("NEXUS_LOCAL_WORKERS", "1"))
+
+    if distributed:
+        if workers > 1:
+            return "distributed_multi"
+        return "distributed_single"
+    else:
+        if workers > 1:
+            return "local_multi"
+        return "local_single"
 
 
 # ============================================================================

@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, TypeVar
 
-from common.config import get_runtime_mode, is_vm_mode
+from common.config import get_runtime_mode, get_execution_mode, is_distributed_mode, is_vm_mode
 
 
 T = TypeVar("T")
@@ -126,21 +126,20 @@ def _detect_spark_workers() -> tuple[int, int, str]:
 
 def get_worker_info() -> WorkerInfo:
     """Detect worker information for the current process.
-    
+
     Auto-detects the execution environment and returns appropriate worker info.
-    
+
     Returns:
         WorkerInfo with current worker details
     """
     import os
-    
+
     hostname = socket.gethostname()
     pid = os.getpid()
-    
-    # Check environment for distributed mode
-    runtime_mode = get_runtime_mode()
-    is_distributed = runtime_mode == "vm"
-    
+
+    # Use is_distributed_mode() for proper distributed detection
+    is_distributed = is_distributed_mode()
+
     # Try to detect from environment
     if os.getenv("AIRFLOW_HOME") or os.getenv("AIRFLOW_WORKER_NUMBER"):
         worker_index, total_workers, worker_id = _detect_airflow_workers()
