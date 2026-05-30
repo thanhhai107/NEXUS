@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-import requests
+import boto3
 
 from common.semantic import load_semantic_contract
 from governance.agents.decision_schema import AgentDecision
@@ -58,36 +58,27 @@ def _collect_evidence(dataset_name: str, batch_id: str) -> dict[str, Any]:
 
 
 def _llm_decision(evidence: dict[str, Any]) -> AgentDecision | None:
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        return None
-
-    model = os.getenv("NEXUS_AGENT_MODEL", "gemini-2.5-flash")
-    base_url = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
-    url = f"{base_url}/models/{model}:generateContent?key={api_key}"
-
-    payload = {
-        "system_instruction": {
-            "parts": [{"text": "Return only valid JSON. Do not include markdown."}]
-        },
-        "contents": [
-            {"role": "user", "parts": [{"text": build_prompt(evidence)}]}
-        ],
-        "generationConfig": {
-            "temperature": 0,
-            "responseMimeType": "application/json",
-        }
-    }
+    region = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+    model = os.getenv("NEXUS_AGENT_MODEL", "amazon.nova-pro-v1:0")
 
     try:
-        response = requests.post(
-            url,
-            headers={"Content-Type": "application/json"},
-            json=payload,
-            timeout=30,
+        client = boto3.client("bedrock-runtime", region_name=region)
+    except Exception as exc:
+        import sys
+        print(f"Warning: Bedrock client creation failed: {exc}", file=sys.stderr)
+        return None
+
+    system_prompt = "Return only valid JSON. Do not include markdown."
+    user_prompt = build_prompt(evidence)
+
+    try:
+        response = client.converse(
+            modelId=model,
+            system=[{"text": system_prompt}],
+            messages=[{"role": "user", "content": [{"text": user_prompt}]}],
+            inferenceConfig={"temperature": 0},
         )
-        response.raise_for_status()
-        content = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+        content = response["output"]["message"]["content"][0]["text"]
         parsed = json.loads(content)
         parsed["dataset_name"] = evidence["dataset_name"]
         parsed["batch_id"] = evidence["batch_id"]

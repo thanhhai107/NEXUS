@@ -56,9 +56,9 @@ def context(
     )
 
 
-def test_raw_adapter_default_output_uses_raw_landing_zone() -> None:
+def test_raw_adapter_default_output_uses_bronze_landing_zone() -> None:
     assert raw_adapter.RAW_OUTPUT_DIR == RAW_DIR
-    assert raw_adapter.RAW_OUTPUT_DIR.name == "raw"
+    assert raw_adapter.RAW_OUTPUT_DIR.name == "bronze"
 
 
 def test_source_run_writes_checkpoint_manifest_and_published_manifest(tmp_path: Path) -> None:

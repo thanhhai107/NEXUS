@@ -108,8 +108,7 @@ x-airflow-environment: &airflow-environment
   AIRFLOW__WEBSERVER__SECRET_KEY: nexus-local-secret
   AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
   AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-db:5432/airflow
-  NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
-  NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db-primary:5432/nexus_governance}
+  NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-local}
   NEXUS_GX_ENABLED: ${NEXUS_GX_ENABLED:-true}
   KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-}
   KAFKA_TOPIC_TRANSPORT_EVENTS: ${KAFKA_TOPIC_TRANSPORT_EVENTS:-transport-events}
@@ -119,9 +118,8 @@ x-airflow-environment: &airflow-environment
   OPENLINEAGE_ENDPOINT: ${OPENLINEAGE_ENDPOINT:-/api/v1/lineage}
   OPENLINEAGE_NAMESPACE: ${OPENLINEAGE_NAMESPACE:-nexus}
   OPENLINEAGE_TIMEOUT_SECONDS: ${OPENLINEAGE_TIMEOUT_SECONDS:-5}
-  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-  GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
-  NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
+  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+  NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-amazon.nova-pro-v1:0}
 
 x-host-access: &host-access
   extra_hosts:
@@ -231,33 +229,6 @@ services:
       timeout: 5s
       retries: 10
 
-  governance-db-primary:
-    image: postgres:16
-    container_name: nexus-governance-db-primary
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: nexus_governance
-      POSTGRES_PASSWORD: nexus_governance
-      POSTGRES_DB: nexus_governance
-      POSTGRES_REPLICATION_PASSWORD: nexus_replication
-    command: >
-      -c wal_level=replica
-      -c max_wal_senders=5
-      -c max_replication_slots=5
-      -c wal_keep_size=256
-      -c hot_standby=on
-    ports:
-      - "5432:5432"
-    volumes:
-      - governance-db-data-primary:/var/lib/postgresql/data
-      - ../../infra/docker/postgres/primary-init.sh:/docker-entrypoint-initdb.d/01-replication.sh
-      - ../../infra/docker/postgres/pg_hba_append.sh:/docker-entrypoint-initdb.d/02-pg-hba.sh
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexus_governance -d nexus_governance"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   redis:
     image: redis:7-alpine
     container_name: nexus-redis
@@ -342,8 +313,8 @@ services:
     environment:
       SPARK_MODE: worker
       SPARK_MASTER_URL: spark://spark:7077
-      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-2G}
-      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-2}
+      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-8G}
+      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-4}
       HOME: /tmp/nexus-spark-home
       HADOOP_USER_NAME: spark
       USER: spark
@@ -404,7 +375,6 @@ services:
     <<: *host-access
     depends_on:
       - airflow-db
-      - governance-db-primary
       - hive-metastore
       - redis
       - minio-init
@@ -443,7 +413,6 @@ services:
       - airflow
       - airflow-db
       - redis
-      - governance-db-primary
     environment:
       <<: *airflow-environment
     command: scheduler
@@ -470,7 +439,6 @@ services:
       - airflow
       - airflow-db
       - redis
-      - governance-db-primary
     environment:
       <<: *airflow-environment
     command: scheduler
@@ -497,11 +465,10 @@ services:
       - airflow
       - airflow-db
       - redis
-      - governance-db-primary
     environment:
       <<: *airflow-environment
       HOSTNAME: worker-local-1
-    command: celery worker
+    command: celery worker --hostname worker-local-1
     volumes:
       - ../../orchestration/airflow/dags:/opt/airflow/dags
       - ../../common:/opt/airflow/common
@@ -525,11 +492,10 @@ services:
       - airflow
       - airflow-db
       - redis
-      - governance-db-primary
     environment:
       <<: *airflow-environment
       HOSTNAME: worker-local-2
-    command: celery worker
+    command: celery worker --hostname worker-local-2
     volumes:
       - ../../orchestration/airflow/dags:/opt/airflow/dags
       - ../../common:/opt/airflow/common
@@ -583,13 +549,11 @@ services:
     <<: *host-access
     depends_on:
       - trino-coordinator
-      - governance-db-primary
     environment:
       TRINO_HOST: trino-coordinator
       TRINO_PORT: 8080
       TRINO_USER: ${TRINO_USER:-nexus}
-      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
-      NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db-primary:5432/nexus_governance}
+      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-local}
     volumes:
       - ../../common:/app/common
       - ../../config:/app/config
@@ -609,10 +573,7 @@ services:
       - ../../runtime/nginx-api-lb.conf:/etc/nginx/nginx.conf:ro
 
   # =========================================================================
-  # OpenMetadata (optional, via --profile metadata)
-  # =========================================================================
   openmetadata-postgresql:
-    profiles: ["metadata"]
     image: docker.getcollate.io/openmetadata/postgresql:1.12.6
     container_name: nexus-openmetadata-postgresql
     command: "--work_mem=10MB"
@@ -630,7 +591,6 @@ services:
       retries: 10
 
   openmetadata-elasticsearch:
-    profiles: ["metadata"]
     image: docker.elastic.co/elasticsearch/elasticsearch:9.3.0
     container_name: nexus-openmetadata-elasticsearch
     environment:
@@ -648,7 +608,6 @@ services:
       retries: 10
 
   openmetadata-migrate:
-    profiles: ["metadata"]
     image: docker.getcollate.io/openmetadata/server:1.12.6
     container_name: nexus-openmetadata-migrate
     command: "./bootstrap/openmetadata-ops.sh migrate"
@@ -661,7 +620,6 @@ services:
         condition: service_healthy
 
   openmetadata-server:
-    profiles: ["metadata"]
     image: docker.getcollate.io/openmetadata/server:1.12.6
     container_name: nexus-openmetadata-server
     restart: always
@@ -681,7 +639,6 @@ services:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8586/healthcheck"]
 
   openmetadata-ingestion:
-    profiles: ["metadata"]
     image: docker.getcollate.io/openmetadata/ingestion:1.12.6
     container_name: nexus-openmetadata-ingestion
     depends_on:
@@ -713,7 +670,6 @@ services:
       - openmetadata-ingestion-tmp:/tmp
 
   marquez-db:
-    profiles: ["metadata"]
     image: postgres:14
     container_name: nexus-marquez-db
     environment:
@@ -729,7 +685,6 @@ services:
       retries: 10
 
   marquez:
-    profiles: ["metadata"]
     image: marquezproject/marquez:${MARQUEZ_TAG:-0.51.1}
     container_name: nexus-marquez
     depends_on:
@@ -754,7 +709,6 @@ services:
       retries: 10
 
   marquez-web:
-    profiles: ["metadata"]
     image: marquezproject/marquez-web:${MARQUEZ_TAG:-0.51.1}
     container_name: nexus-marquez-web
     depends_on:
@@ -772,7 +726,6 @@ volumes:
   minio-data-1:
   hive-metastore-db-data:
   airflow-db-data:
-  governance-db-data-primary:
   superset-home:
   openmetadata-postgres-data:
   openmetadata-es-data:

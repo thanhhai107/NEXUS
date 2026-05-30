@@ -234,8 +234,8 @@ def maybe_annotate_semantic(
         # semantic_cache goes to runtime/semantic_cache (same level as lake)
         runtime_dir = context.output_dir.parent
         cache_dir = runtime_dir / "semantic_cache"
-        llm_model = semantic_config.get("llm_model", "qwen2.5:0.5b")
-        llm_url = semantic_config.get("ollama_url", "http://localhost:11434")
+        llm_model = semantic_config.get("llm_model", "amazon.nova-pro-v1:0")
+        llm_region = semantic_config.get("bedrock_region", "us-east-1")
         llm_timeout = semantic_config.get("llm_timeout_seconds", 180)
         min_new_fields = semantic_config.get("trigger", {}).get("min_new_fields", 3)
         reannotate_threshold = semantic_config.get("trigger", {}).get("reannotate_threshold", 10)
@@ -248,7 +248,7 @@ def maybe_annotate_semantic(
         pipeline = SemanticAnnotationPipeline(
             cache_dir=cache_dir,
             llm_model=llm_model,
-            llm_base_url=llm_url,
+            llm_region=llm_region,
             llm_timeout=llm_timeout,
             min_new_fields=min_new_fields,
             reannotate_threshold=reannotate_threshold,

@@ -15,14 +15,6 @@ schema_inference:
 # Semantic annotation configuration (LLM-based)
 semantic_annotation:
   enabled: true
-  llm_model: "qwen2.5:0.5b"  # Lightweight model for local inference
-  ollama_url: "http://localhost:11434"
-  llm_timeout_seconds: 180
-  
-  # Trigger conditions
-  trigger:
-    min_new_fields: 3           # Call LLM if >= 3 new fields
-    reannotate_threshold: 10    # Re-annotate entire source if >= 10 new fields
 
   # Documentation URLs per source (optional - LLM can work without it)
   docs_urls:
@@ -54,49 +46,49 @@ polling:
     enabled: false
     interval_seconds: 300
     timeout_minutes: 10
-    pool: default_pool
+    pool: tfl_pool
     backfill_on_restart: true
   tfl_line_status:
     enabled: true
     interval_seconds: 300
     timeout_minutes: 5
-    pool: default_pool
+    pool: tfl_pool
     backfill_on_restart: true
   tfl_arrivals:
     enabled: true
     interval_seconds: 60
     timeout_minutes: 5
-    pool: default_pool
+    pool: tfl_pool
     backfill_on_restart: true
   tfl_status:
     enabled: false
     interval_seconds: 60
     timeout_minutes: 5
-    pool: default_pool
+    pool: tfl_pool
     backfill_on_restart: true
   waqi:
     enabled: true
     interval_seconds: 300
     timeout_minutes: 10
-    pool: default_pool
+    pool: waqi_pool
     backfill_on_restart: true
   openweather:
     enabled: true
     interval_seconds: 300
     timeout_minutes: 10
-    pool: default_pool
+    pool: openweather_pool
     backfill_on_restart: true
   londonair:
     enabled: true
     interval_seconds: 600
     timeout_minutes: 15
-    pool: default_pool
+    pool: londonair_pool
     backfill_on_restart: true
   openaq:
     enabled: true
     interval_seconds: 180
     timeout_minutes: 10
-    pool: default_pool
+    pool: openaq_pool
     backfill_on_restart: true
   openmeteo:
     enabled: false
@@ -376,11 +368,6 @@ rate_limits:
   tfl_line_status_delay_seconds: 0.2
   tfl_arrivals_delay_seconds: 0.2
   dft_delay_seconds: 0.1
-retry:
-  max_retries: 5
-  backoff_base_seconds: 1.0
-  backoff_max_seconds: 60.0
-  timeout_seconds: 60
 keep_datasets: true
 resilient_runtime:
   retry_policy:

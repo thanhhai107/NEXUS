@@ -39,7 +39,6 @@ from typing import Any
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CONFIG_DIR = PROJECT_ROOT / "config"
 DOMAINS_DIR = PROJECT_ROOT / "domains"
 
 try:
@@ -325,21 +324,12 @@ QUARANTINE_DIR = RUNTIME_DIR / "quarantine"  # Invalid records
 
 
 # ============================================================================
-# RAW ENVELOPE LANDING ZONE
+# BRONZE ENVELOPE LANDING ZONE
 # ============================================================================
-# Canonical raw JSONL envelopes live outside the lake tiers. Raw source artifacts
-# remain under BRONZE_DIR/{dataset}/run_id={run_id}/raw until they are adapted
-# into this shared landing zone. Spark raw→Bronze jobs consume RAW_DIR.
+# Canonical raw JSONL envelopes after ingestion. Spark bronze→Silver jobs
+# consume RAW_DIR. Source artifacts remain under BRONZE_DIR per run.
 
-RAW_DIR = RUNTIME_DIR / "raw"
-
-
-# ============================================================================
-# LEGACY ALIASES (Backward Compatibility - Deprecated)
-# ============================================================================
-# Will be removed after migration
-
-DATASETS_DIR_LEGACY = BRONZE_DIR  # Legacy alias - use BRONZE_DIR
+RAW_DIR = RUNTIME_DIR / "bronze"
 
 
 # ============================================================================
@@ -449,13 +439,13 @@ def get_effective_runtime_dir() -> tuple[Path, str]:
 
 def get_config_runtime_dir() -> str:
     """Get runtime_dir from config file (for documentation/UI purposes)."""
-    config_yaml = load_yaml(CONFIG_DIR / "download_defaults.yml")
+    config_yaml = load_yaml(PROJECT_ROOT / "ingestion" / "config" / "download_defaults.yml")
     return config_yaml.get("runtime_dir", "")
 
 
 def set_config_runtime_dir(value: str) -> None:
     """Set runtime_dir in config file."""
-    config_path = CONFIG_DIR / "download_defaults.yml"
+    config_path = PROJECT_ROOT / "ingestion" / "config" / "download_defaults.yml"
     config_yaml = load_yaml(config_path)
     config_yaml["runtime_dir"] = value
     with config_path.open("w", encoding="utf-8") as f:
@@ -511,14 +501,16 @@ def is_minio_available() -> bool:
 # CONFIGURATION LOADERS
 # ============================================================================
 
-def load_polling_config(config_dir: Path = CONFIG_DIR) -> dict[str, Any]:
+def load_polling_config(config_dir: Path | None = None) -> dict[str, Any]:
     """Load polling configuration from download_defaults.yml."""
+    config_dir = config_dir or (PROJECT_ROOT / "ingestion" / "config")
     config = load_yaml(config_dir / "download_defaults.yml")
     return config.get("polling", {})
 
 
-def load_backfill_config(config_dir: Path = CONFIG_DIR) -> dict[str, Any]:
+def load_backfill_config(config_dir: Path | None = None) -> dict[str, Any]:
     """Load backfill configuration from download_defaults.yml."""
+    config_dir = config_dir or (PROJECT_ROOT / "ingestion" / "config")
     config = load_yaml(config_dir / "download_defaults.yml")
     return config.get("backfill", {})
 
@@ -545,9 +537,10 @@ def load_dataset_catalog(domains_dir: Path = DOMAINS_DIR) -> dict[str, Any]:
 
 def load_quality_config(
     domains_dir: Path = DOMAINS_DIR,
-    config_dir: Path = CONFIG_DIR,
+    config_dir: Path | None = None,
 ) -> dict[str, Any]:
-    """Load quality rules from domains/ and config/ directories."""
+    """Load quality rules from domains/ and governance/config/ directories."""
+    config_dir = config_dir or (PROJECT_ROOT / "governance" / "config")
     default_rules = load_yaml(config_dir / "quality_defaults.yml").get("default_rules", {})
     datasets: dict[str, Any] = {}
     for path in sorted(domains_dir.glob("*/quality_rules.yml")):
@@ -557,14 +550,17 @@ def load_quality_config(
 
 def load_semantic_config(
     domains_dir: Path = DOMAINS_DIR,
-    config_dir: Path = CONFIG_DIR,
+    config_dir: Path | None = None,
 ) -> dict[str, Any]:
+    """Load semantic rules from domains/ and governance/config/ directories."""
+    config_dir = config_dir or (PROJECT_ROOT / "governance" / "config")
     default_semantic = load_yaml(config_dir / "semantic_defaults.yml").get("default_semantic", {})
     datasets: dict[str, Any] = {}
     for path in sorted(domains_dir.glob("*/semantic_rules.yml")):
         datasets.update(load_yaml(path).get("datasets", {}))
     return {"default_semantic": default_semantic, "datasets": datasets}
 
-def load_governance_defaults(config_dir: Path = CONFIG_DIR) -> dict[str, Any]:
+def load_governance_defaults(config_dir: Path | None = None) -> dict[str, Any]:
     """Load governance defaults."""
-    return load_yaml(config_dir / "governance_defaults.yml").get("default_governance", {})
+    config_dir = config_dir or (PROJECT_ROOT / "governance" / "config")
+    return load_yaml(config_dir / "governance_config.yml").get("default", {})

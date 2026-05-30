@@ -12,11 +12,13 @@
 master_services() {
   echo "zookeeper-1 kafka-1 minio-1 minio-init \
     hive-metastore-db hive-metastore \
-    airflow-db governance-db-primary \
+    airflow-db \
     redis spark spark-worker-1 \
     trino-coordinator trino-worker-1 \
     airflow airflow-scheduler-1 airflow-scheduler-2 airflow-worker-1 airflow-worker-2 \
-    superset api-lb api-1"
+    superset api-lb api-1 \
+    openmetadata-postgresql openmetadata-elasticsearch openmetadata-migrate openmetadata-server openmetadata-ingestion \
+    marquez-db marquez marquez-web"
 }
 
 worker1_services() {
@@ -28,7 +30,7 @@ worker2_services() {
 }
 
 worker3_services() {
-  echo "minio-4 spark-worker trino-worker airflow-worker governance-db-replica"
+  echo "minio-4 spark-worker trino-worker airflow-worker"
 }
 
 worker4_services() {

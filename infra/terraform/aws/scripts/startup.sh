@@ -306,8 +306,7 @@ set_env_value .env AIRFLOW_ADMIN_USERNAME "$${AIRFLOW_ADMIN_USERNAME:-admin}"
 set_env_value .env AIRFLOW_ADMIN_PASSWORD "$${AIRFLOW_ADMIN_PASSWORD:-admin}"
 set_env_value .env AIRFLOW_DB_URL "postgresql+psycopg2://airflow:airflow@$${master_ip}:5433/airflow"
 set_env_value .env AIRFLOW_CELERY_BROKER_URL "redis://:@$${master_ip}:6379/0"
-set_env_value .env NEXUS_GOVERNANCE_DATABASE_URL "postgresql://nexus_governance:nexus_governance@governance-db-primary:5432/nexus_governance"
-set_env_value .env NEXUS_GOVERNANCE_DB_URL "postgresql://nexus_governance:nexus_governance@$${master_ip}:5432/nexus_governance"
+set_env_value .env NEXUS_GOVERNANCE_STORAGE "local"
 set_env_value .env NEXUS_MASTER_PRIVATE_IP "$master_ip"
 set_env_value .env NEXUS_NODE_IP "$NEXUS_NODE_IP"
 
@@ -315,8 +314,6 @@ mkdir -p \
   "$NEXUS_DATA/minio" \
   "$NEXUS_DATA/postgres/hive-metastore" \
   "$NEXUS_DATA/postgres/airflow" \
-  "$NEXUS_DATA/postgres/governance" \
-  "$NEXUS_DATA/postgres/governance-replica" \
   "$NEXUS_DATA/spark" \
   "$NEXUS_DATA/superset"
 

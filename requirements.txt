@@ -11,3 +11,4 @@ pyspark==3.5.1
 dbt-trino==1.8.1
 openlineage-dbt==1.21.0
 python-dotenv==1.0.1
+boto3==1.35.0

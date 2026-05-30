@@ -4,6 +4,7 @@ import argparse
 import csv
 import json
 import os
+import socket
 import sys
 from pathlib import Path
 from typing import Any
@@ -67,6 +68,13 @@ from governance.quality.schema import (
     records_failing_json_schema,
 )
 from governance.schema_drift import compare_schema_drift
+from common.worker import (
+    ServiceStatus,
+    WorkerHealth,
+    check_worker_health,
+    read_heartbeats,
+    write_heartbeat,
+)
 from governance.schema_history import save_schema_snapshot
 from ingestion.batch.api_ingestion import ingest_api_records
 from ingestion.batch.common import read_csv_records, write_jsonl
@@ -849,6 +857,46 @@ def replay_dlq(args: argparse.Namespace) -> None:
         )
     print(json.dumps(result, indent=2))
 
+
+def worker_status(args: argparse.Namespace) -> None:
+    hostname = args.hostname or socket.gethostname()
+    role = "auto" if args.role == "auto" else args.role
+    remote = args.ssh or None
+
+    health = check_worker_health(hostname=hostname, role=role, remote_ssh=remote, timeout=args.timeout)
+
+    if args.format == "table":
+        label = f" {health.worker_id} ({health.hostname}) " if not remote else f" remote:{remote} "
+        print(f"--- Worker Health: {label}---")
+        print(f"Role: {health.role}  Reachable: {'YES' if health.is_reachable else 'NO'}  "
+              f"Healthy: {health.healthy_count}/{health.total_count}  "
+              f"Checked: {health.checked_at}")
+        print("-" * 80)
+        for svc in health.services:
+            mark = "OK" if svc.running else "!!"
+            name = (svc.name + " ").ljust(24)
+            cid = (svc.container_id or "-").ljust(28)
+            uptime_str = f"{svc.uptime_seconds}s" if svc.uptime_seconds is not None else "-"
+            print(f"[{mark}] {name} {cid} uptime={uptime_str}")
+        print("-" * 80)
+        print(f"OVERALL: {'HEALTHY' if health.is_healthy else 'UNHEALTHY'}")
+    else:
+        print(json.dumps(health.to_dict(), indent=2))
+
+    if not health.is_healthy and not args.no_exit_on_fail:
+        raise SystemExit(1)
+
+
+def worker_heartbeat(_args: argparse.Namespace) -> None:
+    payload = write_heartbeat(worker_id=_args.worker_id, ttl_seconds=_args.ttl)
+    print(json.dumps(payload, indent=2))
+
+
+def worker_heartbeats(_args: argparse.Namespace) -> None:
+    records = read_heartbeats(max_age_seconds=_args.max_age)
+    print(json.dumps(records, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="NEXUS operational CLI.")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -1071,6 +1119,26 @@ def build_parser() -> argparse.ArgumentParser:
     dlq_replay.add_argument("--source")
     dlq_replay.add_argument("--dataset")
     dlq_replay.set_defaults(func=replay_dlq)
+
+    worker = subcommands.add_parser("worker", help="Worker status and health check commands")
+    worker_subcommands = worker.add_subparsers(dest="worker_command", required=True)
+    worker_status_parser = worker_subcommands.add_parser("status", help="Check worker health status")
+    worker_status_parser.add_argument("--hostname", help="Override hostname for display")
+    worker_status_parser.add_argument("--role", choices=["master", "worker", "auto"], default="auto")
+    worker_status_parser.add_argument("--ssh", help="SSH host to check remote worker (e.g., user@10.0.0.2)")
+    worker_status_parser.add_argument("--timeout", type=int, default=30, help="SSH timeout in seconds")
+    worker_status_parser.add_argument("--format", choices=["table", "json"], default="table")
+    worker_status_parser.add_argument("--no-exit-on-fail", action="store_true")
+    worker_status_parser.set_defaults(func=worker_status)
+
+    worker_heartbeat_parser = worker_subcommands.add_parser("heartbeat", help="Send a heartbeat signal")
+    worker_heartbeat_parser.add_argument("--worker-id")
+    worker_heartbeat_parser.add_argument("--ttl", type=int, default=120, help="Heartbeat TTL in seconds")
+    worker_heartbeat_parser.set_defaults(func=worker_heartbeat)
+
+    worker_list_parser = worker_subcommands.add_parser("list", help="List recent worker heartbeats")
+    worker_list_parser.add_argument("--max-age", type=int, default=300, help="Max heartbeat age in seconds")
+    worker_list_parser.set_defaults(func=worker_heartbeats)
 
     return parser
 

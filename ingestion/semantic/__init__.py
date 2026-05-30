@@ -19,7 +19,7 @@ from ingestion.semantic.diff_detector import SchemaDiffDetector, DiffResult
 from ingestion.semantic.template_annotator import TemplateAnnotator
 from ingestion.semantic.cache import SemanticCache, CachedAnnotations
 from ingestion.semantic.fetch_docs import fetch_api_docs
-from ingestion.semantic.llm_annotator import OllamaAnnotator
+from ingestion.semantic.llm_annotator import BedrockAnnotator
 from ingestion.semantic.pipeline import SemanticAnnotationPipeline, AnnotationResult
 
 __all__ = [
@@ -29,7 +29,7 @@ __all__ = [
     "TemplateAnnotator",
     "SemanticCache",
     "CachedAnnotations",
-    "OllamaAnnotator",
+    "BedrockAnnotator",
     "SemanticAnnotationPipeline",
     "AnnotationResult",
     # Functions

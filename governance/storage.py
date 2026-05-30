@@ -18,6 +18,27 @@ def using_postgres_storage() -> bool:
     return storage_mode() == "postgres"
 
 
+def _is_s3_storage() -> bool:
+    mode = storage_mode()
+    if mode == "s3":
+        return True
+    if mode == "local":
+        from common.config import is_vm_mode
+        return is_vm_mode()
+    return False
+
+
+def _s3_key(stream: str, local_path: Path | None = None) -> str:
+    if local_path is not None:
+        from common.config import RUNTIME_DIR
+        try:
+            relative = local_path.relative_to(RUNTIME_DIR)
+            return f"governance/{relative.as_posix()}"
+        except ValueError:
+            pass
+    return f"governance/{stream}.jsonl"
+
+
 def _read_jsonl(path: Path | None) -> list[dict[str, Any]]:
     if path is None or not path.exists():
         return []
@@ -44,6 +65,13 @@ def append_governance_event(
         _append_postgres_event(stream, dict(payload))
         return None
 
+    if _is_s3_storage():
+        from common.storage import get_storage
+        storage = get_storage()
+        s3_key = _s3_key(stream, local_path)
+        storage.append_jsonl(s3_key, dict(payload))
+        return local_path or Path(s3_key)
+
     if local_path is None:
         return None
 
@@ -56,6 +84,15 @@ def append_governance_event(
 def read_governance_events(stream: str, local_path: Path | None = None) -> list[dict[str, Any]]:
     if using_postgres_storage():
         return _read_postgres_events(stream)
+
+    if _is_s3_storage():
+        from common.storage import get_storage
+        storage = get_storage()
+        s3_key = _s3_key(stream, local_path)
+        if not storage.exists(s3_key):
+            return []
+        return list(storage.read_jsonl(s3_key))
+
     return _read_jsonl(local_path)
 
 

@@ -115,30 +115,6 @@ services:
       - ${NEXUS_RUNTIME_DIR:-/data}/minio-4:/data
 
   # =========================================================================
-  # Governance DB Replica (worker-3)
-  # =========================================================================
-  governance-db-replica:
-    image: postgres:16
-    container_name: nexus-governance-db-replica
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      POSTGRES_USER: nexus_governance
-      POSTGRES_PASSWORD: nexus_governance
-      POSTGRES_DB: nexus_governance
-      PRIMARY_HOST: ${NEXUS_MASTER_PRIVATE_IP}
-      REPLICATION_USER: replicator
-      REPLICATION_PASSWORD: nexus_replication
-    entrypoint: >-
-      bash -c "
-      chmod +x /replica-entrypoint.sh;
-      exec /replica-entrypoint.sh
-      "
-    volumes:
-      - ../../infra/docker/postgres/replica-entrypoint.sh:/replica-entrypoint.sh
-      - ${NEXUS_RUNTIME_DIR:-/data}/postgres/governance-replica:/var/lib/postgresql/data
-
-  # =========================================================================
   # Spark Worker (all workers)
   # =========================================================================
   spark-worker:
@@ -196,8 +172,7 @@ services:
       AIRFLOW__CELERY__BROKER_URL: ${AIRFLOW_CELERY_BROKER_URL}
       AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@${NEXUS_MASTER_PRIVATE_IP}:5433/airflow
       AIRFLOW__WEBSERVER__SECRET_KEY: nexus-local-secret
-      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
-      NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DB_URL}
+      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-local}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
       NEXUS_BUCKET: ${NEXUS_BUCKET:-nexus-lakehouse}
@@ -206,9 +181,8 @@ services:
       NEXUS_RUNTIME_DIR: ${NEXUS_RUNTIME_DIR:-/data}
       OPENLINEAGE_URL: ${OPENLINEAGE_URL:-}
       OPENLINEAGE_NAMESPACE: ${OPENLINEAGE_NAMESPACE:-nexus}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
-      NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-amazon.nova-pro-v1:0}
       HOSTNAME: worker-remote
     command: celery worker
     volumes:
@@ -239,8 +213,7 @@ services:
       TRINO_HOST: ${NEXUS_MASTER_PRIVATE_IP}
       TRINO_PORT: 8085
       TRINO_USER: ${TRINO_USER:-nexus}
-      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
-      NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DB_URL}
+      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-local}
     volumes:
       - ../../common:/app/common
       - ../../config:/app/config
@@ -259,8 +232,7 @@ services:
       TRINO_HOST: ${NEXUS_MASTER_PRIVATE_IP}
       TRINO_PORT: 8085
       TRINO_USER: ${TRINO_USER:-nexus}
-      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
-      NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DB_URL}
+      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-local}
     volumes:
       - ../../common:/app/common
       - ../../config:/app/config

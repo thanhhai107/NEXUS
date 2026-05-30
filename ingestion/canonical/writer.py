@@ -47,8 +47,8 @@ LOCAL_RAW_DIR = RAW_DIR
 # =============================================================================
 
 def _get_raw_storage_path(dataset_id: str, filename: str) -> str:
-    """Get S3 storage path for raw data."""
-    return f"raw/{dataset_id}/{filename}"
+    """Get S3 storage path for bronze data."""
+    return f"bronze/{dataset_id}/{filename}"
 
 
 def raw_dataset_dir(dataset_id: str, output_dir: Path | None = None) -> Path:
@@ -123,7 +123,7 @@ def _write_s3_envelopes(
     storage = get_storage()
     dataset_id = context.dataset_id
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    storage_path = f"raw/{dataset_id}/{stamp}.jsonl"
+    storage_path = f"bronze/{dataset_id}/{stamp}.jsonl"
     
     # Stream envelopes directly without loading all into memory
     def envelope_generator():
@@ -212,7 +212,7 @@ def _stream_s3_envelopes(
     storage = get_storage()
     dataset_id = context.dataset_id
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    storage_path = f"raw/{dataset_id}/{stamp}.jsonl"
+    storage_path = f"bronze/{dataset_id}/{stamp}.jsonl"
     
     record_count = 0
     lines = []
@@ -323,7 +323,7 @@ def write_partitioned_envelopes(
             partition_key="station_id",
             num_partitions=4
         )
-        # paths = {0: "raw/.../partition=0/...", 1: "...", ...}
+        # paths = {0: "bronze/.../partition=0/...", 1: "...", ...}
     """
     if num_partitions is None:
         num_partitions = get_worker_count()
@@ -375,7 +375,7 @@ def _write_partitioned_s3(
     
     for partition in range(num_partitions):
         if by_partition[partition]:
-            storage_path = f"raw/{dataset_id}/partition={partition}/{stamp}.jsonl"
+            storage_path = f"bronze/{dataset_id}/partition={partition}/{stamp}.jsonl"
             
             # Use streaming write
             storage.write_jsonl(storage_path, by_partition[partition])

@@ -7,8 +7,8 @@ SPARK_BIN=${SPARK_SUBMIT_BIN:-spark-submit}
 MASTER=${SPARK_MASTER:-spark://spark:7077}
 if [[ -n "${SPARK_PROPERTIES_FILE:-}" ]]; then
   PROPERTIES_FILE=$SPARK_PROPERTIES_FILE
-elif [[ -f /opt/nexus/config/spark-defaults.conf ]]; then
-  PROPERTIES_FILE=/opt/nexus/config/spark-defaults.conf
+elif [[ -f /opt/nexus/infra/spark/spark-defaults.conf ]]; then
+  PROPERTIES_FILE=/opt/nexus/infra/spark/spark-defaults.conf
 else
   PROPERTIES_FILE=/opt/airflow/config/spark-defaults.conf
 fi

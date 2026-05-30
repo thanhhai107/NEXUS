@@ -18,7 +18,7 @@ datasets:
     docs_uri: https://docs.openaq.org/
     api_key_env: OPENAQ_API_KEY
     topic: environment-openaq
-    poll_seconds: 60
+    poll_seconds: 180
     schema_path: domains/environment/schemas/openaq_measurements.schema.json
     source_discovery:
       repository: https://github.com/Akapi895/data-bigdata
@@ -74,7 +74,7 @@ datasets:
     docs_uri: https://aqicn.org/api/
     api_key_env: WAQI_API_TOKEN
     topic: environment-waqi
-    poll_seconds: 60
+    poll_seconds: 300
     schema_path: domains/environment/schemas/waqi_air_quality.schema.json
     source_discovery:
       repository: https://github.com/Akapi895/data-bigdata
@@ -146,7 +146,7 @@ datasets:
     local_sample_uri: assets/samples/londonair_monitoring.csv
     docs_uri: https://api.erg.ic.ac.uk/AirQuality/help
     topic: environment-londonair
-    poll_seconds: 3600
+    poll_seconds: 600
     schema_path: domains/environment/schemas/londonair_monitoring.schema.json
     source_discovery:
       repository: https://github.com/Akapi895/data-bigdata
@@ -198,7 +198,7 @@ datasets:
     local_sample_uri: assets/samples/openmeteo_air_quality.csv
     docs_uri: https://open-meteo.com/en/docs/air-quality-api
     topic: environment-openmeteo
-    poll_seconds: 3600
+    poll_seconds: 0
     schema_path: domains/environment/schemas/openmeteo_air_quality.schema.json
     source_discovery:
       repository: https://github.com/Akapi895/data-bigdata
@@ -250,7 +250,7 @@ datasets:
     docs_uri: https://openweathermap.org/current
     api_key_env: OPENWEATHER_API_KEY
     topic: environment-openweather
-    poll_seconds: 1800
+    poll_seconds: 300
     schema_path: domains/environment/schemas/openweather_current.schema.json
     source_discovery:
       repository: https://github.com/Akapi895/data-bigdata

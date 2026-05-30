@@ -584,6 +584,348 @@ class WorkerCoordination:
         return claims
 
 
+# =============================================================================
+# WORKER HEALTH CHECK & HEARTBEAT
+# =============================================================================
+
+import subprocess
+
+from common.storage import get_storage as _get_storage
+
+
+@dataclass
+class ServiceStatus:
+    name: str
+    role: str  # "master" | "worker" | "both"
+    running: bool
+    container_id: str | None = None
+    uptime_seconds: int | None = None
+    detail: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "role": self.role,
+            "running": self.running,
+            "container_id": self.container_id,
+            "uptime_seconds": self.uptime_seconds,
+            "detail": self.detail,
+        }
+
+
+@dataclass
+class WorkerHealth:
+    worker_id: str
+    hostname: str
+    role: str  # "master" | "worker"
+    is_reachable: bool
+    checked_at: str
+    services: list[ServiceStatus]
+    healthy_count: int
+    total_count: int
+    is_healthy: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "worker_id": self.worker_id,
+            "hostname": self.hostname,
+            "role": self.role,
+            "is_reachable": self.is_reachable,
+            "checked_at": self.checked_at,
+            "services": [s.to_dict() for s in self.services],
+            "healthy_count": self.healthy_count,
+            "total_count": self.total_count,
+            "is_healthy": self.is_healthy,
+        }
+
+
+def _docker_ps() -> list[dict[str, str]]:
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "--format", "{{.ID}}\t{{.Names}}\t{{.Status}}\t{{.RunningFor}}"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if result.returncode != 0:
+            return []
+        containers = []
+        for line in result.stdout.strip().split("\n"):
+            if not line.strip():
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 4:
+                containers.append({
+                    "id": parts[0],
+                    "name": parts[1],
+                    "status": parts[2],
+                    "running_for": parts[3],
+                })
+        containers.sort(key=lambda c: len(c["name"]))  # shorter names first → exact matches win
+        return containers
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return []
+        containers = []
+        for line in result.stdout.strip().split("\n"):
+            if not line.strip():
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 4:
+                containers.append({
+                    "id": parts[0],
+                    "name": parts[1],
+                    "status": parts[2],
+                    "running_for": parts[3],
+                })
+        return containers
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return []
+
+
+def _parse_uptime(running_for: str) -> int | None:
+    cleaned = running_for.lower()
+    cleaned = cleaned.replace("about ", "").replace(" ago", "").strip()
+    cleaned = cleaned.replace("a ", "1 ").replace("an ", "1 ")
+    parts = cleaned.split()
+    if not parts:
+        return None
+    total = 0
+    i = 0
+    while i < len(parts) - 1:
+        try:
+            val = int(parts[i])
+            unit = parts[i + 1]
+            if "hour" in unit:
+                total += val * 3600
+            elif "minute" in unit or "min" in unit:
+                total += val * 60
+            elif "second" in unit or "sec" in unit:
+                total += val
+            elif "day" in unit:
+                total += val * 86400
+            elif "week" in unit:
+                total += val * 604800
+            elif "month" in unit:
+                total += val * 2592000
+            i += 2
+        except (ValueError, IndexError):
+            i += 1
+    return total if total > 0 else None
+
+
+MASTER_SERVICES = {
+    "zookeeper":            ("zookeeper-1", "master"),
+    "kafka":                ("kafka-1", "master"),
+    "minio":                ("minio-1", "master"),
+    "spark":                ("spark", "master"),                    # nexus-spark (not spark-worker-*)
+    "trino-coordinator":    ("trino-coordinator", "master"),
+    "airflow-db":           ("airflow-db", "master"),
+    "redis":                ("redis", "master"),
+    "hive-metastore-db":    ("hive-metastore-db", "master"),
+    "hive-metastore":       ("hive-metastore", "master"),          # Not hive-metastore-db
+    "airflow-webserver":    ("airflow", "master"),                  # nexus-airflow (before scheduler)
+    "airflow-scheduler":    ("airflow-scheduler", "master"),
+    "superset":             ("superset", "master"),
+    "api":                  ("api-1", "master"),                    # nexus-api-1
+    "api-lb":               ("api-lb", "master"),
+}
+
+WORKER_SERVICES = {
+    "zookeeper": ("zookeeper-2|zookeeper-3", "worker"),
+    "kafka": ("kafka-2|kafka-3", "worker"),
+    "minio": ("minio-2|minio-3|minio-4", "worker"),
+    "spark-worker": ("spark-worker", "worker"),
+    "trino-worker": ("trino-worker", "worker"),
+    "airflow-worker": ("airflow-worker", "worker"),
+}
+
+OPTIONAL_SERVICES = {
+    "openmetadata":          ("openmetadata", "master"),
+    "marquez":               ("marquez", "master"),
+}
+
+
+def _match_container(container_name: str, patterns: str) -> bool:
+    for pattern in patterns.split("|"):
+        if pattern in container_name:
+            return True
+    return False
+
+
+def check_local_services(role: str = "auto") -> list[ServiceStatus]:
+    if role == "auto":
+        role = "master" if is_coordinator() else "worker"
+
+    containers = _docker_ps()
+
+    services: list[ServiceStatus] = []
+    service_defs = MASTER_SERVICES if role == "master" else WORKER_SERVICES
+    used_containers: set[str] = set()
+
+    for svc_name, (pattern, svc_role) in service_defs.items():
+        matched = None
+        for c in containers:
+            if c["id"] in used_containers:
+                continue
+            if _match_container(c["name"], pattern):
+                matched = c
+                used_containers.add(c["id"])
+                break
+
+        is_running = matched is not None and ("up" in matched["status"].lower() or matched["status"].lower().startswith("up"))
+        services.append(ServiceStatus(
+            name=svc_name,
+            role=svc_role,
+            running=bool(matched) and is_running,
+            container_id=matched["name"] if matched else None,
+            uptime_seconds=_parse_uptime(matched["running_for"]) if matched and is_running else None,
+            detail=matched["status"] if matched else "container not found",
+        ))
+
+    for svc_name, (pattern, svc_role) in OPTIONAL_SERVICES.items():
+        matched = None
+        for c in containers:
+            if c["id"] in used_containers:
+                continue
+            if _match_container(c["name"], pattern):
+                matched = c
+                used_containers.add(c["id"])
+                break
+        services.append(ServiceStatus(
+            name=svc_name,
+            role=svc_role,
+            running=matched is not None,
+            container_id=matched["name"] if matched else None,
+            uptime_seconds=_parse_uptime(matched["running_for"]) if matched else None,
+            detail=matched["status"] if matched else "not present",
+        ))
+
+    return services
+
+
+def check_worker_health(
+    hostname: str | None = None,
+    role: str = "auto",
+    remote_ssh: str | None = None,
+    timeout: int = 30,
+) -> WorkerHealth:
+    worker_info = get_worker_info()
+
+    if hostname is None:
+        hostname = socket.gethostname()
+    if role == "auto":
+        role = "master" if is_coordinator() else "worker"
+
+    checked_at = datetime.now(timezone.utc).isoformat()
+
+    if remote_ssh:
+        is_reachable, services = _remote_docker_check(remote_ssh, role, timeout)
+    else:
+        is_reachable = True
+        services = check_local_services(role)
+
+    healthy = sum(1 for s in services if s.running)
+
+    return WorkerHealth(
+        worker_id=worker_info.worker_id if not remote_ssh else remote_ssh,
+        hostname=hostname,
+        role=role,
+        is_reachable=is_reachable,
+        checked_at=checked_at,
+        services=services,
+        healthy_count=healthy,
+        total_count=len(services),
+        is_healthy=is_reachable and healthy >= max(len(services) - 1, 1),
+    )
+
+
+def _remote_docker_check(ssh_host: str, role: str, timeout: int) -> tuple[bool, list[ServiceStatus]]:
+    script = (
+        "from common.worker import check_local_services; "
+        "import json; "
+        "svcs = check_local_services('{role}'); "
+        "print(json.dumps([s.__dict__ for s in svcs]))"
+    ).format(role=role)
+
+    cmd = [
+        "ssh", "-o", "StrictHostKeyChecking=no",
+        "-o", "ConnectTimeout=10",
+        "-o", "BatchMode=yes",
+        f"ConnectTimeout={min(timeout // 2, 15)}",
+        ssh_host,
+        f"cd /opt/nexus/NEXUS && source .venv/bin/activate && python -c \"{script}\"",
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        if result.returncode != 0:
+            return False, [ServiceStatus(
+                name="ssh", role=role, running=False,
+                detail=f"SSH failed: {result.stderr.strip() or 'exit code ' + str(result.returncode)}",
+            )]
+        try:
+            raw = json.loads(result.stdout.strip().split("\n")[-1])
+            services = [ServiceStatus(**s) for s in raw]
+            return True, services
+        except (json.JSONDecodeError, TypeError):
+            return False, [ServiceStatus(
+                name="parse", role=role, running=False,
+                detail=f"Failed to parse remote output: {result.stdout[:200]}",
+            )]
+    except subprocess.TimeoutExpired:
+        return False, [ServiceStatus(name="ssh", role=role, running=False, detail="SSH timeout")]
+    except FileNotFoundError:
+        return False, [ServiceStatus(name="ssh", role=role, running=False, detail="ssh command not found")]
+
+
+def write_heartbeat(worker_id: str | None = None, ttl_seconds: int = 120) -> dict[str, Any]:
+    storage = _get_storage(force_refresh=True)
+    info = get_worker_info()
+    wid = worker_id or info.worker_id
+    path = f"nexus/heartbeats/{wid}.json"
+
+    payload = {
+        "worker_id": wid,
+        "hostname": socket.gethostname(),
+        "pid": os.getpid(),
+        "worker_index": info.worker_index,
+        "total_workers": info.total_workers,
+        "is_coordinator": info.is_coordinator,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "ttl_seconds": ttl_seconds,
+    }
+    storage.write(path, payload, is_json=True)
+    return payload
+
+
+def read_heartbeats(max_age_seconds: int = 300) -> list[dict[str, Any]]:
+    storage = _get_storage(force_refresh=True)
+    prefix = "nexus/heartbeats/"
+    now = datetime.now(timezone.utc)
+    heartbeats: list[dict[str, Any]] = []
+
+    for path in storage.list(prefix):
+        try:
+            data = storage.read(path)
+            ts_str = data.get("timestamp", "")
+            if ts_str:
+                ts = datetime.fromisoformat(ts_str)
+                age = (now - ts).total_seconds()
+                if age <= max_age_seconds:
+                    data["age_seconds"] = int(age)
+                    data["alive"] = True
+                    heartbeats.append(data)
+                else:
+                    data["age_seconds"] = int(age)
+                    data["alive"] = False
+                    heartbeats.append(data)
+        except Exception:
+            pass
+
+    heartbeats.sort(key=lambda h: h.get("timestamp", ""), reverse=True)
+    return heartbeats
+
+
 __all__ = [
     # Worker detection
     "WorkerInfo",
@@ -604,4 +946,11 @@ __all__ = [
     "filter_by_partition",
     # Coordination
     "WorkerCoordination",
+    # Health check
+    "ServiceStatus",
+    "WorkerHealth",
+    "check_local_services",
+    "check_worker_health",
+    "write_heartbeat",
+    "read_heartbeats",
 ]

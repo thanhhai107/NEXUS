@@ -7,11 +7,21 @@ default:
   retention:
     policy: open-data-standard
     days: 365
+  access_policy:
+    allowed_roles:
+    - admin
+    - steward
+    - analyst
+    - public
+    denied_roles: []
+    api_access: true
+    trino_access: true
+    superset_access: true
 
 # Semantic annotation settings
 semantic:
-  llm_model: qwen2.5:0.5b
-  ollama_url: http://localhost:11434
+  llm_model: amazon.nova-pro-v1:0
+  bedrock_region: us-east-1
   llm_timeout_seconds: 180
   trigger:
     min_new_fields: 3
@@ -19,6 +29,5 @@ semantic:
 
 # Quality rules settings
 quality:
-  default_rules_file: config/quality_defaults.yml
   quarantine_invalid_records: true
   validation_enabled: false

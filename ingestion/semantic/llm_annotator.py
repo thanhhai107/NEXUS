@@ -1,20 +1,22 @@
 """
-LLM Annotator using Ollama API.
+LLM Annotator using Amazon Bedrock.
 
-Local inference via Ollama HTTP API.
-Default model: qwen2.5:0.5b (lightweight, fast)
+Uses boto3 to call Bedrock Converse API.
+Default model: amazon.nova-pro-v1:0
 """
 
 from __future__ import annotations
 
 import json
-import requests
+import os
 from dataclasses import dataclass
 from typing import Any
 
+import boto3
+
 # Default settings
-DEFAULT_MODEL = "qwen2.5:0.5b"
-DEFAULT_BASE_URL = "http://localhost:11434"
+DEFAULT_MODEL = "amazon.nova-pro-v1:0"
+DEFAULT_REGION = "us-east-1"
 DEFAULT_TIMEOUT = 180  # 3 minutes
 DEFAULT_MAX_TOKENS = 2048
 DEFAULT_TEMPERATURE = 0.3
@@ -32,15 +34,14 @@ class LLMAnnotation:
     notes: str | None = None
 
 
-class OllamaAnnotator:
+class BedrockAnnotator:
     """
-    LLM Annotator using Ollama API.
+    LLM Annotator using Amazon Bedrock.
     
-    Default model: qwen2.5:0.5b (lightweight, fast)
-    Alternative: phi3.5-mini (better quality, more resources)
+    Default model: amazon.nova-pro-v1:0
     
     Usage:
-        annotator = OllamaAnnotator()
+        annotator = BedrockAnnotator()
         
         annotations = annotator.annotate(
             source_id="tfl_arrivals",
@@ -53,26 +54,27 @@ class OllamaAnnotator:
     def __init__(
         self,
         model: str = DEFAULT_MODEL,
-        base_url: str = DEFAULT_BASE_URL,
+        region: str = DEFAULT_REGION,
         timeout: int = DEFAULT_TIMEOUT,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = DEFAULT_TEMPERATURE,
     ):
         """
-        Initialize Ollama annotator.
+        Initialize Bedrock annotator.
         
         Args:
-            model: Ollama model name (default: qwen2.5:0.5b)
-            base_url: Ollama API base URL
+            model: Bedrock model ID (default: amazon.nova-pro-v1:0)
+            region: AWS region (default: us-east-1)
             timeout: Request timeout in seconds
             max_tokens: Maximum tokens to generate
             temperature: Sampling temperature (0.0-1.0)
         """
-        self.model = model
-        self.base_url = base_url.rstrip("/")
+        self.model = os.getenv("NEXUS_AGENT_MODEL", model)
+        self.region = os.getenv("AWS_DEFAULT_REGION", region)
         self.timeout = timeout
         self.max_tokens = max_tokens
         self.temperature = temperature
+        self.client = None
     
     def annotate(
         self,
@@ -220,7 +222,7 @@ Return valid JSON only. No explanations."""
     
     def _call_llm(self, prompt: str) -> str:
         """
-        Call Ollama API.
+        Call Amazon Bedrock Converse API.
         
         Args:
             prompt: Full prompt string
@@ -229,43 +231,33 @@ Return valid JSON only. No explanations."""
             LLM response text
         
         Raises:
-            RuntimeError: If Ollama is not available
+            RuntimeError: If Bedrock is not available
         """
-        url = f"{self.base_url}/api/generate"
-        
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "temperature": self.temperature,
-                "num_predict": self.max_tokens,
-            }
-        }
-        
+        if self.client is None:
+            try:
+                self.client = boto3.client(
+                    "bedrock-runtime",
+                    region_name=self.region,
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Cannot create Bedrock client for region {self.region}: {e}"
+                )
+
         try:
-            response = requests.post(
-                url,
-                json=payload,
-                timeout=self.timeout,
+            response = self.client.converse(
+                modelId=self.model,
+                system=[{"text": "Return only valid JSON. Do not include markdown."}],
+                messages=[{"role": "user", "content": [{"text": prompt}]}],
+                inferenceConfig={
+                    "temperature": self.temperature,
+                    "maxTokens": self.max_tokens,
+                },
             )
-            response.raise_for_status()
-            
-            result = response.json()
-            return result.get("response", "")
-            
-        except requests.exceptions.ConnectionError:
-            raise RuntimeError(
-                f"Cannot connect to Ollama at {self.base_url}. "
-                f"Make sure Ollama is running: `ollama serve`"
-            )
-        except requests.exceptions.Timeout:
-            raise RuntimeError(
-                f"Ollama request timed out after {self.timeout}s. "
-                f"Try a smaller model or increase timeout."
-            )
-        except requests.exceptions.HTTPError as e:
-            raise RuntimeError(f"Ollama API error: {e}")
+            content = response["output"]["message"]["content"][0]["text"]
+            return content
+        except Exception as e:
+            raise RuntimeError(f"Bedrock API error: {e}")
     
     def _parse_response(self, response: str) -> dict[str, dict]:
         """
@@ -425,41 +417,38 @@ Return valid JSON only. No explanations."""
     
     def check_health(self) -> dict[str, Any]:
         """
-        Check if Ollama is running and model is available.
+        Check if Bedrock is accessible.
         
         Returns:
             Dict with health status
         """
         try:
-            # Check server
-            response = requests.get(
-                f"{self.base_url}/",
-                timeout=5
+            if self.client is None:
+                self.client = boto3.client(
+                    "bedrock-runtime",
+                    region_name=self.region,
+                )
+            # Try listing foundation models to verify access
+            bedrock = boto3.client("bedrock", region_name=self.region)
+            response = bedrock.list_foundation_models(
+                byProvider="Amazon",
+                byOutputModality="TEXT",
             )
-            server_ok = response.status_code == 200
-        except Exception:
-            server_ok = False
-        
-        try:
-            # Check model
-            response = requests.get(
-                f"{self.base_url}/api/tags",
-                timeout=5
-            )
-            models = []
-            if response.status_code == 200:
-                data = response.json()
-                models = [m.get("name", "") for m in data.get("models", [])]
-            
-            model_available = self.model in models
-        except Exception:
-            models = []
-            model_available = False
-        
-        return {
-            "server_ok": server_ok,
-            "model_available": model_available,
-            "model": self.model,
-            "available_models": models,
-            "base_url": self.base_url,
-        }
+            model_summaries = response.get("modelSummaries", [])
+            model_ids = [m["modelId"] for m in model_summaries]
+            model_available = any(self.model in mid for mid in model_ids)
+            return {
+                "server_ok": True,
+                "model_available": model_available,
+                "model": self.model,
+                "available_models": model_ids[:20],
+                "region": self.region,
+            }
+        except Exception as e:
+            return {
+                "server_ok": False,
+                "model_available": False,
+                "model": self.model,
+                "error": str(e),
+                "region": self.region,
+            }

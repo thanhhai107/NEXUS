@@ -12,6 +12,7 @@ Orchestrates the complete semantic annotation workflow:
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
 
 # Default settings
 DEFAULT_CACHE_DIR = "semantic_cache"
-DEFAULT_LLM_MODEL = "qwen2.5:0.5b"
+DEFAULT_LLM_MODEL = "amazon.nova-pro-v1:0"
 DEFAULT_MIN_NEW_FIELDS = 3
 DEFAULT_REANNOTATE_THRESHOLD = 10
 
@@ -82,7 +83,7 @@ class SemanticAnnotationPipeline:
         self,
         cache_dir: Path | str = DEFAULT_CACHE_DIR,
         llm_model: str = DEFAULT_LLM_MODEL,
-        llm_base_url: str = "http://localhost:11434",
+        llm_region: str = "us-east-1",
         min_new_fields: int = DEFAULT_MIN_NEW_FIELDS,
         reannotate_threshold: int = DEFAULT_REANNOTATE_THRESHOLD,
         llm_timeout: int = 180,
@@ -92,15 +93,15 @@ class SemanticAnnotationPipeline:
         
         Args:
             cache_dir: Path to semantic cache directory
-            llm_model: Ollama model name
-            llm_base_url: Ollama API base URL
+            llm_model: Bedrock model ID
+            llm_region: AWS region
             min_new_fields: Minimum new fields to trigger LLM
             reannotate_threshold: Threshold for full re-annotation
             llm_timeout: LLM request timeout in seconds
         """
         self.cache_dir = Path(cache_dir)
         self.llm_model = llm_model
-        self.llm_base_url = llm_base_url
+        self.llm_region = llm_region
         self.min_new_fields = min_new_fields
         self.reannotate_threshold = reannotate_threshold
         self.llm_timeout = llm_timeout
@@ -109,15 +110,15 @@ class SemanticAnnotationPipeline:
         from ingestion.semantic.diff_detector import SchemaDiffDetector
         from ingestion.semantic.template_annotator import TemplateAnnotator
         from ingestion.semantic.cache import SemanticCache
-        from ingestion.semantic.llm_annotator import OllamaAnnotator
+        from ingestion.semantic.llm_annotator import BedrockAnnotator
         from ingestion.semantic.fetch_docs import fetch_api_docs
         
         self.diff_detector = SchemaDiffDetector(cache_dir)
         self.template_annotator = TemplateAnnotator()
         self.cache = SemanticCache(cache_dir)
-        self.llm_annotator = OllamaAnnotator(
+        self.llm_annotator = BedrockAnnotator(
             model=llm_model,
-            base_url=llm_base_url,
+            region=llm_region,
             timeout=llm_timeout,
         )
         self.fetch_docs = fetch_api_docs
@@ -433,6 +434,7 @@ def run_pipeline(
     pipeline = SemanticAnnotationPipeline(
         cache_dir=cache_dir,
         llm_model=llm_model,
+        llm_region=os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
     )
     
     return pipeline.process(

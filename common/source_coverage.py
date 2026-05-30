@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import Any, Iterable
 
-from common.config import CONFIG_DIR, DOMAINS_DIR, load_dataset_catalog, load_quality_config
+from common.config import DOMAINS_DIR, load_dataset_catalog, load_quality_config
 from common.source_discovery import (
     DEFAULT_SOURCE_DIR,
     SOURCE_REPOSITORY_URL,
@@ -171,7 +171,7 @@ STREAM_SOURCE_KEYS = {
 def build_ingestion_coverage_map(
     source_dir: Path = DEFAULT_SOURCE_DIR,
     domains_dir: Path = DOMAINS_DIR,
-    config_dir: Path = CONFIG_DIR,
+    config_dir: Path | None = None,
 ) -> dict[str, Any]:
     catalog = load_discovery_catalog(source_dir)
     dataset_catalog = load_dataset_catalog(domains_dir).get("datasets", {})
@@ -259,7 +259,7 @@ def write_ingestion_coverage_map(
     output_path: Path,
     source_dir: Path = DEFAULT_SOURCE_DIR,
     domains_dir: Path = DOMAINS_DIR,
-    config_dir: Path = CONFIG_DIR,
+    config_dir: Path | None = None,
 ) -> dict[str, Any]:
     coverage = build_ingestion_coverage_map(source_dir, domains_dir, config_dir)
     output_path.parent.mkdir(parents=True, exist_ok=True)

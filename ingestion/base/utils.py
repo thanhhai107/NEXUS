@@ -9,7 +9,7 @@ from typing import Any, Iterable
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "download_defaults.yml"
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "ingestion" / "config" / "download_defaults.yml"
 DEFAULT_ENV_PATH = PROJECT_ROOT / ".env"
 
 from common.config import BRONZE_DIR
