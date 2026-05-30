@@ -339,6 +339,51 @@ def set_config_runtime_dir(value: str) -> None:
 
 
 # ============================================================================
+# MINIO/S3 CONFIGURATION
+# ============================================================================
+# Configuration for MinIO/S3 distributed storage
+# Used when NEXUS_RUNTIME_MODE=vm
+
+def get_minio_config() -> dict[str, Any]:
+    """Get MinIO/S3 configuration from environment.
+    
+    Returns:
+        Dict with MinIO/S3 settings
+    """
+    import os
+    
+    return {
+        "endpoint": os.getenv("MINIO_ENDPOINT", "http://localhost:9000"),
+        "access_key": os.getenv("MINIO_ROOT_USER", "minioadmin"),
+        "secret_key": os.getenv("MINIO_ROOT_PASSWORD", "minioadmin"),
+        "bucket": os.getenv("NEXUS_BUCKET", "nexus-lakehouse"),
+        "region": os.getenv("AWS_REGION", "us-east-1"),
+        "secure": os.getenv("MINIO_SECURE", "false").lower() == "true",
+        "session_token": os.getenv("AWS_SESSION_TOKEN"),
+    }
+
+
+def is_minio_available() -> bool:
+    """Check if MinIO/S3 is available and configured.
+    
+    Returns:
+        True if MinIO/S3 is available
+    """
+    import os
+    
+    # Check environment variables
+    endpoint = os.getenv("MINIO_ENDPOINT")
+    if not endpoint:
+        return False
+    
+    # Check mode
+    if get_runtime_mode() != "vm":
+        return False
+    
+    return True
+
+
+# ============================================================================
 # CONFIGURATION LOADERS
 # ============================================================================
 

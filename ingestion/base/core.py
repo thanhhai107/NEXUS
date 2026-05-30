@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
+from common.config import is_vm_mode
+from common.storage import StorageBackend, get_storage
 from ingestion.base.contracts import (
     CHUNK_FAILED,
     CHUNK_SKIPPED,
@@ -83,6 +85,7 @@ class SourceRun:
         context: DownloadContext,
         source_key: str,
         dataset_name: str | None = None,
+        storage: StorageBackend | None = None,
     ) -> None:
         self.source_id = source_id
         self.source_key = source_key
@@ -90,19 +93,31 @@ class SourceRun:
         self.context = context
         self.run_id = context.run_id
         self.started_at = now_iso()
+        
+        # Storage backend: use provided or get from storage abstraction
+        self._storage = storage
+        
+        # Directory structure
         self.base_dir = context.output_dir / source_id / f"run_id={self.run_id}"
         self.raw_dir = self.base_dir / "raw"
         self.staging_dir = self.base_dir / "staging"
         self.published_dir = self.base_dir / "published"
         self.metadata_dir = self.base_dir / "metadata"
-        self.raw_dir.mkdir(parents=True, exist_ok=True)
-        self.staging_dir.mkdir(parents=True, exist_ok=True)
-        self.published_dir.mkdir(parents=True, exist_ok=True)
-        self.metadata_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create directories (for local mode; S3 creates implicitly)
+        if not is_vm_mode():
+            self.raw_dir.mkdir(parents=True, exist_ok=True)
+            self.staging_dir.mkdir(parents=True, exist_ok=True)
+            self.published_dir.mkdir(parents=True, exist_ok=True)
+            self.metadata_dir.mkdir(parents=True, exist_ok=True)
+        
+        # File paths
         self.request_log_path = self.metadata_dir / "request_log.jsonl"
         self.checkpoint_path = self.metadata_dir / "checkpoint.json"
         self.run_manifest_path = self.metadata_dir / "run_manifest.json"
         self.published_manifest_path = self.published_dir / "published_manifest.json"
+        
+        # State
         self.row_count = 0
         self.failed_requests = 0
         self.first_timestamp: str | None = None
@@ -115,6 +130,13 @@ class SourceRun:
         self._chunk_first_attempt_at: dict[str, str] = {}
         self._publish_status = PUBLISH_UNPUBLISHED
         self.write_run_manifest()
+    
+    @property
+    def storage(self) -> StorageBackend:
+        """Get storage backend, initializing if needed."""
+        if self._storage is None:
+            self._storage = get_storage()
+        return self._storage
 
     def _load_checkpoint(self) -> dict[str, Any]:
         if not self.context.resume or self.context.overwrite or not self.checkpoint_path.exists():
@@ -316,36 +338,89 @@ class SourceRun:
             self.failed_requests += 1
         elif status_code and status_code >= 400:
             self.failed_requests += 1
-        with self.request_log_path.open("a", encoding="utf-8", newline="\n") as file:
-            file.write(json.dumps(event, ensure_ascii=False) + "\n")
+        
+        # Log to request log (use storage backend if in VM mode)
+        if is_vm_mode():
+            self.storage.append_jsonl(
+                f"{self.source_id}/run_id={self.run_id}/metadata/request_log.jsonl",
+                event
+            )
+        else:
+            with self.request_log_path.open("a", encoding="utf-8", newline="\n") as file:
+                file.write(json.dumps(event, ensure_ascii=False) + "\n")
 
     def write_json(self, relative_path: str, payload: Any, record_count: int | None = None) -> Path:
-        path = self._resolve_output_path(relative_path)
-        tmp_path = self._staging_path(path)
-        try:
-            tmp_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-            self._atomic_publish(tmp_path, path)
-        except Exception:
-            tmp_path.unlink(missing_ok=True)
-            raise
-        count = estimate_record_count(payload) if record_count is None else record_count
-        self._record_output(path, count, payload)
-        return path
+        """Write JSON data using appropriate storage backend."""
+        storage_path = f"{self.source_id}/run_id={self.run_id}/raw/{relative_path}"
+        
+        if is_vm_mode():
+            # Use S3 storage
+            full_path = self.storage.write(storage_path, payload, is_json=True)
+            count = estimate_record_count(payload) if record_count is None else record_count
+            self._record_output_s3(storage_path, count, payload)
+            return Path(full_path)
+        else:
+            # Use local filesystem
+            path = self._resolve_output_path(relative_path)
+            tmp_path = self._staging_path(path)
+            try:
+                tmp_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+                self._atomic_publish(tmp_path, path)
+            except Exception:
+                tmp_path.unlink(missing_ok=True)
+                raise
+            count = estimate_record_count(payload) if record_count is None else record_count
+            self._record_output(path, count, payload)
+            return path
 
     def write_jsonl(self, relative_path: str, records: Iterable[dict[str, Any]]) -> Path:
-        path = self._resolve_output_path(relative_path)
-        tmp_path = self._staging_path(path)
-        rows = list(records)
-        try:
-            with tmp_path.open("w", encoding="utf-8", newline="\n") as file:
-                for record in rows:
-                    file.write(json.dumps(record, ensure_ascii=False) + "\n")
-            self._atomic_publish(tmp_path, path)
-        except Exception:
-            tmp_path.unlink(missing_ok=True)
-            raise
-        self._record_output(path, len(rows), rows)
-        return path
+        """Write JSONL data using appropriate storage backend."""
+        storage_path = f"{self.source_id}/run_id={self.run_id}/raw/{relative_path}"
+        
+        if is_vm_mode():
+            # Use S3 storage
+            full_path = self.storage.write_jsonl(storage_path, records)
+            rows = list(records)  # Consume iterator for count
+            self._record_output_s3(storage_path, len(rows), rows)
+            return Path(full_path)
+        else:
+            # Use local filesystem
+            path = self._resolve_output_path(relative_path)
+            tmp_path = self._staging_path(path)
+            rows = list(records)
+            try:
+                with tmp_path.open("w", encoding="utf-8", newline="\n") as file:
+                    for record in rows:
+                        file.write(json.dumps(record, ensure_ascii=False) + "\n")
+                self._atomic_publish(tmp_path, path)
+            except Exception:
+                tmp_path.unlink(missing_ok=True)
+                raise
+            self._record_output(path, len(rows), rows)
+            return path
+
+    def _record_output_s3(self, storage_path: str, record_count: int, payload: Any) -> None:
+        """Record output metadata for S3 storage."""
+        self.row_count += max(record_count, 0)
+        self._update_timestamps(payload)
+        chunk_id = self._active_chunk_id or "__unassigned__"
+        
+        # For S3, we can't compute local checksum/size easily
+        # Store the S3 path instead
+        output = {
+            "path": f"s3://{self.storage._bucket if hasattr(self.storage, '_bucket') else 'nexus-lakehouse'}/{storage_path}",
+            "relative_path": storage_path,
+            "record_count": max(record_count, 0),
+            "storage": "s3",
+            "written_at": now_iso(),
+        }
+        
+        current_outputs = self._chunk_outputs.setdefault(chunk_id, [])
+        self._chunk_outputs[chunk_id] = [
+            row for row in current_outputs
+            if row.get("relative_path") != storage_path
+        ]
+        self._chunk_outputs[chunk_id].append(output)
 
     def _resolve_output_path(self, relative_path: str) -> Path:
         path = self.raw_dir / relative_path

@@ -2,6 +2,7 @@
 
 Provides deduplication for records at the Bronze layer to prevent
 duplicate writes when jobs fail and retry.
+Supports both local filesystem and S3/MinIO storage.
 """
 
 from __future__ import annotations
@@ -13,7 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from common.config import RUNTIME_DIR
+from common.config import RUNTIME_DIR, is_vm_mode
+from common.storage import get_storage
 
 
 DEDUP_DIR = RUNTIME_DIR / "dedup"
@@ -216,31 +218,37 @@ class Deduplicator:
         index = self._get_index(source_id, run_id)
         return index.to_dict() if index else None
     
-    def save_index(self, source_id: str, run_id: str) -> Path:
-        """Save dedup index to disk.
+    def save_index(self, source_id: str, run_id: str) -> Path | str:
+        """Save dedup index to disk or S3.
         
         Args:
             source_id: Source identifier
             run_id: Run identifier
             
         Returns:
-            Path to saved index file
+            Path to saved index file (local path or S3 URL)
         """
         index = self._get_index(source_id, run_id)
         if not index:
             raise ValueError(f"No index found for {source_id}/{run_id}")
         
-        path = self.dedup_dir / source_id / f"{run_id}.dedup.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        
         data = index.to_dict()
         data["seen_keys"] = list(index.seen_keys)
         
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-        return path
-    
+        if is_vm_mode():
+            # Use S3 storage
+            storage = get_storage()
+            storage_path = f"dedup/{source_id}/{run_id}.dedup.json"
+            return storage.write(storage_path, data, is_json=True)
+        else:
+            # Use local filesystem
+            path = self.dedup_dir / source_id / f"{run_id}.dedup.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            return path
+
     def load_index(self, source_id: str, run_id: str) -> DedupIndex | None:
-        """Load dedup index from disk.
+        """Load dedup index from disk or S3.
         
         Args:
             source_id: Source identifier
@@ -249,28 +257,55 @@ class Deduplicator:
         Returns:
             DedupIndex or None if not found
         """
-        path = self.dedup_dir / source_id / f"{run_id}.dedup.json"
-        
-        if not path.exists():
-            return None
-        
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            seen_keys = set(data.pop("seen_keys", []))
+        if is_vm_mode():
+            # Use S3 storage
+            storage = get_storage()
+            storage_path = f"dedup/{source_id}/{run_id}.dedup.json"
             
-            index = DedupIndex(
-                source_id=data["source_id"],
-                run_id=data["run_id"],
-                seen_keys=seen_keys,
-                created_at=data.get("created_at", ""),
-                record_count=data.get("record_count", 0),
-                duplicate_count=data.get("duplicate_count", 0),
-            )
+            if not storage.exists(storage_path):
+                return None
             
-            self._indices[f"{source_id}/{run_id}"] = index
-            return index
-        except (json.JSONDecodeError, KeyError):
-            return None
+            try:
+                data = storage.read(storage_path)
+                seen_keys = set(data.pop("seen_keys", []))
+                
+                index = DedupIndex(
+                    source_id=data["source_id"],
+                    run_id=data["run_id"],
+                    seen_keys=seen_keys,
+                    created_at=data.get("created_at", ""),
+                    record_count=data.get("record_count", 0),
+                    duplicate_count=data.get("duplicate_count", 0),
+                )
+                
+                self._indices[f"{source_id}/{run_id}"] = index
+                return index
+            except Exception:
+                return None
+        else:
+            # Use local filesystem
+            path = self.dedup_dir / source_id / f"{run_id}.dedup.json"
+            
+            if not path.exists():
+                return None
+            
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                seen_keys = set(data.pop("seen_keys", []))
+                
+                index = DedupIndex(
+                    source_id=data["source_id"],
+                    run_id=data["run_id"],
+                    seen_keys=seen_keys,
+                    created_at=data.get("created_at", ""),
+                    record_count=data.get("record_count", 0),
+                    duplicate_count=data.get("duplicate_count", 0),
+                )
+                
+                self._indices[f"{source_id}/{run_id}"] = index
+                return index
+            except (json.JSONDecodeError, KeyError):
+                return None
     
     def _get_index(self, source_id: str, run_id: str) -> DedupIndex | None:
         """Get index from memory."""

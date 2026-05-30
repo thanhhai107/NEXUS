@@ -1,7 +1,7 @@
 """Dead Letter Queue Module.
 
 Provides DLQ for operational failures (not bad data - those go to quarantine).
-Supports both file-based and Postgres storage, with retry backoff and scheduling.
+Supports both file-based and S3/MinIO storage, with retry backoff and scheduling.
 """
 
 from __future__ import annotations
@@ -13,7 +13,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from common.config import RUNTIME_DIR
+from common.config import RUNTIME_DIR, is_vm_mode
+from common.storage import get_storage
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,11 @@ logger = logging.getLogger(__name__)
 DEFAULT_DLQ_DIR = RUNTIME_DIR / "dlq"
 DLQ_STREAM = "dlq"
 DLQ_INDEX_DIR = RUNTIME_DIR / "dlq" / ".index"
+
+
+def _get_dlq_storage_path(category: str, timestamp: str) -> str:
+    """Get S3 storage path for DLQ entry."""
+    return f"dlq/{category}_{timestamp}.jsonl"
 
 
 # --- Retry Policy ---
@@ -140,18 +146,40 @@ class EnhancedDLQ:
         )
         return self._write_entry(entry)
     
-    def _write_entry(self, entry: DLQEntry) -> Path:
-        """Write a DLQ entry to disk."""
-        entry_path = self.dlq_dir / f"{entry.category}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.jsonl"
+    def _write_entry(self, entry: DLQEntry) -> Path | str:
+        """Write a DLQ entry to disk or S3."""
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
         
-        with entry_path.open("a", encoding="utf-8", newline="\n") as f:
-            f.write(json.dumps(entry.to_dict(), ensure_ascii=False) + "\n")
-        
-        self._update_index(entry)
-        return entry_path
+        if is_vm_mode():
+            # Use S3 storage
+            storage = get_storage()
+            storage_path = f"dlq/{entry.category}_{timestamp}.jsonl"
+            line = json.dumps(entry.to_dict(), ensure_ascii=False) + "\n"
+            
+            # Read existing content or create new
+            existing_content = b""
+            if storage.exists(storage_path):
+                existing_content = storage.read_bytes(storage_path)
+            
+            content = existing_content + line.encode("utf-8")
+            storage.write_bytes(storage_path, content)
+            
+            # Update index in S3
+            self._update_index_s3(entry, timestamp)
+            
+            return f"s3://{storage._bucket if hasattr(storage, '_bucket') else 'nexus-lakehouse'}/{storage_path}"
+        else:
+            # Use local filesystem
+            entry_path = self.dlq_dir / f"{entry.category}_{timestamp}.jsonl"
+            
+            with entry_path.open("a", encoding="utf-8", newline="\n") as f:
+                f.write(json.dumps(entry.to_dict(), ensure_ascii=False) + "\n")
+            
+            self._update_index(entry)
+            return entry_path
     
     def _update_index(self, entry: DLQEntry) -> None:
-        """Update the DLQ index."""
+        """Update the DLQ index (local)."""
         index_file = self.index_dir / f"{entry.category}.index.json"
         
         index = {}
@@ -170,22 +198,51 @@ class EnhancedDLQ:
         
         index_file.write_text(json.dumps(index, indent=2), encoding="utf-8")
     
+    def _update_index_s3(self, entry: DLQEntry, timestamp: str) -> None:
+        """Update the DLQ index in S3."""
+        storage = get_storage()
+        index_path = f"dlq/.index/{entry.category}.index.json"
+        
+        index = {}
+        if storage.exists(index_path):
+            try:
+                index = storage.read(index_path)
+            except Exception:
+                index = {}
+        
+        key = f"{entry.source}:{entry.captured_at}"
+        index[key] = entry.to_dict()
+        
+        if len(index) > 1000:
+            sorted_items = sorted(index.items(), key=lambda x: x[1]["captured_at"])
+            index = dict(sorted_items[-1000:])
+        
+        storage.write(index_path, index, is_json=True)
+    
     def list_pending(self, category: str | None = None) -> list[DLQEntry]:
         """List pending DLQ entries."""
         entries = []
         now = datetime.now(timezone.utc)
         
-        for path in self.dlq_dir.glob("*.jsonl"):
-            if category and not path.name.startswith(category):
-                continue
+        if is_vm_mode():
+            # Use S3 storage
+            storage = get_storage()
+            prefix = "dlq/"
+            if category:
+                prefix = f"dlq/{category}_"
             
-            with path.open("r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    
-                    try:
+            for key in storage.list(prefix):
+                if not key.endswith(".jsonl"):
+                    continue
+                
+                try:
+                    # Read each DLQ file
+                    content = storage.read_bytes(key).decode("utf-8")
+                    for line in content.splitlines():
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
                         data = json.loads(line)
                         entry = DLQEntry.from_dict(data)
                         
@@ -198,8 +255,35 @@ class EnhancedDLQ:
                                 continue
                         
                         entries.append(entry)
-                    except (json.JSONDecodeError, KeyError):
-                        continue
+                except Exception:
+                    continue
+        else:
+            # Use local filesystem
+            for path in self.dlq_dir.glob("*.jsonl"):
+                if category and not path.name.startswith(category):
+                    continue
+                
+                with path.open("r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
+                        try:
+                            data = json.loads(line)
+                            entry = DLQEntry.from_dict(data)
+                            
+                            if entry.status != "pending":
+                                continue
+                            
+                            if entry.next_retry:
+                                next_retry = datetime.fromisoformat(entry.next_retry)
+                                if next_retry > now:
+                                    continue
+                            
+                            entries.append(entry)
+                        except (json.JSONDecodeError, KeyError):
+                            continue
         
         return sorted(entries, key=lambda e: e.captured_at)
     

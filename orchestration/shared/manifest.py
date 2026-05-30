@@ -2,6 +2,7 @@
 
 Provides manifest reading/writing operations.
 Extracted from ingestion/base/core.py for orchestration use.
+Supports both local filesystem and S3/MinIO storage.
 """
 
 from __future__ import annotations
@@ -13,7 +14,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from common.config import BRONZE_DIR, RUNTIME_DIR
+from common.config import BRONZE_DIR, RUNTIME_DIR, is_vm_mode
+from common.storage import StorageBackend, get_storage
 
 
 class CoverageStatus(str, Enum):
@@ -182,7 +184,7 @@ def read_published_manifest(run_id: str, dataset: str) -> PublishedManifest | No
         return None
 
 
-def write_manifest(run_id: str, dataset: str, manifest: RunManifest) -> Path:
+def write_manifest(run_id: str, dataset: str, manifest: RunManifest) -> Path | str:
     """Write run manifest.
     
     Args:
@@ -191,17 +193,22 @@ def write_manifest(run_id: str, dataset: str, manifest: RunManifest) -> Path:
         manifest: Manifest to write
     
     Returns:
-        Path to written manifest
+        Path to written manifest (local path or S3 URL)
     """
-    path = get_manifest_path(run_id, dataset)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    
-    path.write_text(
-        json.dumps(manifest.to_dict(), indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    
-    return path
+    if is_vm_mode():
+        # Use S3 storage
+        storage = get_storage()
+        storage_path = f"bronze/{dataset}/run_id={run_id}/metadata/run_manifest.json"
+        return storage.write(storage_path, manifest.to_dict(), is_json=True)
+    else:
+        # Use local filesystem
+        path = get_manifest_path(run_id, dataset)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(manifest.to_dict(), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return path
 
 
 def is_published(run_id: str, dataset: str) -> bool:

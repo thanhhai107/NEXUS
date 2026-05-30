@@ -2,6 +2,7 @@
 
 Validates records at ingestion time to catch schema violations early
 and route invalid records to quarantine before they enter the lake.
+Supports both local filesystem and S3/MinIO storage.
 """
 
 from __future__ import annotations
@@ -13,7 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from common.config import RUNTIME_DIR
+from common.config import RUNTIME_DIR, is_vm_mode
+from common.storage import get_storage
 from governance.quality.quarantine import quarantine_records
 
 
@@ -293,16 +295,22 @@ class BronzeSchemaValidator:
                 sample[key] = value
         return sample
     
-    def _save_validation_result(self, result: BatchValidationResult) -> Path:
-        """Save validation result to disk."""
-        path = self.validation_dir / self.source_id / f"{self.run_id}.validation.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        
+    def _save_validation_result(self, result: BatchValidationResult) -> Path | str:
+        """Save validation result to disk or S3."""
         data = result.to_dict()
         data["validation_errors"] = result.validation_errors[:100]  # Limit stored errors
         
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-        return path
+        if is_vm_mode():
+            # Use S3 storage
+            storage = get_storage()
+            storage_path = f"validation/bronze/{self.source_id}/{self.run_id}.validation.json"
+            return storage.write(storage_path, data, is_json=True)
+        else:
+            # Use local filesystem
+            path = self.validation_dir / self.source_id / f"{self.run_id}.validation.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            return path
     
     def _quarantine_records(self, records: list[dict[str, Any]]) -> Path | None:
         """Quarantine invalid records."""

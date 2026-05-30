@@ -2,6 +2,7 @@
 
 Provides checkpoint tracking for resumable pipeline runs.
 Extracted from ingestion/base/core.py for orchestration use.
+Supports both local filesystem and S3/MinIO storage.
 """
 
 from __future__ import annotations
@@ -11,10 +12,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from common.config import RUNTIME_DIR
+from common.config import RUNTIME_DIR, is_vm_mode
+from common.storage import get_storage
 
 
 CHECKPOINTS_DIR = RUNTIME_DIR / "checkpoints"
+
+
+def _get_checkpoint_storage_path(run_id: str, dataset: str) -> str:
+    """Get storage path for checkpoint in S3."""
+    return f"checkpoints/{dataset}/{run_id}.checkpoint.json"
 
 
 def ensure_checkpoints_dir(dataset: str | None = None) -> Path:
@@ -57,31 +64,61 @@ def load_checkpoint(run_id: str, dataset: str) -> dict[str, Any]:
     Returns:
         Checkpoint dict with completed_chunks, failed_chunks, etc.
     """
-    path = get_checkpoint_path(run_id, dataset)
-    
-    if not path.exists():
-        return {
-            "run_id": run_id,
-            "dataset": dataset,
-            "completed_chunks": {},
-            "failed_chunks": {},
-            "skipped_chunks": {},
-            "chunk_outputs": {},
-            "last_run_at": None,
-        }
-    
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return {
-            "run_id": run_id,
-            "dataset": dataset,
-            "completed_chunks": {},
-            "failed_chunks": {},
-            "skipped_chunks": {},
-            "chunk_outputs": {},
-            "last_run_at": None,
-        }
+    if is_vm_mode():
+        # Use S3 storage
+        storage = get_storage()
+        storage_path = _get_checkpoint_storage_path(run_id, dataset)
+        
+        if not storage.exists(storage_path):
+            return {
+                "run_id": run_id,
+                "dataset": dataset,
+                "completed_chunks": {},
+                "failed_chunks": {},
+                "skipped_chunks": {},
+                "chunk_outputs": {},
+                "last_run_at": None,
+            }
+        
+        try:
+            return storage.read(storage_path)
+        except Exception:
+            return {
+                "run_id": run_id,
+                "dataset": dataset,
+                "completed_chunks": {},
+                "failed_chunks": {},
+                "skipped_chunks": {},
+                "chunk_outputs": {},
+                "last_run_at": None,
+            }
+    else:
+        # Use local filesystem
+        path = get_checkpoint_path(run_id, dataset)
+        
+        if not path.exists():
+            return {
+                "run_id": run_id,
+                "dataset": dataset,
+                "completed_chunks": {},
+                "failed_chunks": {},
+                "skipped_chunks": {},
+                "chunk_outputs": {},
+                "last_run_at": None,
+            }
+        
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {
+                "run_id": run_id,
+                "dataset": dataset,
+                "completed_chunks": {},
+                "failed_chunks": {},
+                "skipped_chunks": {},
+                "chunk_outputs": {},
+                "last_run_at": None,
+            }
 
 
 def save_checkpoint(run_id: str, dataset: str, data: dict[str, Any]) -> None:
@@ -92,13 +129,19 @@ def save_checkpoint(run_id: str, dataset: str, data: dict[str, Any]) -> None:
         dataset: Dataset name
         data: Checkpoint data to save
     """
-    path = get_checkpoint_path(run_id, dataset)
-    
     data["run_id"] = run_id
     data["dataset"] = dataset
     data["last_run_at"] = datetime.now(timezone.utc).isoformat()
     
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    if is_vm_mode():
+        # Use S3 storage
+        storage = get_storage()
+        storage_path = _get_checkpoint_storage_path(run_id, dataset)
+        storage.write(storage_path, data, is_json=True)
+    else:
+        # Use local filesystem
+        path = get_checkpoint_path(run_id, dataset)
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def is_chunk_completed(run_id: str, dataset: str, chunk_id: str) -> bool:
