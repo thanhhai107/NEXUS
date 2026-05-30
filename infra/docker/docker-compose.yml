@@ -413,7 +413,7 @@ services:
       true) &&
       airflow webserver"
     ports:
-      - "8080:8080"
+      - "8082:8080"
     volumes:
       - ../../orchestration/airflow/dags:/opt/airflow/dags
       - ../../common:/opt/airflow/common
