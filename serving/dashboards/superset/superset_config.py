@@ -17,4 +17,4 @@ NEXUS_POLICY_ROLES = {
 }
 
 # Add a Trino database connection in the Superset UI:
-# trino://nexus@trino:8080/iceberg
+# trino://nexus@trino-coordinator:8080/iceberg

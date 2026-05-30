@@ -34,6 +34,12 @@ if [ -z "$${NEXUS_MASTER_PRIVATE_IP}" ]; then
   NEXUS_MASTER_PRIVATE_IP="$${NEXUS_NODE_IP}"
 fi
 
+# MinIO peer IPs from Terraform
+NEXUS_MINIO_PEER_IPS="${minio_peer_ips}"
+
+# ZK peer IPs (first 3 nodes: master + worker-1 + worker-2)
+NEXUS_ZK_PEER_IPS="${zk_peer_ips}"
+
 # ---------------------------------------------------------------------------
 # Master-worker SSH key
 # ---------------------------------------------------------------------------
@@ -170,7 +176,11 @@ EOF
 # Write helper scripts
 # ---------------------------------------------------------------------------
 write_nexus_helpers() {
-  cat >/usr/local/bin/nexus-configure-env <<'EOF'
+  # Install node-services.sh as a library
+  cp "$${NEXUS_APP_DIR}/infra/docker/node-services.sh" /usr/local/bin/nexus-node-services
+  chmod 0644 /usr/local/bin/nexus-node-services
+
+  cat >/usr/local/bin/nexus-configure-env <<'NCEOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -180,26 +190,6 @@ DOCKER="docker"
 if ! docker info >/dev/null 2>&1; then
   DOCKER="sudo docker"
 fi
-
-default_worker_cores() {
-  local cpus
-  cpus="$(nproc --all 2>/dev/null || echo 2)"
-  if [ "$cpus" -gt 2 ]; then
-    echo $((cpus - 1))
-  else
-    echo "$cpus"
-  fi
-}
-
-default_worker_memory() {
-  local mem_mb usable_gb
-  mem_mb="$(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo)"
-  usable_gb=$(((mem_mb - 2048) / 1024))
-  if [ "$usable_gb" -lt 1 ]; then
-    usable_gb=1
-  fi
-  echo "$${usable_gb}G"
-}
 
 set_env_value() {
   local env_file="$1"
@@ -221,7 +211,29 @@ if [ ! -f .env ] && [ -f .env.example ]; then
 fi
 
 master_ip="$${NEXUS_MASTER_PRIVATE_IP:-$NEXUS_NODE_IP}"
-spark_url="spark://$${master_ip}:7077"
+zk_peers="$${NEXUS_ZK_PEER_IPS:-$master_ip}"
+minio_peers="$${NEXUS_MINIO_PEER_IPS:-$master_ip}"
+
+default_worker_cores() {
+  local cpus
+  cpus="$(nproc --all 2>/dev/null || echo 2)"
+  if [ "$cpus" -gt 2 ]; then
+    echo $((cpus - 1))
+  else
+    echo "$cpus"
+  fi
+}
+
+default_worker_memory() {
+  local mem_mb usable_gb
+  mem_mb="$(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo)"
+  usable_gb=$(((mem_mb - 2048) / 1024))
+  if [ "$usable_gb" -lt 1 ]; then
+    usable_gb=1
+  fi
+  echo "$${usable_gb}G"
+}
+
 worker_cores="$${SPARK_WORKER_CORES:-$(default_worker_cores)}"
 worker_memory="$${SPARK_WORKER_MEMORY:-$(default_worker_memory)}"
 parallelism="$worker_cores"
@@ -229,46 +241,179 @@ if [[ "$NEXUS_WORKER_COUNT" =~ ^[0-9]+$ ]] && [[ "$worker_cores" =~ ^[0-9]+$ ]];
   parallelism=$((NEXUS_WORKER_COUNT * worker_cores))
 fi
 
+# Build ZK config
+IFS=' ' read -r -a zk_ips <<< "$zk_peers"
+zk_servers=""
+for i in "$${!zk_ips[@]}"; do
+  if [ -n "$zk_servers" ]; then zk_servers+=";"; fi
+  zk_servers+="$${zk_ips[$i]}:2888:3888"
+done
+zk_connect=""
+for ip in "$${zk_ips[@]}"; do
+  if [ -n "$zk_connect" ]; then zk_connect+=","; fi
+  zk_connect+="$${ip}:2181"
+done
+
+# Build MinIO peer command
+minio_cmd=""
+for ip in $minio_peers; do
+  if [ -n "$minio_cmd" ]; then minio_cmd+=" "; fi
+  minio_cmd+="http://$${ip}:9000/data"
+done
+
+# Build Kafka bootstrap servers
+kafka_servers=""
+for ip in "$${zk_ips[@]}"; do
+  if [ -n "$kafka_servers" ]; then kafka_servers+=","; fi
+  kafka_servers+="$${ip}:9092"
+done
+
 set_env_value .env NEXUS_RUNTIME_MODE vm
 set_env_value .env NEXUS_RUNTIME_DIR "$NEXUS_DATA"
 set_env_value .env NEXUS_ACTOR vm
 set_env_value .env NEXUS_GOVERNANCE_STORAGE postgres
-set_env_value .env NEXUS_MINIO_VOLUME "$NEXUS_DATA/minio"
-set_env_value .env NEXUS_HIVE_METASTORE_DB_VOLUME "$NEXUS_DATA/postgres/hive-metastore"
-set_env_value .env NEXUS_AIRFLOW_DB_VOLUME "$NEXUS_DATA/postgres/airflow"
-set_env_value .env NEXUS_GOVERNANCE_DB_VOLUME "$NEXUS_DATA/postgres/governance"
-set_env_value .env NEXUS_SUPERSET_HOME_VOLUME "$NEXUS_DATA/superset"
+set_env_value .env NEXUS_GX_ENABLED true
 set_env_value .env MINIO_ENDPOINT "http://$${master_ip}:9000"
-set_env_value .env HIVE_METASTORE_URI "thrift://$${master_ip}:9083"
-set_env_value .env KAFKA_ADVERTISED_HOST "$master_ip"
-set_env_value .env KAFKA_BOOTSTRAP_SERVERS "$${master_ip}:29092"
-set_env_value .env SPARK_MASTER "$spark_url"
-set_env_value .env SPARK_MASTER_URL "$spark_url"
-set_env_value .env SPARK_PROPERTIES_FILE /opt/airflow/config/spark-defaults.conf
-set_env_value .env SPARK_DRIVER_HOST "$master_ip"
-set_env_value .env SPARK_DRIVER_BIND_ADDRESS 0.0.0.0
-set_env_value .env SPARK_DRIVER_PORT 7078
-set_env_value .env SPARK_BLOCKMANAGER_PORT 7079
+set_env_value .env MINIO_ROOT_USER "$${MINIO_ROOT_USER:-minioadmin}"
+set_env_value .env MINIO_ROOT_PASSWORD "$${MINIO_ROOT_PASSWORD:-minioadmin}"
+set_env_value .env NEXUS_BUCKET "$${NEXUS_BUCKET:-nexus-lakehouse}"
+set_env_value .env NEXUS_MINIO_VOLUME "$${NEXUS_DATA}/minio"
+set_env_value .env ZK_SERVERS "$zk_servers"
+set_env_value .env ZK_CONNECT "$zk_connect"
+set_env_value .env MINIO_PEERS "$minio_cmd"
+set_env_value .env KAFKA_BOOTSTRAP_SERVERS "$kafka_servers"
+set_env_value .env HIVE_METASTORE_URI "thrift://hive-metastore:9083"
+set_env_value .env TRINO_HOST trino-coordinator
+set_env_value .env TRINO_PORT 8080
+set_env_value .env TRINO_USER "$${TRINO_USER:-nexus}"
+set_env_value .env SPARK_MASTER_URL "spark://$${master_ip}:7077"
 set_env_value .env SPARK_WORKER_CORES "$worker_cores"
 set_env_value .env SPARK_WORKER_MEMORY "$worker_memory"
-set_env_value .env SPARK_LOCAL_DIRS "$NEXUS_DATA/spark"
 set_env_value .env SPARK_EXECUTOR_CORES "$worker_cores"
 set_env_value .env SPARK_EXECUTOR_MEMORY "$worker_memory"
 set_env_value .env SPARK_DEFAULT_PARALLELISM "$parallelism"
 set_env_value .env SPARK_SQL_SHUFFLE_PARTITIONS "$parallelism"
+set_env_value .env SPARK_LOCAL_DIRS "$NEXUS_DATA/spark"
+set_env_value .env SUPERSET_SECRET_KEY "$${SUPERSET_SECRET_KEY:-change-me-for-production}"
+set_env_value .env SUPERSET_ADMIN_USERNAME "$${SUPERSET_ADMIN_USERNAME:-admin}"
+set_env_value .env SUPERSET_ADMIN_PASSWORD "$${SUPERSET_ADMIN_PASSWORD:-admin}"
+set_env_value .env AIRFLOW_ADMIN_USERNAME "$${AIRFLOW_ADMIN_USERNAME:-admin}"
+set_env_value .env AIRFLOW_ADMIN_PASSWORD "$${AIRFLOW_ADMIN_PASSWORD:-admin}"
+set_env_value .env AIRFLOW_DB_URL "postgresql+psycopg2://airflow:airflow@$${master_ip}:5432/airflow"
+set_env_value .env AIRFLOW_CELERY_BROKER_URL "redis://:@$${master_ip}:6379/0"
+set_env_value .env NEXUS_GOVERNANCE_DATABASE_URL "postgresql://nexus_governance:nexus_governance@governance-db-primary:5432/nexus_governance"
+set_env_value .env NEXUS_GOVERNANCE_DB_URL "postgresql://nexus_governance:nexus_governance@$${master_ip}:5432/nexus_governance"
+set_env_value .env NEXUS_MASTER_PRIVATE_IP "$master_ip"
+set_env_value .env NEXUS_NODE_IP "$NEXUS_NODE_IP"
 
 mkdir -p \
   "$NEXUS_DATA/minio" \
   "$NEXUS_DATA/postgres/hive-metastore" \
   "$NEXUS_DATA/postgres/airflow" \
   "$NEXUS_DATA/postgres/governance" \
+  "$NEXUS_DATA/postgres/governance-replica" \
   "$NEXUS_DATA/spark" \
   "$NEXUS_DATA/superset"
 
 chown -R 1001:0 "$NEXUS_DATA/spark" || true
 chown -R 999:999 "$NEXUS_DATA/postgres" || true
-EOF
+
+# Generate nginx API LB config with remote worker IPs
+mkdir -p "${NEXUS_APP_DIR}/runtime"
+cat > "${NEXUS_APP_DIR}/runtime/nginx-api-lb.conf" <<NGINXEOF
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream api_backend {
+        server api-1:8000;
+NGINXEOF
+
+worker_count="${NEXUS_WORKER_COUNT:-4}"
+if [ "$worker_count" -ge 1 ]; then
+  for peer_ip in $minio_peers; do
+    if [ "$peer_ip" != "$master_ip" ]; then
+      echo "        server ${peer_ip}:8002;" >> "${NEXUS_APP_DIR}/runtime/nginx-api-lb.conf"
+      break
+    fi
+  done
+fi
+if [ "$worker_count" -ge 2 ]; then
+  count=0
+  for peer_ip in $minio_peers; do
+    if [ "$peer_ip" != "$master_ip" ]; then
+      count=$((count + 1))
+      if [ "$count" -eq 2 ]; then
+        echo "        server ${peer_ip}:8003;" >> "${NEXUS_APP_DIR}/runtime/nginx-api-lb.conf"
+        break
+      fi
+    fi
+  done
+fi
+
+cat >> "${NEXUS_APP_DIR}/runtime/nginx-api-lb.conf" <<NGINXEOF
+    }
+
+    server {
+        listen 8000;
+
+        location / {
+            proxy_pass http://api_backend;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+        }
+    }
+}
+NGINXEOF
+NCEOF
   chmod 0755 /usr/local/bin/nexus-configure-env
+
+  cat >/usr/local/bin/start-nexus-compose <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+. /etc/nexus-node.env
+
+if [ "$NEXUS_NODE_ROLE" != "master" ]; then
+  echo "Run this command on the master VM."
+  exit 1
+fi
+
+DOCKER="docker"
+if ! docker info >/dev/null 2>&1; then
+  DOCKER="sudo docker"
+fi
+
+cd "${NEXUS_APP_DIR}"
+nexus-configure-env
+
+. /usr/local/bin/nexus-node-services
+SERVICES=$(node_services)
+
+echo "Starting MASTER services (role=${NEXUS_NODE_ROLE}): ${SERVICES}"
+${DOCKER} compose --env-file .env -f infra/docker/docker-compose.yml up -d --build ${SERVICES}
+${DOCKER} compose --env-file .env -f infra/docker/docker-compose.yml ps
+EOF
+  chmod 0755 /usr/local/bin/start-nexus-compose
+
+  cat >/usr/local/bin/stop-nexus-compose <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+. /etc/nexus-node.env
+
+DOCKER="docker"
+if ! docker info >/dev/null 2>&1; then
+  DOCKER="sudo docker"
+fi
+
+cd "${NEXUS_APP_DIR}"
+${DOCKER} compose --env-file .env -f infra/docker/docker-compose.yml down
+EOF
+  chmod 0755 /usr/local/bin/stop-nexus-compose
 
   cat >/usr/local/bin/start-nexus-worker <<'EOF'
 #!/usr/bin/env bash
@@ -288,7 +433,12 @@ fi
 
 nexus-configure-env
 cd "$NEXUS_APP_DIR"
-$DOCKER compose --env-file .env -f infra/docker/docker-compose.worker.yml up -d --build
+
+. /usr/local/bin/nexus-node-services
+SERVICES=$(node_services)
+
+echo "Starting WORKER services (index=${NEXUS_NODE_INDEX}, ip=${NEXUS_NODE_IP}): ${SERVICES}"
+$DOCKER compose --env-file .env -f infra/docker/docker-compose.worker.yml up -d --build ${SERVICES}
 $DOCKER compose --env-file .env -f infra/docker/docker-compose.worker.yml ps
 EOF
   chmod 0755 /usr/local/bin/start-nexus-worker
@@ -312,46 +462,6 @@ EOF
   if [ "$${NEXUS_NODE_ROLE}" != "master" ]; then
     return 0
   fi
-
-  cat >/usr/local/bin/start-nexus-compose <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-. /etc/nexus-node.env
-
-if [ "$${NEXUS_NODE_ROLE}" != "master" ]; then
-  echo "Run this command on the master VM."
-  exit 1
-fi
-
-DOCKER="docker"
-if ! docker info >/dev/null 2>&1; then
-  DOCKER="sudo docker"
-fi
-
-cd "$${NEXUS_APP_DIR}"
-nexus-configure-env
-
-$${DOCKER} compose --env-file .env -f infra/docker/docker-compose.yml up -d --build
-$${DOCKER} compose --env-file .env -f infra/docker/docker-compose.yml ps
-EOF
-  chmod 0755 /usr/local/bin/start-nexus-compose
-
-  cat >/usr/local/bin/stop-nexus-compose <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-. /etc/nexus-node.env
-
-DOCKER="docker"
-if ! docker info >/dev/null 2>&1; then
-  DOCKER="sudo docker"
-fi
-
-cd "$${NEXUS_APP_DIR}"
-$${DOCKER} compose --env-file .env -f infra/docker/docker-compose.yml down
-EOF
-  chmod 0755 /usr/local/bin/stop-nexus-compose
 
   cat >/usr/local/bin/nexus-spark-submit <<'EOF'
 #!/usr/bin/env bash
@@ -388,8 +498,6 @@ spark_executor_cores="$(env_value SPARK_EXECUTOR_CORES "")"
 spark_executor_memory="$(env_value SPARK_EXECUTOR_MEMORY "")"
 spark_default_parallelism="$(env_value SPARK_DEFAULT_PARALLELISM "")"
 spark_shuffle_partitions="$(env_value SPARK_SQL_SHUFFLE_PARTITIONS "")"
-minio_root_user="$(env_value MINIO_ROOT_USER minioadmin)"
-minio_root_password="$(env_value MINIO_ROOT_PASSWORD minioadmin)"
 
 if ! $DOCKER image inspect nexus-spark:3.5 >/dev/null 2>&1; then
   $DOCKER build -t nexus-spark:3.5 infra/docker/spark
@@ -397,7 +505,7 @@ fi
 
 $DOCKER run --rm \
   --network host \
-  -e SPARK_MASTER="spark://$${NEXUS_MASTER_PRIVATE_IP}:7077" \
+  -e SPARK_MASTER="spark://$NEXUS_MASTER_PRIVATE_IP:7077" \
   -e SPARK_PROPERTIES_FILE=/opt/nexus/config/spark-defaults.conf \
   -e SPARK_DRIVER_HOST="$NEXUS_MASTER_PRIVATE_IP" \
   -e SPARK_DRIVER_BIND_ADDRESS=0.0.0.0 \
@@ -408,10 +516,10 @@ $DOCKER run --rm \
   -e SPARK_DEFAULT_PARALLELISM="$spark_default_parallelism" \
   -e SPARK_SQL_SHUFFLE_PARTITIONS="$spark_shuffle_partitions" \
   -e SPARK_LOCAL_DIRS="$NEXUS_DATA/spark" \
-  -e HIVE_METASTORE_URI="thrift://$${NEXUS_MASTER_PRIVATE_IP}:9083" \
-  -e MINIO_ENDPOINT="http://$${NEXUS_MASTER_PRIVATE_IP}:9000" \
-  -e MINIO_ROOT_USER="$minio_root_user" \
-  -e MINIO_ROOT_PASSWORD="$minio_root_password" \
+  -e HIVE_METASTORE_URI="thrift://$NEXUS_MASTER_PRIVATE_IP:9083" \
+  -e MINIO_ENDPOINT="http://$NEXUS_MASTER_PRIVATE_IP:9000" \
+  -e MINIO_ROOT_USER="minioadmin" \
+  -e MINIO_ROOT_PASSWORD="minioadmin" \
   -e NEXUS_RUNTIME_MODE=vm \
   -e NEXUS_RUNTIME_DIR="$NEXUS_DATA" \
   -v "$NEXUS_APP_DIR:/opt/nexus" \
@@ -453,6 +561,8 @@ NEXUS_NODE_NAME=$${NEXUS_NODE_NAME}
 NEXUS_NODE_IP=$${NEXUS_NODE_IP}
 NEXUS_MASTER_PRIVATE_IP=$${NEXUS_MASTER_PRIVATE_IP}
 NEXUS_WORKER_COUNT=$${NEXUS_WORKER_COUNT}
+NEXUS_MINIO_PEER_IPS=$${NEXUS_MINIO_PEER_IPS}
+NEXUS_ZK_PEER_IPS=$${NEXUS_ZK_PEER_IPS}
 NEXUS_HOME=$${NEXUS_HOME}
 NEXUS_APP_DIR=$${NEXUS_APP_DIR}
 NEXUS_DATA=$${NEXUS_DATA}

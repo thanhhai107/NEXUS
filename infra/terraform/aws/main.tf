@@ -390,6 +390,38 @@ resource "aws_security_group" "master_ui" {
     cidr_blocks = var.allowed_admin_cidrs
   }
 
+  ingress {
+    description = "Kafka broker 1"
+    from_port   = 29092
+    to_port     = 29092
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_admin_cidrs
+  }
+
+  ingress {
+    description = "Kafka broker 2"
+    from_port   = 29093
+    to_port     = 29093
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_admin_cidrs
+  }
+
+  ingress {
+    description = "Kafka broker 3"
+    from_port   = 29094
+    to_port     = 29094
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_admin_cidrs
+  }
+
+  ingress {
+    description = "MinIO API node 2"
+    from_port   = 9002
+    to_port     = 9002
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_admin_cidrs
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -527,6 +559,17 @@ locals {
     ssh_password                  = var.ssh_password
     enable_master_worker_ssh      = var.enable_master_worker_ssh
     master_worker_private_key_b64 = var.enable_master_worker_ssh ? base64encode(tls_private_key.master_worker[0].private_key_openssh) : ""
+    minio_peer_ips = join(" ", compact([
+      aws_instance.master.private_ip,
+      try(aws_instance.workers[0].private_ip, ""),
+      try(aws_instance.workers[1].private_ip, ""),
+      try(aws_instance.workers[2].private_ip, ""),
+    ]))
+    zk_peer_ips = join(" ", compact([
+      aws_instance.master.private_ip,
+      try(aws_instance.workers[0].private_ip, ""),
+      try(aws_instance.workers[1].private_ip, ""),
+    ]))
   }
 }
 
@@ -637,5 +680,5 @@ output "service_urls" {
 
 output "nexus_tunnel_command" {
   description = "Use this when you need local access to Nexus services without exposing them publicly."
-  value       = "ssh -L 8000:127.0.0.1:8000 -L 8080:127.0.0.1:8080 -L 8081:127.0.0.1:8081 -L 8085:127.0.0.1:8085 -L 8088:127.0.0.1:8088 -L 9000:127.0.0.1:9000 -L 9001:127.0.0.1:9001 ${var.ssh_user}@${aws_instance.master.public_ip}"
+  value       = "ssh -L 8000:127.0.0.1:8000 -L 8080:127.0.0.1:8080 -L 8081:127.0.0.1:8081 -L 8085:127.0.0.1:8085 -L 8088:127.0.0.1:8088 -L 9000:127.0.0.1:9000 -L 9001:127.0.0.1:9001 -L 29092:127.0.0.1:29092 ${var.ssh_user}@${aws_instance.master.public_ip}"
 }

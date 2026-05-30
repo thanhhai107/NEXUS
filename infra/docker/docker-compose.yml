@@ -101,131 +101,101 @@ x-openmetadata-environment: &openmetadata-environment
   WEB_CONF_CACHE_CONTROL: ""
   WEB_CONF_PRAGMA: ""
 
+x-airflow-environment: &airflow-environment
+  AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+  AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  AIRFLOW__WEBSERVER__SECRET_KEY: nexus-local-secret
+  AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+  AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@airflow-db:5432/airflow
+  NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
+  NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db-primary:5432/nexus_governance}
+  NEXUS_GX_ENABLED: ${NEXUS_GX_ENABLED:-true}
+  KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-}
+  KAFKA_TOPIC_TRANSPORT_EVENTS: ${KAFKA_TOPIC_TRANSPORT_EVENTS:-transport-events}
+  MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio-1:9000}
+  NEXUS_BUCKET: ${NEXUS_BUCKET:-nexus-lakehouse}
+  OPENLINEAGE_URL: ${OPENLINEAGE_URL:-}
+  OPENLINEAGE_ENDPOINT: ${OPENLINEAGE_ENDPOINT:-/api/v1/lineage}
+  OPENLINEAGE_NAMESPACE: ${OPENLINEAGE_NAMESPACE:-nexus}
+  OPENLINEAGE_TIMEOUT_SECONDS: ${OPENLINEAGE_TIMEOUT_SECONDS:-5}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
+  NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
+
+x-host-access: &host-access
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
 services:
-  minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
-    container_name: nexus-minio
+  # =========================================================================
+  # DISTRIBUTED INFRASTRUCTURE - Host networking (reachable across VMs)
+  # =========================================================================
+  zookeeper-1:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: nexus-zookeeper-1
     restart: unless-stopped
-    command: server /data --console-address ":9001"
+    network_mode: host
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: ${ZK_SERVERS}
+
+  kafka-1:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: nexus-kafka-1
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - zookeeper-1
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: ${ZK_CONNECT}
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${NEXUS_MASTER_PRIVATE_IP}:9092,PLAINTEXT_HOST://${NEXUS_MASTER_PRIVATE_IP}:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  minio-1:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: nexus-minio-1
+    restart: unless-stopped
+    network_mode: host
+    command: server --console-address ":9001" ${MINIO_PEERS}
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     volumes:
-      - ${NEXUS_MINIO_VOLUME:-minio-data}:/data
+      - ${NEXUS_MINIO_VOLUME:-minio-data-1}:/data
 
   minio-init:
     image: minio/mc:RELEASE.2025-04-16T18-13-26Z
     container_name: nexus-minio-init
+    <<: *host-access
     depends_on:
-      - minio
+      - minio-1
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
       NEXUS_BUCKET: ${NEXUS_BUCKET:-nexus-lakehouse}
     entrypoint: >
       /bin/sh -c "
-      until mc alias set nexus http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do sleep 2; done;
+      until mc alias set nexus http://host.docker.internal:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do sleep 2; done;
       mc mb --ignore-existing nexus/$${NEXUS_BUCKET};
       mc anonymous set none nexus/$${NEXUS_BUCKET};
       "
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.1
-    container_name: nexus-zookeeper
-    restart: unless-stopped
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
-
-  kafka:
-    image: confluentinc/cp-kafka:7.6.1
-    container_name: nexus-kafka
-    restart: unless-stopped
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://${KAFKA_ADVERTISED_HOST:-localhost}:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    ports:
-      - "29092:29092"
-
-  spark:
-    build:
-      context: spark
-    image: nexus-spark:3.5
-    container_name: nexus-spark
-    restart: unless-stopped
-    depends_on:
-      - hive-metastore
-      - minio-init
-    environment:
-      SPARK_MODE: master
-      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
-      SPARK_RPC_ENCRYPTION_ENABLED: "no"
-      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
-      SPARK_SSL_ENABLED: "no"
-      HOME: /tmp/nexus-spark-home
-      HADOOP_USER_NAME: spark
-      USER: spark
-      LOGNAME: spark
-      PYSPARK_PYTHON: /opt/bitnami/python/bin/python3.12
-      PYSPARK_DRIVER_PYTHON: /opt/bitnami/python/bin/python3.12
-      SPARK_LOCAL_DIRS: ${SPARK_LOCAL_DIRS:-/data/spark}
-    ports:
-      - "7077:7077"
-      - "8081:8080"
-    volumes:
-      - ../../:/opt/nexus
-      - ${NEXUS_RUNTIME_DIR:-../../runtime}:/data
-
-  spark-worker:
-    image: nexus-spark:3.5
-    container_name: nexus-spark-worker
-    restart: unless-stopped
-    depends_on:
-      - spark
-      - hive-metastore
-      - minio-init
-    environment:
-      SPARK_MODE: worker
-      SPARK_MASTER_URL: ${SPARK_MASTER_URL:-spark://spark:7077}
-      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-2G}
-      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-2}
-      SPARK_LOCAL_DIRS: ${SPARK_LOCAL_DIRS:-/data/spark}
-      HOME: /tmp/nexus-spark-home
-      HADOOP_USER_NAME: spark
-      USER: spark
-      LOGNAME: spark
-      PYSPARK_PYTHON: /opt/bitnami/python/bin/python3.12
-      PYSPARK_DRIVER_PYTHON: /opt/bitnami/python/bin/python3.12
-    volumes:
-      - ../../:/opt/nexus
-      - ${NEXUS_RUNTIME_DIR:-../../runtime}:/data
-
-  trino:
-    image: trinodb/trino:451
-    container_name: nexus-trino
-    restart: unless-stopped
-    depends_on:
-      - hive-metastore
-      - minio-init
-    ports:
-      - "8085:8080"
-    volumes:
-      - ../../serving/query/trino/catalog:/etc/trino/catalog
-      - ../../serving/query/trino/access-control.properties:/etc/trino/access-control.properties
-      - ../../serving/query/trino/rules.json:/etc/trino/rules.json
-
+  # =========================================================================
+  # DATABASES - Bridge networking (master-only)
+  # =========================================================================
   hive-metastore-db:
     image: postgres:16
     container_name: nexus-hive-metastore-db
@@ -235,19 +205,78 @@ services:
       POSTGRES_PASSWORD: hive
       POSTGRES_DB: metastore_db
     volumes:
-      - ${NEXUS_HIVE_METASTORE_DB_VOLUME:-hive-metastore-db-data}:/var/lib/postgresql/data
+      - hive-metastore-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hive -d metastore_db"]
       interval: 10s
       timeout: 5s
       retries: 10
 
+  airflow-db:
+    image: postgres:16
+    container_name: nexus-airflow-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  governance-db-primary:
+    image: postgres:16
+    container_name: nexus-governance-db-primary
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nexus_governance
+      POSTGRES_PASSWORD: nexus_governance
+      POSTGRES_DB: nexus_governance
+      POSTGRES_REPLICATION_PASSWORD: nexus_replication
+    command: >
+      -c wal_level=replica
+      -c max_wal_senders=5
+      -c max_replication_slots=5
+      -c wal_keep_size=256
+      -c hot_standby=on
+    ports:
+      - "5432:5432"
+    volumes:
+      - governance-db-data-primary:/var/lib/postgresql/data
+      - ../../infra/docker/postgres/primary-init.sh:/docker-entrypoint-initdb.d/01-replication.sh
+      - ../../infra/docker/postgres/pg_hba_append.sh:/docker-entrypoint-initdb.d/02-pg-hba.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus_governance -d nexus_governance"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexus-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # =========================================================================
+  # HIVE METASTORE - Bridge
+  # =========================================================================
   hive-metastore:
     build:
       context: hive-metastore
     image: nexus-hive-metastore:4.0.0
     container_name: nexus-hive-metastore
     restart: unless-stopped
+    <<: *host-access
     depends_on:
       hive-metastore-db:
         condition: service_healthy
@@ -267,38 +296,98 @@ services:
     ports:
       - "9083:9083"
 
-  airflow-db:
-    image: postgres:16
-    container_name: nexus-airflow-db
+  # =========================================================================
+  # SPARK - Bridge
+  # =========================================================================
+  spark:
+    build:
+      context: spark
+    image: nexus-spark:3.5
+    container_name: nexus-spark
     restart: unless-stopped
+    <<: *host-access
+    depends_on:
+      - hive-metastore
+      - minio-init
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
+      SPARK_MODE: master
+      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
+      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
+      SPARK_SSL_ENABLED: "no"
+      HOME: /tmp/nexus-spark-home
+      HADOOP_USER_NAME: spark
+      USER: spark
+      LOGNAME: spark
+      PYSPARK_PYTHON: /opt/bitnami/python/bin/python3.12
+      PYSPARK_DRIVER_PYTHON: /opt/bitnami/python/bin/python3.12
+    ports:
+      - "7077:7077"
+      - "8081:8080"
     volumes:
-      - ${NEXUS_AIRFLOW_DB_VOLUME:-airflow-db-data}:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      - ../../:/opt/nexus
 
-  governance-db:
-    image: postgres:16
-    container_name: nexus-governance-db
+  spark-worker-1:
+    image: nexus-spark:3.5
+    container_name: nexus-spark-worker-local
     restart: unless-stopped
+    <<: *host-access
+    depends_on:
+      - spark
+      - hive-metastore
+      - minio-init
     environment:
-      POSTGRES_USER: nexus_governance
-      POSTGRES_PASSWORD: nexus_governance
-      POSTGRES_DB: nexus_governance
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark:7077
+      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-2G}
+      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-2}
+      HOME: /tmp/nexus-spark-home
+      HADOOP_USER_NAME: spark
+      USER: spark
+      LOGNAME: spark
+      PYSPARK_PYTHON: /opt/bitnami/python/bin/python3.12
+      PYSPARK_DRIVER_PYTHON: /opt/bitnami/python/bin/python3.12
     volumes:
-      - ${NEXUS_GOVERNANCE_DB_VOLUME:-governance-db-data}:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexus_governance -d nexus_governance"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      - ../../:/opt/nexus
 
+  # =========================================================================
+  # TRINO - Bridge
+  # =========================================================================
+  trino-coordinator:
+    image: trinodb/trino:451
+    container_name: nexus-trino-coordinator
+    restart: unless-stopped
+    <<: *host-access
+    depends_on:
+      - hive-metastore
+      - minio-init
+    ports:
+      - "8085:8080"
+    volumes:
+      - ../../serving/query/trino/coordinator/config.properties:/etc/trino/config.properties
+      - ../../serving/query/trino/coordinator/node.properties:/etc/trino/node.properties
+      - ../../serving/query/trino/catalog:/etc/trino/catalog
+      - ../../serving/query/trino/access-control.properties:/etc/trino/access-control.properties
+      - ../../serving/query/trino/rules.json:/etc/trino/rules.json
+
+  trino-worker-1:
+    image: trinodb/trino:451
+    container_name: nexus-trino-worker-local
+    restart: unless-stopped
+    <<: *host-access
+    depends_on:
+      - trino-coordinator
+      - minio-init
+    environment:
+      NODE_ID: trino-worker-local
+    volumes:
+      - ../../serving/query/trino/worker/config.properties:/etc/trino/config.properties
+      - ../../serving/query/trino/worker/node.properties:/etc/trino/node.properties
+      - ../../serving/query/trino/catalog:/etc/trino/catalog
+
+  # =========================================================================
+  # AIRFLOW - Bridge
+  # =========================================================================
   airflow:
     build:
       context: ../..
@@ -306,55 +395,17 @@ services:
     image: nexus-airflow:2.9.1-python3.11
     container_name: nexus-airflow
     restart: unless-stopped
+    <<: *host-access
     depends_on:
       - airflow-db
-      - governance-db
+      - governance-db-primary
       - hive-metastore
-      - kafka
+      - redis
       - minio-init
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      AIRFLOW__WEBSERVER__SECRET_KEY: nexus-local-secret
-      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
-      NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db:5432/nexus_governance}
-      NEXUS_GX_ENABLED: ${NEXUS_GX_ENABLED:-true}
+      <<: *airflow-environment
       AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_ADMIN_USERNAME:-admin}
       AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
-      KAFKA_TOPIC_TRANSPORT_EVENTS: ${KAFKA_TOPIC_TRANSPORT_EVENTS:-transport-events}
-      NEXUS_STREAM_SOURCE: ${NEXUS_STREAM_SOURCE:-transport}
-      TRANSPORT_EVENTS_API_URL: ${TRANSPORT_EVENTS_API_URL:-}
-      TRANSPORT_EVENTS_API_KEY: ${TRANSPORT_EVENTS_API_KEY:-}
-      TFL_API_URL: ${TFL_API_URL:-https://api.tfl.gov.uk/Line/Mode/tube,dlr,overground,elizabeth-line/Status}
-      TFL_API_KEY: ${TFL_API_KEY:-}
-      GTFS_REALTIME_URL: ${GTFS_REALTIME_URL:-}
-      GTFS_REALTIME_TYPE: ${GTFS_REALTIME_TYPE:-vehicle_positions}
-      SG_TRAFFIC_API_URL: ${SG_TRAFFIC_API_URL:-https://api-open.data.gov.sg/v2/real-time/api/traffic-images}
-      OPENAQ_API_URL: ${OPENAQ_API_URL:-https://api.openaq.org/v3/measurements}
-      OPENAQ_API_KEY: ${OPENAQ_API_KEY:-}
-      WAQI_API_URL: ${WAQI_API_URL:-}
-      WAQI_API_TOKEN: ${WAQI_API_TOKEN:-}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
-      NEXUS_BUCKET: ${NEXUS_BUCKET:-nexus-lakehouse}
-      OPENLINEAGE_URL: ${OPENLINEAGE_URL:-}
-      OPENLINEAGE_ENDPOINT: ${OPENLINEAGE_ENDPOINT:-/api/v1/lineage}
-      OPENLINEAGE_NAMESPACE: ${OPENLINEAGE_NAMESPACE:-nexus}
-      OPENLINEAGE_TIMEOUT_SECONDS: ${OPENLINEAGE_TIMEOUT_SECONDS:-5}
-      OPENLINEAGE_STRICT: ${OPENLINEAGE_STRICT:-false}
-      SPARK_MASTER: ${SPARK_MASTER:-spark://spark:7077}
-      SPARK_PROPERTIES_FILE: ${SPARK_PROPERTIES_FILE:-/opt/airflow/config/spark-defaults.conf}
-      SPARK_DRIVER_HOST: ${SPARK_DRIVER_HOST:-}
-      SPARK_DRIVER_BIND_ADDRESS: ${SPARK_DRIVER_BIND_ADDRESS:-0.0.0.0}
-      SPARK_DRIVER_PORT: ${SPARK_DRIVER_PORT:-}
-      SPARK_BLOCKMANAGER_PORT: ${SPARK_BLOCKMANAGER_PORT:-}
-      SPARK_EXECUTOR_CORES: ${SPARK_EXECUTOR_CORES:-}
-      SPARK_EXECUTOR_MEMORY: ${SPARK_EXECUTOR_MEMORY:-}
-      SPARK_DEFAULT_PARALLELISM: ${SPARK_DEFAULT_PARALLELISM:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
-      NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
     command: >
       bash -c "airflow db migrate &&
       (airflow users create --username $${AIRFLOW_ADMIN_USERNAME} --password $${AIRFLOW_ADMIN_PASSWORD}
@@ -375,56 +426,20 @@ services:
       - ../../governance:/opt/airflow/governance
       - ../../cli:/opt/airflow/cli
       - ../../assets:/opt/airflow/assets
-      - ${NEXUS_RUNTIME_DIR:-../../runtime}:/opt/airflow/runtime
+      - ../../runtime:/opt/airflow/runtime
 
-  airflow-scheduler:
+  airflow-scheduler-1:
     image: nexus-airflow:2.9.1-python3.11
-    container_name: nexus-airflow-scheduler
+    container_name: nexus-airflow-scheduler-1
     restart: unless-stopped
+    <<: *host-access
     depends_on:
       - airflow
-      - governance-db
-      - hive-metastore
+      - airflow-db
+      - redis
+      - governance-db-primary
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
-      NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db:5432/nexus_governance}
-      NEXUS_GX_ENABLED: ${NEXUS_GX_ENABLED:-true}
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
-      KAFKA_TOPIC_TRANSPORT_EVENTS: ${KAFKA_TOPIC_TRANSPORT_EVENTS:-transport-events}
-      NEXUS_STREAM_SOURCE: ${NEXUS_STREAM_SOURCE:-transport}
-      TRANSPORT_EVENTS_API_URL: ${TRANSPORT_EVENTS_API_URL:-}
-      TRANSPORT_EVENTS_API_KEY: ${TRANSPORT_EVENTS_API_KEY:-}
-      TFL_API_URL: ${TFL_API_URL:-https://api.tfl.gov.uk/Line/Mode/tube,dlr,overground,elizabeth-line/Status}
-      TFL_API_KEY: ${TFL_API_KEY:-}
-      GTFS_REALTIME_URL: ${GTFS_REALTIME_URL:-}
-      GTFS_REALTIME_TYPE: ${GTFS_REALTIME_TYPE:-vehicle_positions}
-      SG_TRAFFIC_API_URL: ${SG_TRAFFIC_API_URL:-https://api-open.data.gov.sg/v2/real-time/api/traffic-images}
-      OPENAQ_API_URL: ${OPENAQ_API_URL:-https://api.openaq.org/v3/measurements}
-      OPENAQ_API_KEY: ${OPENAQ_API_KEY:-}
-      WAQI_API_URL: ${WAQI_API_URL:-}
-      WAQI_API_TOKEN: ${WAQI_API_TOKEN:-}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
-      NEXUS_BUCKET: ${NEXUS_BUCKET:-nexus-lakehouse}
-      OPENLINEAGE_URL: ${OPENLINEAGE_URL:-}
-      OPENLINEAGE_ENDPOINT: ${OPENLINEAGE_ENDPOINT:-/api/v1/lineage}
-      OPENLINEAGE_NAMESPACE: ${OPENLINEAGE_NAMESPACE:-nexus}
-      OPENLINEAGE_TIMEOUT_SECONDS: ${OPENLINEAGE_TIMEOUT_SECONDS:-5}
-      OPENLINEAGE_STRICT: ${OPENLINEAGE_STRICT:-false}
-      SPARK_MASTER: ${SPARK_MASTER:-spark://spark:7077}
-      SPARK_PROPERTIES_FILE: ${SPARK_PROPERTIES_FILE:-/opt/airflow/config/spark-defaults.conf}
-      SPARK_DRIVER_HOST: ${SPARK_DRIVER_HOST:-}
-      SPARK_DRIVER_BIND_ADDRESS: ${SPARK_DRIVER_BIND_ADDRESS:-0.0.0.0}
-      SPARK_DRIVER_PORT: ${SPARK_DRIVER_PORT:-}
-      SPARK_BLOCKMANAGER_PORT: ${SPARK_BLOCKMANAGER_PORT:-}
-      SPARK_EXECUTOR_CORES: ${SPARK_EXECUTOR_CORES:-}
-      SPARK_EXECUTOR_MEMORY: ${SPARK_EXECUTOR_MEMORY:-}
-      SPARK_DEFAULT_PARALLELISM: ${SPARK_DEFAULT_PARALLELISM:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
-      NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
+      <<: *airflow-environment
     command: scheduler
     volumes:
       - ../../orchestration/airflow/dags:/opt/airflow/dags
@@ -438,21 +453,106 @@ services:
       - ../../governance:/opt/airflow/governance
       - ../../cli:/opt/airflow/cli
       - ../../assets:/opt/airflow/assets
-      - ${NEXUS_RUNTIME_DIR:-../../runtime}:/opt/airflow/runtime
+      - ../../runtime:/opt/airflow/runtime
 
+  airflow-scheduler-2:
+    image: nexus-airflow:2.9.1-python3.11
+    container_name: nexus-airflow-scheduler-2
+    restart: unless-stopped
+    <<: *host-access
+    depends_on:
+      - airflow
+      - airflow-db
+      - redis
+      - governance-db-primary
+    environment:
+      <<: *airflow-environment
+    command: scheduler
+    volumes:
+      - ../../orchestration/airflow/dags:/opt/airflow/dags
+      - ../../common:/opt/airflow/common
+      - ../../config:/opt/airflow/config
+      - ../../domains:/opt/airflow/domains
+      - ../../ingestion:/opt/airflow/ingestion
+      - ../../processing:/opt/airflow/processing
+      - ../../infra:/opt/airflow/infra
+      - ../../transform:/opt/airflow/transform
+      - ../../governance:/opt/airflow/governance
+      - ../../cli:/opt/airflow/cli
+      - ../../assets:/opt/airflow/assets
+      - ../../runtime:/opt/airflow/runtime
+
+  airflow-worker-1:
+    image: nexus-airflow:2.9.1-python3.11
+    container_name: nexus-airflow-worker-local-1
+    restart: unless-stopped
+    <<: *host-access
+    depends_on:
+      - airflow
+      - airflow-db
+      - redis
+      - governance-db-primary
+    environment:
+      <<: *airflow-environment
+    command: celery worker
+    volumes:
+      - ../../orchestration/airflow/dags:/opt/airflow/dags
+      - ../../common:/opt/airflow/common
+      - ../../config:/opt/airflow/config
+      - ../../domains:/opt/airflow/domains
+      - ../../ingestion:/opt/airflow/ingestion
+      - ../../processing:/opt/airflow/processing
+      - ../../infra:/opt/airflow/infra
+      - ../../transform:/opt/airflow/transform
+      - ../../governance:/opt/airflow/governance
+      - ../../cli:/opt/airflow/cli
+      - ../../assets:/opt/airflow/assets
+      - ../../runtime:/opt/airflow/runtime
+
+  airflow-worker-2:
+    image: nexus-airflow:2.9.1-python3.11
+    container_name: nexus-airflow-worker-local-2
+    restart: unless-stopped
+    <<: *host-access
+    depends_on:
+      - airflow
+      - airflow-db
+      - redis
+      - governance-db-primary
+    environment:
+      <<: *airflow-environment
+    command: celery worker
+    volumes:
+      - ../../orchestration/airflow/dags:/opt/airflow/dags
+      - ../../common:/opt/airflow/common
+      - ../../config:/opt/airflow/config
+      - ../../domains:/opt/airflow/domains
+      - ../../ingestion:/opt/airflow/ingestion
+      - ../../processing:/opt/airflow/processing
+      - ../../infra:/opt/airflow/infra
+      - ../../transform:/opt/airflow/transform
+      - ../../governance:/opt/airflow/governance
+      - ../../cli:/opt/airflow/cli
+      - ../../assets:/opt/airflow/assets
+      - ../../runtime:/opt/airflow/runtime
+
+  # =========================================================================
+  # SUPERSET - Bridge
+  # =========================================================================
   superset:
     image: apache/superset:4.0.2
     container_name: nexus-superset
     restart: unless-stopped
+    <<: *host-access
     depends_on:
-      - trino
+      - trino-coordinator
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-change-me-for-production}
     ports:
       - "8088:8088"
     volumes:
       - ../../serving/dashboards/superset:/app/pythonpath
-      - ${NEXUS_SUPERSET_HOME_VOLUME:-superset-home}:/app/superset_home
+      - superset-home:/app/superset_home
     command: >
       bash -c "superset db upgrade &&
       (superset fab create-admin --username ${SUPERSET_ADMIN_USERNAME:-admin}
@@ -461,30 +561,46 @@ services:
       superset init &&
       superset run -h 0.0.0.0 -p 8088"
 
-  api:
+  # =========================================================================
+  # NEXUS API + LB - Bridge
+  # =========================================================================
+  api-1:
     build:
       context: ../..
       dockerfile: serving/api/Dockerfile
-    container_name: nexus-api
+    container_name: nexus-api-1
     restart: unless-stopped
+    <<: *host-access
     depends_on:
-      - trino
-      - governance-db
+      - trino-coordinator
+      - governance-db-primary
     environment:
-      TRINO_HOST: ${TRINO_HOST:-trino}
-      TRINO_PORT: ${TRINO_PORT:-8080}
+      TRINO_HOST: trino-coordinator
+      TRINO_PORT: 8080
       TRINO_USER: ${TRINO_USER:-nexus}
       NEXUS_GOVERNANCE_STORAGE: ${NEXUS_GOVERNANCE_STORAGE:-postgres}
-      NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db:5432/nexus_governance}
-    ports:
-      - "8000:8000"
+      NEXUS_GOVERNANCE_DATABASE_URL: ${NEXUS_GOVERNANCE_DATABASE_URL:-postgresql://nexus_governance:nexus_governance@governance-db-primary:5432/nexus_governance}
     volumes:
       - ../../common:/app/common
       - ../../config:/app/config
       - ../../domains:/app/domains
-      - ${NEXUS_RUNTIME_DIR:-../../runtime}:/app/runtime
+      - ../../runtime:/app/runtime
       - ../../governance:/app/governance
 
+  api-lb:
+    image: nginx:alpine
+    container_name: nexus-api-lb
+    restart: unless-stopped
+    depends_on:
+      - api-1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../runtime/nginx-api-lb.conf:/etc/nginx/nginx.conf:ro
+
+  # =========================================================================
+  # OpenMetadata (optional, via --profile metadata)
+  # =========================================================================
   openmetadata-postgresql:
     profiles: ["metadata"]
     image: docker.getcollate.io/openmetadata/postgresql:1.12.6
@@ -643,10 +759,10 @@ services:
       - "${MARQUEZ_WEB_PORT:-3000}:3000"
 
 volumes:
-  minio-data:
+  minio-data-1:
   hive-metastore-db-data:
   airflow-db-data:
-  governance-db-data:
+  governance-db-data-primary:
   superset-home:
   openmetadata-postgres-data:
   openmetadata-es-data:
