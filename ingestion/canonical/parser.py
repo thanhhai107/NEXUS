@@ -27,6 +27,9 @@ def iter_artifact_records(path: str | Path) -> Iterable[dict[str, Any]]:
     if suffix == ".csv":
         yield from _iter_csv(artifact_path)
         return
+    if suffix in {".xml", ".xsd"}:
+        yield from _iter_xml(artifact_path)
+        return
     raise ValueError(f"Unsupported ingestion artifact type: {artifact_path.suffix}")
 
 
@@ -103,3 +106,71 @@ def _normalize_field_name(name: str | None) -> str:
     # Replace spaces and special chars with underscores
     normalized = re.sub(r"[^a-zA-Z0-9]+", "_", name)
     return normalized.strip("_").lower() or "unnamed_column"
+
+
+def _iter_xml(path: Path) -> Iterable[dict[str, Any]]:
+    """Parse XML files into dictionaries.
+
+    Handles common XML structures:
+    - Single root with repeated child elements
+    - Nested records with attributes and text
+    - Converts XML attributes to prefixed keys (e.g., @id)
+    - Converts text content to #text key
+    """
+    import xml.etree.ElementTree as ET
+
+    tree = ET.parse(path)
+    root = tree.getroot()
+
+    def _element_to_dict(element: ET.Element) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+
+        # Handle attributes
+        if element.attrib:
+            for key, value in element.attrib.items():
+                result[f"@{key}"] = value
+
+        # Handle child elements
+        for child in element:
+            child_dict = _element_to_dict(child)
+            child_key = child.tag
+
+            # Handle repeated child elements (create list)
+            if child_key in result:
+                if not isinstance(result[child_key], list):
+                    result[child_key] = [result[child_key]]
+                result[child_key].append(child_dict)
+            else:
+                result[child_key] = child_dict
+
+        # Handle text content
+        if element.text and element.text.strip():
+            text_key = "#text"
+            if result:  # Has attributes or children
+                result[text_key] = element.text.strip()
+            else:
+                return element.text.strip()
+
+        return result
+
+    # Try to find repeated record elements
+    # Common patterns: <records><record>...</record></records> or <items><item>...</item></items>
+    record_tags = {"record", "item", "entry", "row", "data", "event", "object"}
+    children = list(root)
+
+    # If root has many children, treat each as a record
+    if len(children) > 1:
+        for child in children:
+            yield _element_to_dict(child)
+    # If root has a single child with many grandchildren, treat grandchildren as records
+    elif len(children) == 1:
+        grandchildren = list(children[0])
+        if len(grandchildren) > 1 and children[0].tag.lower() in record_tags:
+            for grandchild in grandchildren:
+                yield _element_to_dict(grandchild)
+        else:
+            # Single record
+            yield _element_to_dict(root)
+    else:
+        # Single element with no children
+        yield _element_to_dict(root)
