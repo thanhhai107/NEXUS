@@ -104,8 +104,14 @@ class SourceRun:
         self.published_dir = self.base_dir / "published"
         self.metadata_dir = self.base_dir / "metadata"
         
-        # Create directories (for local mode; S3 creates implicitly)
-        if not is_vm_mode():
+        # Create directories (local filesystem needs explicit creation)
+        # S3 handles this implicitly, but VM uses local filesystem
+        from common.config import is_vm_mode
+        storage = get_storage()
+        is_s3 = storage.is_s3_uri(str(context.output_dir))
+
+        if not is_s3:
+            # Local filesystem (including VM mode with /data/) needs directories created
             self.raw_dir.mkdir(parents=True, exist_ok=True)
             self.staging_dir.mkdir(parents=True, exist_ok=True)
             self.published_dir.mkdir(parents=True, exist_ok=True)
