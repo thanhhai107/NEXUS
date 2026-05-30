@@ -500,7 +500,8 @@ services:
       - governance-db-primary
     environment:
       <<: *airflow-environment
-    command: celery -A airflow.executors.celery_executor worker --hostname=worker@%h
+      HOSTNAME: worker-local-1
+    command: celery worker
     volumes:
       - ../../orchestration/airflow/dags:/opt/airflow/dags
       - ../../common:/opt/airflow/common
@@ -527,7 +528,8 @@ services:
       - governance-db-primary
     environment:
       <<: *airflow-environment
-    command: celery -A airflow.executors.celery_executor worker --hostname=worker@%h
+      HOSTNAME: worker-local-2
+    command: celery worker
     volumes:
       - ../../orchestration/airflow/dags:/opt/airflow/dags
       - ../../common:/opt/airflow/common
