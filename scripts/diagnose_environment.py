@@ -13,6 +13,7 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import platform
 import socket
 from pathlib import Path
@@ -23,11 +24,18 @@ def main() -> int:
     print("NEXUS ENVIRONMENT DIAGNOSTICS")
     print("=" * 60)
 
-    # Import after sys.path setup
+    # Setup path and load .env
     import sys
     project_root = Path(__file__).resolve().parents[1]
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
+    sys.path.insert(0, str(project_root))
+
+    from dotenv import load_dotenv
+    env_path = project_root / ".env"
+    if env_path.exists():
+        load_dotenv(env_path, override=False)
+        print(f"\n[*] Loaded .env from: {env_path}")
+    else:
+        print(f"\n[!] No .env found at: {env_path}")
 
     from common.config import (
         is_vm_mode,
@@ -66,10 +74,14 @@ def main() -> int:
     print("-" * 40)
     print(f"  Distributed:   {is_distributed_mode()}")
     print(f"  Execution:     {get_execution_mode()}")
+    print(f"  Env vars from .env:")
+    print(f"    - NEXUS_RUNTIME_MODE: {os.getenv('NEXUS_RUNTIME_MODE', '(not set)')}")
+    print(f"    - NEXUS_DISTRIBUTED_MODE: {os.getenv('NEXUS_DISTRIBUTED_MODE', '(not set)')}")
+    print(f"    - NEXUS_LOCAL_WORKERS: {os.getenv('NEXUS_LOCAL_WORKERS', '(not set)')}")
     print(f"  Auto-detect sources:")
-    print(f"    - AIRFLOW_WORKER_NUMBER: {__import__('os').getenv('AIRFLOW_WORKER_NUMBER', '(not set)')}")
-    print(f"    - KUBERNETES_SERVICE_HOST: {'(set)' if __import__('os').getenv('KUBERNETES_SERVICE_HOST') else '(not set)'}")
-    print(f"    - SPARK_EXECUTOR_ID: {__import__('os').getenv('SPARK_EXECUTOR_ID', '(not set)')}")
+    print(f"    - AIRFLOW_WORKER_NUMBER: {os.getenv('AIRFLOW_WORKER_NUMBER', '(not set)')}")
+    print(f"    - KUBERNETES_SERVICE_HOST: {'(set)' if os.getenv('KUBERNETES_SERVICE_HOST') else '(not set)'}")
+    print(f"    - SPARK_EXECUTOR_ID: {os.getenv('SPARK_EXECUTOR_ID', '(not set)')}")
 
     # Section 4: Worker Info
     print("\n[4] WORKER CONFIGURATION")
