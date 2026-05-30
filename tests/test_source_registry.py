@@ -10,11 +10,11 @@ from common.source_registry import (
 def test_registry_lists_known_dataset():
     sources = list_sources()
     names = {entry.name for entry in sources}
-    assert "us_accidents" in names
-    entry = get_source("us_accidents")
+    assert "stats19_collisions" in names
+    entry = get_source("stats19_collisions")
     assert entry.domain == "transport"
-    assert entry.ingestion_method == "batch_csv"
-    assert entry.update_frequency == "every_1d"
+    assert entry.ingestion_method == "batch_csv_download"
+    assert entry.update_frequency == "every_1y"
     assert entry.owner == "transport-data-platform"
 
 

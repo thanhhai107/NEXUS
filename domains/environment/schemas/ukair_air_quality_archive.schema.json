@@ -1,0 +1,21 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "title": "UK-AIR Air Quality Archive",
+    "description": "DEFRA UK-AIR air quality monitoring archive data. Contains hourly and daily measurements of pollutants (NO2, PM10, PM2.5, O3, SO2, CO) from London monitoring stations, downloaded as CSV files from the UK-AIR flat files service.",
+    "required": ["event_id", "source", "event_type", "event_time", "site_id"],
+    "properties": {
+        "event_id": {"type": "string", "description": "Unique event identifier."},
+        "source": {"type": "string", "description": "Source system identifier."},
+        "event_type": {"type": "string", "description": "Type of event (e.g. csv_download)."},
+        "event_time": {"type": "string", "format": "date-time", "description": "Event timestamp in ISO 8601 format."},
+        "site_id": {"type": "string", "description": "DEFRA monitoring site ID (e.g. BG1, BL0, BN1)."},
+        "site_name": {"type": "string", "description": "Monitoring site name."},
+        "year": {"type": "integer", "description": "Year of measurement data."},
+        "pollutant": {"type": "string", "description": "Pollutant code (e.g. NO2, PM10, PM2.5, O3, SO2, CO)."},
+        "file_url": {"type": "string", "description": "Download URL for the CSV file."},
+        "file_path": {"type": "string", "description": "Local path to the downloaded file."},
+        "path_group": {"type": "string", "description": "UK-AIR path group (site_data, 15min_site_data, site_pol_data)."},
+        "manifest_url": {"type": "string", "description": "URL of the site archive listing page."}
+    }
+}

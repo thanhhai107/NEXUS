@@ -5,15 +5,6 @@ sources:
     database: iceberg
     schema: silver
     tables:
-      - name: us_accidents
-        description: Cleaned Silver Transport accident dataset.
-        meta:
-          glossary_term: Road Accident Event
-          source_time_role: event_time
-          source_timezone: America/Los_Angeles
-          storage_timezone: UTC
-          source_crs: EPSG:4326
-          storage_crs: EPSG:4326
       - name: transport_events
         description: Cleaned Silver Transport streaming events.
         meta:

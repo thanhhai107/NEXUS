@@ -1,30 +1,6 @@
 version: 2
 
 models:
-  - name: us_accidents_summary
-    description: Gold aggregate of US accident counts and distance by state and severity.
-    meta:
-      semantic_grain:
-        entity_grain:
-          - state
-          - severity
-        aggregation_level: state_severity
-      unit_standardization:
-        source_unit: mi
-        canonical_unit: km
-        mapping_seed: unit_mapping
-    columns:
-      - name: state
-        tests:
-          - not_null
-      - name: severity
-        tests:
-          - not_null
-      - name: accident_count
-        tests:
-          - not_null
-      - name: total_distance_km
-        description: Total affected road distance converted to kilometers through unit_mapping.
   - name: transport_events_hourly
     description: Gold hourly rollup of transport streaming events by state and event type.
     meta:

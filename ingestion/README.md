@@ -3,8 +3,8 @@
 ## Overview
 
 The `ingestion` module provides data ingestion capabilities for NEXUS with two main paradigms:
-- **Batch Processing**: REST API calls, CSV downloads, CSV file ingestion
-- **Streaming**: Kafka-based real-time data pipeline with real Apache Kafka integration
+- **Batch Processing**: REST API calls, CSV downloads, CSV file ingestion, Parquet ingestion
+- **Streaming**: Kafka-based real-time data pipeline, REST API polling, GTFS Realtime feed ingestion
 
 ## Directory Structure
 
@@ -22,13 +22,16 @@ ingestion/
 │   ├── api_ingestion.py # REST API ingestion with pagination
 │   ├── csv_ingestion.py # CSV file → raw landing zone
 │   ├── csv_download_ingestion.py # CSV download from URL → landing zone
+│   ├── parquet_ingestion.py # Parquet file/URL → raw landing zone
 │   └── common.py       # write_jsonl, read_csv_records
 │
-├── streaming/           # Kafka Streaming Pipeline
+├── streaming/           # Streaming Pipeline (Kafka + API + GTFS)
 │   ├── __init__.py     # Public API exports
 │   ├── kafka_config.py  # Kafka configuration dataclasses
 │   ├── producer.py     # Kafka producer (real Kafka + simulated)
-│   └── consumer.py     # Kafka consumer → raw landing zone
+│   ├── consumer.py     # Kafka consumer → raw landing zone
+│   ├── api_stream.py   # REST API polling stream
+│   └── gtfs_realtime.py # GTFS Realtime protobuf feed ingestion
 │
 ├── sources/            # Source Adapters (London-specific)
 │   └── __init__.py     # Re-exports from downloaders/sources/
@@ -72,6 +75,18 @@ from ingestion.batch import download_csv
 download_csv(url="https://example.com/data.csv")
 ```
 
+### Parquet Ingestion
+
+```python
+# Local Parquet ingestion
+from ingestion.batch import ingest_parquet
+ingest_parquet(dataset="my_dataset", source=Path("data.parquet"))
+
+# Parquet download from URL
+from ingestion.batch import ingest_parquet_download
+ingest_parquet_download(dataset="my_dataset", url="https://example.com/data.parquet")
+```
+
 ### Kafka Streaming
 
 ```python
@@ -109,6 +124,45 @@ kafka_config = KafkaConfig(
     sasl_plain_password="mypassword",
     ssl_cafile="/path/to/ca.crt",
 )
+```
+
+### API Stream
+
+```python
+# Long-running API polling stream
+from ingestion.streaming import ApiStreamConfig, run_api_stream
+
+config = ApiStreamConfig(
+    source_key="openaq",
+    dataset="openaq_locations",
+    api_url="https://api.openaq.org/v3/locations",
+    api_key="your-api-key",
+    poll_interval_seconds=300.0,
+    max_iterations=100,
+)
+result = run_api_stream(config)
+
+# CLI
+python -m ingestion.streaming.api_stream --source openaq --dataset aqi --api-url https://api.openaq.org/v3/locations
+```
+
+### GTFS Realtime
+
+```python
+# GTFS Realtime feed polling
+from ingestion.streaming import GTFSRealtimeConfig, run_gtfs_stream
+
+config = GTFSRealtimeConfig(
+    source_key="tfl_gtfs",
+    dataset="tfl_gtfs_realtime",
+    feed_url="https://api.tfl.gov.uk/gtfs/trip-updates",
+    feed_type="trip_update",
+    poll_interval_seconds=60.0,
+)
+result = run_gtfs_stream(config)
+
+# CLI
+python -m ingestion.streaming.gtfs_realtime --source tfl --dataset transit --feed-url https://api.tfl.gov.uk/gtfs/trip-updates --feed-type trip_update
 ```
 
 ### CLI Usage
@@ -159,6 +213,11 @@ download_openmeteo(run, context)
 4. **streaming/ uses real Kafka**: The streaming module integrates with real Apache Kafka via kafka-python
 
 5. **downloaders/ is the entry point**: The London downloader provides a CLI for downloading London-specific data sources
+
+6. **Parquet, API Stream, GTFS Realtime added**: Three additional ingestion methods round out the framework: 
+   - batch_parquet for columnar data (PyArrow/Pandas)
+   - stream_api for REST API polling without Kafka dependency
+   - stream_gtfs_realtime for transit feed ingestion (protobuf parsing with fallback)
 
 ## Environment Variables
 

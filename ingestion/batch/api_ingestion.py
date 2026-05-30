@@ -41,21 +41,108 @@ def extract_records(payload: Any) -> list[dict[str, Any]]:
     raise ValueError("Unsupported API response shape")
 
 
+def _make_request(
+    run: SourceRun,
+    url: str,
+    api_key: str | None = None,
+    auth_style: str = "bearer",
+    extra_params: dict[str, Any] | None = None,
+) -> Any:
+    headers: dict[str, str] = {"Accept": "application/json"}
+    params: dict[str, Any] = dict(extra_params or {})
+    if api_key:
+        if auth_style == "x-api-key":
+            headers["X-API-Key"] = api_key
+        elif auth_style == "token-header":
+            headers["token"] = api_key
+        elif auth_style == "query-token":
+            params["token"] = api_key
+        elif auth_style == "query-appid":
+            params["appid"] = api_key
+        elif auth_style == "query-app_key":
+            params["app_key"] = api_key
+        else:
+            headers["Authorization"] = f"Bearer {api_key}"
+    return request_json(run, url, headers=headers, params=params)
+
+
+def _ingest_arcgis_records(
+    url: str,
+    api_key: str | None = None,
+    auth_style: str = "bearer",
+    max_pages: int = 0,
+    max_rows: int = 0,
+    page_size: int = 100,
+) -> list[dict[str, Any]]:
+    """Ingest records from an ArcGIS REST FeatureServer endpoint with offset pagination."""
+    params: dict[str, Any] = {
+        "where": "1=1",
+        "outFields": "*",
+        "returnGeometry": "false",
+        "resultOffset": 0,
+        "resultRecordCount": page_size,
+        "f": "json",
+    }
+
+    run = batch_api_source_run(url)
+    all_records: list[dict[str, Any]] = []
+    page_count = 0
+    status = "success"
+
+    try:
+        while True:
+            response = _make_request(run, url, api_key=api_key, auth_style=auth_style, extra_params=dict(params))
+            records = extract_records(response)
+            all_records.extend(records)
+            page_count += 1
+
+            if max_rows and len(all_records) >= max_rows:
+                all_records = all_records[:max_rows]
+                break
+            if max_pages and page_count >= max_pages:
+                break
+            if not response.get("exceededTransferLimit"):
+                break
+
+            params["resultOffset"] = params["resultOffset"] + page_size
+    except Exception:
+        status = "failed"
+        raise
+    finally:
+        if run.failed_requests and status == "success":
+            status = "partial"
+        run.finish(status)
+
+    return all_records
+
+
 def ingest_api_records(
     url: str,
     api_key: str | None = None,
     max_pages: int = 5,
     page_size: int = 50,
     auth_style: str = "bearer",
+    max_rows: int = 0,
 ) -> list[dict[str, Any]]:
     """Fetch records from a REST API, following pagination if present.
 
     Supports JSON:API-style pagination (used by DfT Road Traffic API)
     where `links.next` indicates the next page URL.
+    Also supports ArcGIS FeatureServer endpoints with offset-based pagination.
     Falls back to a single non-paginated request if pagination params fail.
     """
+    if "FeatureServer" in url:
+        return _ingest_arcgis_records(
+            url,
+            api_key=api_key,
+            auth_style=auth_style,
+            max_pages=max_pages,
+            max_rows=max_rows,
+            page_size=page_size,
+        )
+
     headers = {"Accept": "application/json"}
-    params = {}
+    params: dict[str, Any] = {}
     if api_key:
         if auth_style == "x-api-key":
             headers["X-API-Key"] = api_key
@@ -75,13 +162,11 @@ def ingest_api_records(
     status = "success"
 
     try:
-        # First try a simple single request (works for most APIs).
         if page_size:
             params["page[size]"] = str(page_size)
         payload = fetch_api_page(run, url, headers=headers, params=params, page=1)
         all_records.extend(extract_records(payload))
 
-        # If the response has pagination links, follow them.
         next_url = next_page_url(payload)
         page = 1
         while next_url and page < max_pages:
@@ -145,9 +230,9 @@ def next_page_url(payload: Any) -> str | None:
     return str(value) if value else None
 
 
-def ingest_api(dataset: str, url: str, api_key: str | None = None, auth_style: str = "bearer") -> str:
+def ingest_api(dataset: str, url: str, api_key: str | None = None, auth_style: str = "bearer", max_rows: int = 0) -> str:
     """Ingest records from an HTTP API into the raw local landing zone."""
-    records = ingest_api_records(url, api_key, auth_style=auth_style)
+    records = ingest_api_records(url, api_key, auth_style=auth_style, max_pages=0, max_rows=max_rows)
     output_path = write_jsonl(dataset=dataset, records=records, source=url)
     print(f"Ingested {len(records)} records for dataset={dataset} into {output_path}")
     return str(output_path)
@@ -158,9 +243,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset", required=True, help="Dataset name from domains/*/datasets.yml")
     parser.add_argument("--url", required=True, help="Public API URL")
     parser.add_argument("--api-key", default=None, help="Optional API token")
+    parser.add_argument("--auth-style", default="bearer", help="Auth style: bearer, x-api-key, token-header, query-token, query-appid, query-app_key, none")
+    parser.add_argument("--max-rows", default=0, type=int, help="Limit total rows ingested")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    ingest_api(dataset=args.dataset, url=args.url, api_key=args.api_key)
+    ingest_api(dataset=args.dataset, url=args.url, api_key=args.api_key, auth_style=args.auth_style, max_rows=args.max_rows)

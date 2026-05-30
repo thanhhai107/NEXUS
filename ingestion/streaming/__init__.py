@@ -4,6 +4,8 @@ Streaming Ingestion Pipeline for NEXUS.
 Provides Kafka streaming capabilities:
 - Producer for publishing events to Kafka topics
 - Consumer for consuming events from Kafka topics
+- API Stream for polling REST APIs and publishing to Kafka
+- GTFS Realtime for ingesting transit feed data
 
 Usage:
     # Producer
@@ -13,6 +15,14 @@ Usage:
     # Consumer
     from ingestion.streaming import consume_events
     result = consume_events(topic="transport-events", dataset="transport")
+
+    # API Stream
+    from ingestion.streaming import run_api_stream
+    result = run_api_stream(source="weather", interval=60)
+
+    # GTFS Realtime
+    from ingestion.streaming import run_gtfs_stream
+    result = run_gtfs_stream(feed_url="https://example.com/gtfs-rt.pb", interval=30)
 
 Environment Variables:
     KAFKA_BOOTSTRAP_SERVERS - Kafka broker address (default: localhost:29092)
@@ -73,6 +83,25 @@ from ingestion.streaming.consumer import (
     main as consumer_main,
 )
 
+# API Stream functions
+from ingestion.streaming.api_stream import (
+    ApiStreamConfig,
+    ApiStreamResult,
+    fetch_api_records,
+    poll_api_stream,
+    run_api_stream,
+)
+
+# GTFS Realtime functions
+from ingestion.streaming.gtfs_realtime import (
+    GTFSRealtimeConfig,
+    GTFSRealtimeResult,
+    parse_gtfs_feed,
+    fetch_gtfs_feed,
+    poll_gtfs_stream,
+    run_gtfs_stream,
+)
+
 # Backward compatibility
 TOPICS = {k: v.topic for k, v in STREAM_TOPICS.items()}
 
@@ -109,4 +138,17 @@ __all__ = [
     "BatchConsumerResult",
     "consumer_parse_args",
     "consumer_main",
+    # API Stream
+    "ApiStreamConfig",
+    "ApiStreamResult",
+    "fetch_api_records",
+    "poll_api_stream",
+    "run_api_stream",
+    # GTFS Realtime
+    "GTFSRealtimeConfig",
+    "GTFSRealtimeResult",
+    "parse_gtfs_feed",
+    "fetch_gtfs_feed",
+    "poll_gtfs_stream",
+    "run_gtfs_stream",
 ]

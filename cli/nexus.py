@@ -91,7 +91,6 @@ SOURCE_DATASETS = {
     "tfl_arrivals": "tfl_transport_status",
     "tfl_line_status": "tfl_transport_status",
     "gtfs": "gtfs_realtime_events",
-    "singapore": "sg_traffic",
     "londonair": "londonair_monitoring",
     "openmeteo": "openmeteo_air_quality",
     "openweather": "openweather_current",
