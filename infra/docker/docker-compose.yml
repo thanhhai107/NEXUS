@@ -500,7 +500,7 @@ services:
       - governance-db-primary
     environment:
       <<: *airflow-environment
-    command: celery worker
+    command: celery -A airflow.executors.celery_executor worker --hostname=worker@%h
     volumes:
       - ../../orchestration/airflow/dags:/opt/airflow/dags
       - ../../common:/opt/airflow/common
@@ -527,7 +527,7 @@ services:
       - governance-db-primary
     environment:
       <<: *airflow-environment
-    command: celery worker
+    command: celery -A airflow.executors.celery_executor worker --hostname=worker@%h
     volumes:
       - ../../orchestration/airflow/dags:/opt/airflow/dags
       - ../../common:/opt/airflow/common
@@ -542,6 +542,8 @@ services:
       - ../../assets:/opt/airflow/assets
       - ../../runtime:/opt/airflow/runtime
 
+  # =========================================================================
+  # NEXUS API + LB - Bridge
   # =========================================================================
   # SUPERSET - Bridge
   # =========================================================================

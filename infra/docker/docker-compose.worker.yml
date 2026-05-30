@@ -209,7 +209,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_BASE_URL: ${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
       NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gemini-2.5-flash}
-    command: celery worker
+    command: celery -A airflow.executors.celery_executor worker --hostname=worker@%h
     volumes:
       - ../../orchestration/airflow/dags:/opt/airflow/dags
       - ../../common:/opt/airflow/common
