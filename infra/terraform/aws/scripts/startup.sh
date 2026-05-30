@@ -255,11 +255,16 @@ for ip in "$${zk_ips[@]}"; do
 done
 
 # Build MinIO peer command
-minio_cmd=""
-for ip in $minio_peers; do
-  if [ -n "$minio_cmd" ]; then minio_cmd+=" "; fi
-  minio_cmd+="http://$${ip}:9000/data"
-done
+IFS=' ' read -r -a minio_ips <<< "$minio_peers"
+if [ "$${#minio_ips[@]}" -le 1 ]; then
+  minio_cmd="/data"
+else
+  minio_cmd=""
+  for ip in "$${minio_ips[@]}"; do
+    if [ -n "$minio_cmd" ]; then minio_cmd+=" "; fi
+    minio_cmd+="http://$${ip}:9000/data"
+  done
+fi
 
 # Build Kafka bootstrap servers
 kafka_servers=""
