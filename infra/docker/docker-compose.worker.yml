@@ -16,6 +16,7 @@ services:
       ZOOKEEPER_INIT_LIMIT: 5
       ZOOKEEPER_SYNC_LIMIT: 2
       ZOOKEEPER_SERVERS: ${ZK_SERVERS}
+      ZOOKEEPER_ADMIN_SERVER_PORT: 8089
 
   zookeeper-3:
     image: confluentinc/cp-zookeeper:7.6.1
@@ -29,6 +30,7 @@ services:
       ZOOKEEPER_INIT_LIMIT: 5
       ZOOKEEPER_SYNC_LIMIT: 2
       ZOOKEEPER_SERVERS: ${ZK_SERVERS}
+      ZOOKEEPER_ADMIN_SERVER_PORT: 8089
 
   # =========================================================================
   # Kafka broker (worker-1: id=2, worker-2: id=3)

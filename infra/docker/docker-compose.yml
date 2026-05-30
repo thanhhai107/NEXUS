@@ -143,6 +143,7 @@ services:
       ZOOKEEPER_INIT_LIMIT: 5
       ZOOKEEPER_SYNC_LIMIT: 2
       ZOOKEEPER_SERVERS: ${ZK_SERVERS}
+      ZOOKEEPER_ADMIN_SERVER_PORT: 8089
 
   kafka-1:
     image: confluentinc/cp-kafka:7.6.1
@@ -363,6 +364,8 @@ services:
     depends_on:
       - hive-metastore
       - minio-init
+    environment:
+      TRINO_DISCOVERY_URI: http://trino-coordinator:8080
     ports:
       - "8085:8080"
     volumes:
@@ -382,6 +385,7 @@ services:
       - minio-init
     environment:
       NODE_ID: trino-worker-local
+      TRINO_DISCOVERY_URI: http://trino-coordinator:8080
     volumes:
       - ../../serving/query/trino/worker/config.properties:/etc/trino/config.properties
       - ../../serving/query/trino/worker/node.properties:/etc/trino/node.properties
