@@ -2,15 +2,31 @@
 NEXUS Configuration Module.
 
 Unified config cho cả local (runtime/) và VM (/data/).
-Cấu trúc thư mục theo Medallion Architecture:
-    runtime/           (local)
-        /data/        (VM — AWS EC2 / GCP Compute Engine)
-            ├── lake/           Bronze → Silver → Gold
-            ├── pipeline/       Orchestration
-            ├── warehouse/      Query engines
-            ├── staging/        Workspace tạm
-            ├── dlq/            Dead Letter Queue
-            └── quarantine/      Invalid records
+Cấu trúc thư mục theo Medallion Architecture với metadata và governance:
+
+    runtime/
+    ├── lake/                    # Data Layer (Bronze → Silver → Gold)
+    │   ├── bronze/             # Raw data gốc (source format)
+    │   ├── silver/             # Validated + standardized data
+    │   └── gold/               # Business aggregates
+    │
+    ├── catalog/                 # Metadata Layer
+    │   ├── schemas/           # Versioned schemas
+    │   └── datasets/           # Dataset registry
+    │
+    ├── governance/              # Governance Layer
+    │   ├── semantic/          # Semantic annotations
+    │   └── quality/           # Quality reports
+    │
+    ├── checkpoints/             # Orchestration state
+    │
+    ├── raw/                    # Raw envelope landing zone
+    ├── dlq/                    # Dead Letter Queue
+    ├── quarantine/              # Invalid records
+    ├── staging/                # Temporary files
+    ├── tmp/                    # Temp files
+    ├── logs/                    # Application logs
+    └── metrics/                # Prometheus metrics
 """
 
 from __future__ import annotations
@@ -104,13 +120,66 @@ def is_vm_mode() -> bool:
 #
 #   lake/silver/{dataset}/                   # Validated, standardized data
 #   lake/gold/{dataset}/                     # Business aggregates
-#   lake/schemas/{dataset}.schema.json
 
 LAKE_DIR = RUNTIME_DIR / "lake"
 BRONZE_DIR = LAKE_DIR / "bronze"  # Raw data gốc (source format)
 SILVER_DIR = LAKE_DIR / "silver"  # Validated + standardized data
 GOLD_DIR = LAKE_DIR / "gold"      # Business aggregates (optional)
-SCHEMAS_DIR = LAKE_DIR / "schemas"  # JSON schemas cho từng dataset
+
+
+# ============================================================================
+# CATALOG (Metadata Service)
+# ============================================================================
+# Versioned schemas và dataset registry
+#
+# Structure:
+#   catalog/
+#       ├── schemas/
+#       │   └── {dataset}/
+#       │       ├── v1/
+#       │       │   └── schema.json
+#       │       └── v2/
+#       │           └── schema.json
+#       └── datasets/
+#           └── {dataset}.json
+
+CATALOG_DIR = RUNTIME_DIR / "catalog"
+SCHEMAS_DIR = CATALOG_DIR / "schemas"  # Versioned schemas
+DATASETS_DIR = CATALOG_DIR / "datasets"  # Dataset registry
+
+
+# ============================================================================
+# GOVERNANCE (Semantic + Quality)
+# ============================================================================
+# Semantic annotations và quality reports
+#
+# Structure:
+#   governance/
+#       ├── semantic/
+#       │   └── {dataset}/
+#       │       └── v1/
+#       │           └── annotations.json
+#       └── quality/
+#           └── {dataset}/
+#               └── run_id={run_id}/
+#                   └── quality_report.json
+
+GOVERNANCE_DIR = RUNTIME_DIR / "governance"
+SEMANTIC_DIR = GOVERNANCE_DIR / "semantic"  # Semantic annotations
+QUALITY_DIR = GOVERNANCE_DIR / "quality"     # Quality reports
+
+
+# ============================================================================
+# ORCHESTRATION STATE
+# ============================================================================
+# Checkpoints và pipeline state
+#
+# Structure:
+#   checkpoints/
+#       └── {dataset}/
+#           └── {run_id}.checkpoint.json
+
+CHECKPOINTS_DIR = RUNTIME_DIR / "checkpoints"
 
 
 # ============================================================================
@@ -146,7 +215,7 @@ RAW_DIR = RUNTIME_DIR / "raw"
 # ============================================================================
 # Will be removed after migration
 
-DATASETS_DIR = BRONZE_DIR  # Legacy alias - use BRONZE_DIR
+DATASETS_DIR_LEGACY = BRONZE_DIR  # Legacy alias - use BRONZE_DIR
 
 
 # ============================================================================
@@ -267,6 +336,51 @@ def set_config_runtime_dir(value: str) -> None:
     config_yaml["runtime_dir"] = value
     with config_path.open("w", encoding="utf-8") as f:
         yaml.dump(config_yaml, f, default_flow_style=False, sort_keys=False)
+
+
+# ============================================================================
+# MINIO/S3 CONFIGURATION
+# ============================================================================
+# Configuration for MinIO/S3 distributed storage
+# Used when NEXUS_RUNTIME_MODE=vm
+
+def get_minio_config() -> dict[str, Any]:
+    """Get MinIO/S3 configuration from environment.
+    
+    Returns:
+        Dict with MinIO/S3 settings
+    """
+    import os
+    
+    return {
+        "endpoint": os.getenv("MINIO_ENDPOINT", "http://localhost:9000"),
+        "access_key": os.getenv("MINIO_ROOT_USER", "minioadmin"),
+        "secret_key": os.getenv("MINIO_ROOT_PASSWORD", "minioadmin"),
+        "bucket": os.getenv("NEXUS_BUCKET", "nexus-lakehouse"),
+        "region": os.getenv("AWS_REGION", "us-east-1"),
+        "secure": os.getenv("MINIO_SECURE", "false").lower() == "true",
+        "session_token": os.getenv("AWS_SESSION_TOKEN"),
+    }
+
+
+def is_minio_available() -> bool:
+    """Check if MinIO/S3 is available and configured.
+    
+    Returns:
+        True if MinIO/S3 is available
+    """
+    import os
+    
+    # Check environment variables
+    endpoint = os.getenv("MINIO_ENDPOINT")
+    if not endpoint:
+        return False
+    
+    # Check mode
+    if get_runtime_mode() != "vm":
+        return False
+    
+    return True
 
 
 # ============================================================================

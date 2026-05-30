@@ -1,0 +1,62 @@
+# Coverage Policy Configuration
+# Defines when a run is considered successful based on chunk completion
+
+default:
+  # Require 100% of chunks to be successful before publishing
+  min_success_ratio: 1.0
+  
+  # Allow publishing with warnings if some chunks fail
+  allow_publish_with_warnings: false
+  
+  # Specific chunks that must always succeed (empty = all required)
+  required_chunks: []
+
+per_source:
+  # Transport - high reliability required
+  tfl_arrivals:
+    min_success_ratio: 0.95
+    allow_publish_with_warnings: true
+    required_chunks: []
+  
+  tfl_line_status:
+    min_success_ratio: 0.9
+    allow_publish_with_warnings: true
+    required_chunks: []
+  
+  # Air Quality - can tolerate some gaps
+  openaq:
+    min_success_ratio: 0.8
+    allow_publish_with_warnings: true
+    required_chunks: []
+  
+  waqi:
+    min_success_ratio: 0.8
+    allow_publish_with_warnings: true
+    required_chunks: []
+  
+  londonair:
+    min_success_ratio: 0.7
+    allow_publish_with_warnings: true
+    required_chunks: []
+  
+  # Weather - can tolerate gaps
+  openweather:
+    min_success_ratio: 0.8
+    allow_publish_with_warnings: true
+    required_chunks: []
+  
+  openmeteo:
+    min_success_ratio: 0.7
+    allow_publish_with_warnings: true
+    required_chunks: []
+  
+  # Batch downloads - strict requirements
+  dft:
+    min_success_ratio: 1.0
+    allow_publish_with_warnings: false
+    required_chunks: []
+  
+  stats19:
+    min_success_ratio: 1.0
+    allow_publish_with_warnings: false
+    required_chunks: []
