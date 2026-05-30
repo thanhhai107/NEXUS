@@ -2,14 +2,27 @@
 
 Writes invalid records to quarantine so they are not lost or silently loaded.
 Supports local filesystem, PostgreSQL, and S3/MinIO storage.
+
+Usage:
+    quarantine_records(
+        dataset="tfl_bus",
+        invalid_records=[record],
+        reason="null_value",
+        rule_id="not_null_check",
+        failed_field="arrival_time",
+        failed_value=None,
+        expected_value="not null",
+        dq_check_type="null_check",
+    )
 """
 
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Any, Iterable, Mapping
 
 from common.config import RUNTIME_DIR, is_vm_mode
 from common.storage import get_storage
@@ -37,6 +50,13 @@ def quarantine_records(
     quarantine_dir: Path = DEFAULT_QUARANTINE_DIR,
     source_name: str | None = None,
     layer: str = "bronze",
+    # Extended quarantine metadata
+    rule_id: str | None = None,
+    failed_field: str | None = None,
+    failed_value: Any = None,
+    expected_value: Any = None,
+    dq_check_type: str | None = None,
+    quarantine_id: str | None = None,
 ) -> Path | str:
     """Write invalid records to quarantine.
     
@@ -51,6 +71,12 @@ def quarantine_records(
         quarantine_dir: Quarantine directory (local mode)
         source_name: Source name
         layer: Data layer (bronze/silver/gold)
+        rule_id: ID of the validation rule that failed
+        failed_field: Name of the field that failed validation
+        failed_value: The value that caused the failure
+        expected_value: The expected value or constraint
+        dq_check_type: Type of DQ check (null_check, range_check, etc.)
+        quarantine_id: Optional quarantine ID (auto-generated if not provided)
         
     Returns:
         Path (local) or S3 URL
@@ -64,33 +90,52 @@ def quarantine_records(
         issue_category = str(item_dict.get("issue_category", "data_quality"))
         issue_code = str(item_dict.get("issue_code", reason))
         severity = str(item_dict.get("severity", "high"))
-        rule_id = str(item_dict.get("rule_id", "unknown_rule"))
         record_key = str(item_dict.get("record_key", item_dict.get("id", "unknown")))
-        expected_value = item_dict.get("expected_value")
-        actual_value = item_dict.get("actual_value")
-        action_taken = str(item_dict.get("action_taken", "quarantined"))
-        status = str(item_dict.get("status", "open"))
+        
+        # Generate quarantine_id if not provided
+        q_id = quarantine_id or str(uuid.uuid4())
+        
+        # Get field values from item or from function parameters
+        item_rule_id = str(item_dict.get("rule_id", rule_id or "unknown_rule"))
+        item_failed_field = item_dict.get("column_name") or item_dict.get("failed_field") or failed_field
+        item_expected_value = item_dict.get("expected_value", expected_value)
+        item_actual_value = item_dict.get("actual_value", item_dict.get("failed_value", failed_value))
+        item_dq_check_type = item_dict.get("dq_check_type", dq_check_type)
+        item_status = str(item_dict.get("status", "open"))
+        
         return {
+            # Core quarantine metadata
+            "quarantine_id": q_id,
+            "quarantine_reason": reason,
             "dataset": dataset,
             "dataset_name": dataset,
             "source_name": source_name,
             "layer": layer,
-            "reason": reason,
+            # Validation context
+            "rule_id": item_rule_id,
+            "dq_check_type": item_dq_check_type,
+            "failed_field": item_failed_field,
+            "failed_value": item_actual_value,
+            "expected_value": item_expected_value,
+            # Record identification
+            "record_key": record_key,
+            "record_id": item_dict.get("record_id", q_id),
+            # Governance context
             **context.to_event_fields(),
+            # Timestamps
             "quarantined_at": detected_at,
             "detected_at": detected_at,
-            "record_key": record_key,
+            # Legacy/compatible fields
             "issue_category": issue_category,
             "issue_code": issue_code,
             "severity": severity,
-            "rule_id": rule_id,
-            "column_name": item_dict.get("column_name"),
-            "expected_value": expected_value,
-            "actual_value": actual_value,
-            "action_taken": action_taken,
-            "status": status,
+            "column_name": item_failed_field,
+            "actual_value": item_actual_value,
+            "action_taken": str(item_dict.get("action_taken", "quarantined")),
+            "status": item_status,
             "resolved_at": item_dict.get("resolved_at"),
             "resolver_note": item_dict.get("resolver_note"),
+            # Full record
             "raw_payload": json.dumps(item_dict, ensure_ascii=False),
             "item": item_dict,
         }

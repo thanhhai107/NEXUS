@@ -24,7 +24,7 @@ class EnvelopeContext:
     run_id: str | None = None
     chunk_id: str | None = None
     source_path: str | Path | None = None
-    schema_version: str | None = None
+    schema_version: str = "0.0.0"  # Required - defaults to unknown for backward compat
     published_at: str | None = None
     trace_id: str | None = None
 

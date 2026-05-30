@@ -1,9 +1,0 @@
-id,subtype,class,names_primary,road,level,connector_ids,surface,max_speed,is_bridge,is_tunnel,width,length_m,bbox_xmin,bbox_ymin,bbox_xmax,bbox_ymax,version
-08b2845a6c8fff34,road,primary,Oxford Street,A40,0,"['08b2845a6c800001','08b2845a6c800002']",asphalt,48,false,false,12.0,2400.0,-0.145,51.515,-0.140,51.517,2026-05-20.0
-08b2845a6c8fff35,road,secondary,Regent Street,A4201,0,"['08b2845a6c800003','08b2845a6c800004']",asphalt,32,false,false,10.0,1300.0,-0.138,51.511,-0.135,51.513,2026-05-20.0
-08b2845a6c8fff36,road,motorway,M25,M25,0,"['08b2845a6c800005','08b2845a6c800006']",asphalt,112,false,false,15.0,5000.0,-0.320,51.480,-0.310,51.490,2026-05-20.0
-08b2845a6c8fff37,road,tertiary,Baker Street,,0,"['08b2845a6c800007','08b2845a6c800008']",asphalt,32,false,false,8.0,700.0,-0.157,51.522,-0.155,51.524,2026-05-20.0
-08b2845a6c8fff38,path,path,Thames Path,,0,"['08b2845a6c800009','08b2845a6c800010']",gravel,0,false,false,3.0,450.0,-0.120,51.507,-0.118,51.509,2026-05-20.0
-08b2845a6c8fff39,road,primary,Park Lane,A4202,0,"['08b2845a6c800011','08b2845a6c800012']",asphalt,48,false,false,11.0,1100.0,-0.157,51.504,-0.153,51.506,2026-05-20.0
-08b2845a6c8fff3a,road,residential,Downing Street,,0,"['08b2845a6c800013','08b2845a6c800014']",asphalt,32,false,false,6.0,200.0,-0.128,51.503,-0.127,51.504,2026-05-20.0
-08b2845a6c8fff3b,road,trunk,Western Avenue,A40,1,"['08b2845a6c800015','08b2845a6c800016']",asphalt,64,true,false,13.0,1800.0,-0.280,51.510,-0.270,51.515,2026-05-20.0
