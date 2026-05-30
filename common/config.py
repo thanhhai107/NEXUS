@@ -191,6 +191,46 @@ def get_execution_mode() -> str:
 
 
 # ============================================================================
+# SPARK CLUSTER CONFIG
+# ============================================================================
+# Configuration for connecting to Spark cluster (standalone or YARN/K8s)
+
+def get_spark_master_url() -> str:
+    """Get Spark master URL for cluster mode.
+
+    Returns:
+        Spark master URL (e.g., 'spark://host:7077' for standalone,
+        'yarn', 'k8s://https://...', or 'local[*]' for local)
+    """
+    return os.getenv("SPARK_MASTER_URL", "local[*]")
+
+
+def get_spark_config() -> dict[str, str]:
+    """Get Spark configuration for cluster mode.
+
+    Returns:
+        Dict of Spark config key-value pairs
+    """
+    config = {}
+
+    # MinIO/S3 configuration
+    minio_endpoint = os.getenv("MINIO_ENDPOINT")
+    if minio_endpoint:
+        config["spark.hadoop.fs.s3a.endpoint"] = minio_endpoint
+        config["spark.hadoop.fs.s3a.access.key"] = os.getenv("MINIO_ROOT_USER", "minioadmin")
+        config["spark.hadoop.fs.s3a.secret.key"] = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
+        config["spark.hadoop.fs.s3a.path.style.access"] = "true"
+        config["spark.hadoop.fs.s3a.impl"] = "org.apache.hadoop.fs.s3a.S3AFileSystem"
+
+    # Iceberg configuration
+    config["spark.sql.extensions"] = "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+    config["spark.sql.catalog.spark_catalog"] = "org.apache.iceberg.spark.SparkCatalog"
+    config["spark.sql.catalog.spark_catalog.type"] = "hive"
+
+    return config
+
+
+# ============================================================================
 # LAKE STRUCTURE (Medallion Architecture)
 # ============================================================================
 # Data lake với 3 tier: Bronze → Silver → Gold

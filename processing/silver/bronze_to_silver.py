@@ -12,12 +12,22 @@ from processing.common.idempotency import parse_key_list, write_idempotent_icebe
 
 def build_spark():
     from pyspark.sql import SparkSession
+    from common.config import get_spark_master_url, get_spark_config
 
-    return (
-        SparkSession.builder.appName("nexus-bronze-to-silver")
-        .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-        .getOrCreate()
-    )
+    master = get_spark_master_url()
+    spark_cfg = get_spark_config()
+
+    builder = SparkSession.builder.appName("nexus-bronze-to-silver")
+
+    # Set master URL
+    if master.startswith("spark://") or master.startswith("k8s://"):
+        builder = builder.master(master)
+
+    # Apply configs
+    for key, value in spark_cfg.items():
+        builder = builder.config(key, value)
+
+    return builder.getOrCreate()
 
 
 def run(
