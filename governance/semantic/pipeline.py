@@ -58,7 +58,7 @@ class SemanticAnnotationPipeline:
     Usage:
         pipeline = SemanticAnnotationPipeline(
             cache_dir="governance/semantic",
-            llm_model="qwen2.5:0.5b"
+            llm_model="amazon.nova-pro-v1:0"
         )
         
         result = pipeline.process(
