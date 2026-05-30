@@ -106,9 +106,9 @@ class SourceRun:
         
         # Create directories (local filesystem needs explicit creation)
         # S3 handles this implicitly, but VM uses local filesystem
-        from common.config import is_vm_mode
+        from common.storage import S3StorageBackend
         storage = get_storage()
-        is_s3 = storage.is_s3_uri(str(context.output_dir))
+        is_s3 = isinstance(storage, S3StorageBackend)
 
         if not is_s3:
             # Local filesystem (including VM mode with /data/) needs directories created
