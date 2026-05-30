@@ -30,6 +30,7 @@ pattern = re.compile(r"cat\s+>(/usr/local/bin/\S+)\s*<<'(.*?)'\s*\n(.*?)\n\2", r
 for m in pattern.finditer(func_body):
     path = m.group(1)
     body = m.group(3)
+    body = body.replace('$$', '$')
     targets[path] = body
 
 # Also handle the node-services.sh copy

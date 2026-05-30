@@ -304,7 +304,7 @@ set_env_value .env SUPERSET_ADMIN_USERNAME "$${SUPERSET_ADMIN_USERNAME:-admin}"
 set_env_value .env SUPERSET_ADMIN_PASSWORD "$${SUPERSET_ADMIN_PASSWORD:-admin}"
 set_env_value .env AIRFLOW_ADMIN_USERNAME "$${AIRFLOW_ADMIN_USERNAME:-admin}"
 set_env_value .env AIRFLOW_ADMIN_PASSWORD "$${AIRFLOW_ADMIN_PASSWORD:-admin}"
-set_env_value .env AIRFLOW_DB_URL "postgresql+psycopg2://airflow:airflow@$${master_ip}:5432/airflow"
+set_env_value .env AIRFLOW_DB_URL "postgresql+psycopg2://airflow:airflow@$${master_ip}:5433/airflow"
 set_env_value .env AIRFLOW_CELERY_BROKER_URL "redis://:@$${master_ip}:6379/0"
 set_env_value .env NEXUS_GOVERNANCE_DATABASE_URL "postgresql://nexus_governance:nexus_governance@governance-db-primary:5432/nexus_governance"
 set_env_value .env NEXUS_GOVERNANCE_DB_URL "postgresql://nexus_governance:nexus_governance@$${master_ip}:5432/nexus_governance"
@@ -339,7 +339,7 @@ worker_count="${NEXUS_WORKER_COUNT:-4}"
 if [ "$worker_count" -ge 1 ]; then
   for peer_ip in $minio_peers; do
     if [ "$peer_ip" != "$master_ip" ]; then
-      echo "        server ${peer_ip}:8002;" >> "${NEXUS_APP_DIR}/runtime/nginx-api-lb.conf"
+      echo "        server ${peer_ip}:8000;" >> "${NEXUS_APP_DIR}/runtime/nginx-api-lb.conf"
       break
     fi
   done
@@ -350,7 +350,7 @@ if [ "$worker_count" -ge 2 ]; then
     if [ "$peer_ip" != "$master_ip" ]; then
       count=$((count + 1))
       if [ "$count" -eq 2 ]; then
-        echo "        server ${peer_ip}:8003;" >> "${NEXUS_APP_DIR}/runtime/nginx-api-lb.conf"
+        echo "        server ${peer_ip}:8000;" >> "${NEXUS_APP_DIR}/runtime/nginx-api-lb.conf"
         break
       fi
     fi
