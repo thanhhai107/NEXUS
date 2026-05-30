@@ -57,7 +57,19 @@ class DownloadContext:
 
 
 class SourceRun:
-    """Runtime state for one source run.
+    """Core module for ingestion downloader.
+
+    DEPRECATED: Các concerns như checkpoint, coverage, retry đã được tách ra:
+    - orchestration/shared/checkpoint.py - Checkpoint management
+    - orchestration/shared/manifest.py - Manifest reading/writing
+    - orchestration/shared/coverage.py - Coverage calculation
+
+    SourceRun hiện tại vẫn hoạt động, nhưng nên migrate dần sang dùng shared modules.
+    Xem docs/plan-ingestion-orchestration-boundary.md để biết thêm chi tiết.
+
+    ---
+
+    Runtime state for one source run.
 
     The public methods stay backward-compatible with existing source adapters:
     ``should_skip``, ``write_json``, ``write_jsonl``, ``mark_complete`` and

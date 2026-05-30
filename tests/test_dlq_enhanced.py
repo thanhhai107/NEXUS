@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from governance.dlq_enhanced import (
+from governance.dlq import (
     RetryPolicy,
     DLQEntry,
     EnhancedDLQ,

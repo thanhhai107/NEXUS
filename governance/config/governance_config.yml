@@ -1,0 +1,24 @@
+# Governance Configuration
+
+default:
+  owner: data-platform
+  steward: data-steward
+  sensitivity: public
+  retention:
+    policy: open-data-standard
+    days: 365
+
+# Semantic annotation settings
+semantic:
+  llm_model: qwen2.5:0.5b
+  ollama_url: http://localhost:11434
+  llm_timeout_seconds: 180
+  trigger:
+    min_new_fields: 3
+    reannotate_threshold: 10
+
+# Quality rules settings
+quality:
+  default_rules_file: config/quality_defaults.yml
+  quarantine_invalid_records: true
+  validation_enabled: false
