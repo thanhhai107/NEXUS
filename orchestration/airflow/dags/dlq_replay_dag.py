@@ -7,7 +7,7 @@ from airflow import DAG
 from airflow.models.param import Param
 from airflow.operators.bash import BashOperator
 
-DEFAULT_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
+DEFAULT_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka-1:9092,kafka-2:9092,kafka-3:9092")
 
 with DAG(
     dag_id="nexus_dlq_replay",
