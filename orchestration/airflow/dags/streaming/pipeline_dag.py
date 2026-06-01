@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
+from pathlib import Path
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
@@ -16,7 +17,7 @@ DEFAULT_DATASET = os.getenv("NEXUS_STREAM_DATASET", "transport_events")
 DEFAULT_TOPIC = os.getenv("NEXUS_STREAM_TOPIC", "transport-events")
 DEFAULT_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka-1:9092,kafka-2:9092,kafka-3:9092")
 
-PROJECT_ROOT = os.getenv("NEXUS_REPO_PATH", str(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))))
+PROJECT_ROOT = os.getenv("NEXUS_REPO_PATH", str(Path(__file__).resolve().parents[5]))
 
 with DAG(
     dag_id="nexus_streaming_pipeline",

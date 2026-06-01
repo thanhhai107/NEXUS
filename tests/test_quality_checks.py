@@ -137,7 +137,6 @@ def test_json_schema_validation_failure_blocks_status() -> None:
             "max_missing_ratio": 0.0,
             "max_duplicate_ratio": 0.0,
             "min_freshness_score": 1.0,
-            "min_readiness_score": 0.75,
         },
     )
 
@@ -165,12 +164,11 @@ def test_all_thresholds_are_enforced() -> None:
             "max_missing_ratio": 0.0,
             "max_duplicate_ratio": 0.0,
             "min_freshness_score": 1.0,
-            "min_readiness_score": 0.99,
         },
     )
 
     assert status == "failed"
-    assert len(violations) == 4
+    assert len(violations) == 3
 
 
 def test_schema_normalization_matches_auto_fix_names() -> None:

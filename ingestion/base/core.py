@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from common.config import is_vm_mode
-from common.storage import StorageBackend, get_storage
+from common.storage import StorageBackend, get_raw_storage
 from ingestion.base.contracts import (
     CHUNK_FAILED,
     CHUNK_SKIPPED,
@@ -134,7 +134,7 @@ class SourceRun:
     def storage(self) -> StorageBackend:
         """Get storage backend, initializing if needed."""
         if self._storage is None:
-            self._storage = get_storage()
+            self._storage = get_raw_storage()
         return self._storage
 
     def _load_checkpoint(self) -> dict[str, Any]:
@@ -350,7 +350,7 @@ class SourceRun:
 
     def write_json(self, relative_path: str, payload: Any, record_count: int | None = None) -> Path:
         """Write JSON data using appropriate storage backend."""
-        storage_path = f"{self.source_id}/run_id={self.run_id}/raw/{relative_path}"
+        storage_path = f"bronze/{self.source_id}/run_id={self.run_id}/raw/{relative_path}"
         
         if is_vm_mode():
             # Use S3 storage
@@ -374,8 +374,8 @@ class SourceRun:
 
     def write_jsonl(self, relative_path: str, records: Iterable[dict[str, Any]]) -> Path:
         """Write JSONL data using appropriate storage backend."""
-        storage_path = f"{self.source_id}/run_id={self.run_id}/raw/{relative_path}"
-        
+        storage_path = f"bronze/{self.source_id}/run_id={self.run_id}/raw/{relative_path}"
+
         if is_vm_mode():
             # Use S3 storage
             full_path = self.storage.write_jsonl(storage_path, records)

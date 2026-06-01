@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Iterable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_REPOSITORY_URL = "https://github.com/Akapi895/data-bigdata"
+SOURCE_REPOSITORY_URL = os.getenv("NEXUS_REPOSITORY_URL", "https://github.com/Akapi895/data-bigdata")
 DEFAULT_SOURCE_DIR = PROJECT_ROOT / "assets" / "source_discovery"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "runtime" / "source_discovery"
 ALL_SCHEMAS_FILE = "all_schemas.json"

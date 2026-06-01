@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from common.config import RUNTIME_DIR, is_vm_mode
-from common.storage import get_storage
+from common.storage import get_governance_storage
 
 
 logger = logging.getLogger(__name__)
@@ -152,7 +152,7 @@ class EnhancedDLQ:
         
         if is_vm_mode():
             # Use S3 storage
-            storage = get_storage()
+            storage = get_governance_storage()
             storage_path = f"dlq/{entry.category}_{timestamp}.jsonl"
             line = json.dumps(entry.to_dict(), ensure_ascii=False) + "\n"
             
@@ -200,7 +200,7 @@ class EnhancedDLQ:
     
     def _update_index_s3(self, entry: DLQEntry, timestamp: str) -> None:
         """Update the DLQ index in S3."""
-        storage = get_storage()
+        storage = get_governance_storage()
         index_path = f"dlq/.index/{entry.category}.index.json"
         
         index = {}
@@ -226,7 +226,7 @@ class EnhancedDLQ:
         
         if is_vm_mode():
             # Use S3 storage
-            storage = get_storage()
+            storage = get_governance_storage()
             prefix = "dlq/"
             if category:
                 prefix = f"dlq/{category}_"

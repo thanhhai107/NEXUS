@@ -19,6 +19,16 @@ from orchestration.airflow.pools import get_pool_name
 from orchestration.airflow.config import get_source_timeout, get_source_retry_config
 from orchestration.shared import is_published
 
+SOURCE_TO_DATASET = {
+    "openaq": "openaq_measurements",
+    "waqi": "waqi_air_quality",
+    "tfl_status": "tfl_transport_status",
+    "tfl_arrivals": "tfl_transport_status",
+    "londonair": "londonair_monitoring",
+    "openweather": "openweather_current",
+    "openmeteo": "openmeteo_air_quality",
+}
+
 
 DEFAULT_SOURCES = [
     source.strip()
@@ -123,4 +133,37 @@ with DAG(
         trigger_rule="none_failed_min_one_success",
     )
 
-    download_tasks >> validate_published_outputs
+    quality_tasks = []
+    for source in DEFAULT_SOURCES:
+        dataset = SOURCE_TO_DATASET.get(source)
+        if not dataset:
+            continue
+        quality_tasks.append(
+            BashOperator(
+                task_id=f"quality_check_{source}",
+                bash_command=(
+                    f"cd {nexus_repo_path} && "
+                    f"python -m cli.nexus batch run "
+                    f"--dataset {dataset} "
+                    "--batch-id {{ ts_nodash }} "
+                    "--run-id {{ ts_nodash }} "
+                    "--actor airflow "
+                    "--no-exit-on-fail"
+                ),
+                pool=get_pool_name(source),
+                pool_slots=1,
+                retries=2,
+                retry_delay=timedelta(minutes=1),
+            )
+        )
+
+    trigger_medallion = BashOperator(
+        task_id="trigger_medallion",
+        bash_command=(
+            f"cd {nexus_repo_path} && "
+            "echo 'Medallion pipeline triggered for datasets: {{ params.datasets }}'"
+        ),
+        params={"datasets": [SOURCE_TO_DATASET.get(s) for s in DEFAULT_SOURCES]},
+    )
+
+    download_tasks >> validate_published_outputs >> quality_tasks >> trigger_medallion

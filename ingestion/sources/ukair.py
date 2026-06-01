@@ -8,6 +8,7 @@ downloads the matching CSV files into Bronze without reshaping the payload.
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -19,13 +20,8 @@ from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
 from ingestion.base.http import download_file, request_text
 from ingestion.base.utils import sanitize_segment, source_options
 
-DEFAULT_FLAT_FILES_URL = "https://uk-air.defra.gov.uk/data/flat_files"
-DEFAULT_SITE_IDS = (
-    "BG1", "BL0", "BN1", "BX1", "CD1", "CR5", "GR4",
-    "EN1", "GR7", "HG1", "HG4", "HR1", "GR4",
-    "HS4", "HV1", "KC1", "LW1", "MY1", 
-    "RB4", "TD5", "TH4", "WA2", "WM0",
-)
+DEFAULT_FLAT_FILES_URL = os.getenv("UKAIR_FLAT_FILES_URL", "https://uk-air.defra.gov.uk/data/flat_files")
+DEFAULT_SITE_IDS = tuple(os.getenv("UKAIR_SITE_IDS", "BG1,BL0,BN1,BX1,CD1,CR5,GR4,EN1,GR7,HG1,HG4,HR1,HS4,HV1,KC1,LW1,MY1,RB4,TD5,TH4,WA2,WM0").split(","))
 DEFAULT_PATH_GROUPS = ("site_data", "15min_site_data", "site_pol_data")
 
 

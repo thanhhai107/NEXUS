@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcds_warehouse",
+  "type": "object",
+  "properties": {
+    "w_warehouse_sk": { "type": "integer" },
+    "w_warehouse_id": { "type": "string" },
+    "w_warehouse_name": { "type": "string" },
+    "w_warehouse_sq_ft": { "type": "integer" },
+    "w_street_number": { "type": "string" },
+    "w_street_name": { "type": "string" },
+    "w_street_type": { "type": "string" },
+    "w_suite_number": { "type": "string" },
+    "w_city": { "type": "string" },
+    "w_county": { "type": "string" },
+    "w_state": { "type": "string" },
+    "w_zip": { "type": "string" },
+    "w_country": { "type": "string" },
+    "w_gmt_offset": { "type": "number" }
+  },
+  "required": ["w_warehouse_sk", "w_warehouse_id", "w_warehouse_name", "w_warehouse_sq_ft", "w_street_number", "w_street_name", "w_street_type", "w_suite_number", "w_city", "w_county", "w_state", "w_zip", "w_country", "w_gmt_offset"],
+  "additionalProperties": false
+}

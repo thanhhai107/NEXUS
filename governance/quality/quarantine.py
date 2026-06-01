@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from common.config import RUNTIME_DIR, is_vm_mode
-from common.storage import get_storage
+from common.storage import get_raw_storage
 from governance.context import GovernanceContext, utc_now_iso
 from governance.storage import append_governance_event, using_postgres_storage
 
@@ -149,7 +149,7 @@ def quarantine_records(
     
     # Try S3 if in VM mode
     if is_vm_mode():
-        storage = get_storage()
+        storage = get_raw_storage()
         storage_path = _get_quarantine_storage_path(dataset)
         
         # Read existing content or create new

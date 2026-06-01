@@ -1,0 +1,72 @@
+datasets:
+  openaq_measurements:
+    required_columns:
+    - location_id
+    - location
+    - parameter
+    - value
+    - unit
+    - datetime
+    freshness_column: datetime
+  waqi_air_quality:
+    required_columns:
+    - station_uid
+    - station_name
+    - aqi
+    - observed_at
+    freshness_column: observed_at
+  ncei_cdo_climate:
+    required_columns:
+    - station
+    - date
+    - datatype
+    - value
+    freshness_column: date
+  londonair_monitoring:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    - site_code
+    freshness_column: event_time
+  openmeteo_air_quality:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    - latitude
+    - longitude
+    freshness_column: event_time
+  openweather_current:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    freshness_column: event_time
+
+  ukair_air_quality_archive:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    - site_id
+    freshness_column: event_time
+    primary_keys:
+    - event_id
+
+  openmeteo_historical_weather:
+    required_columns:
+    - event_id
+    - source
+    - event_type
+    - event_time
+    - latitude
+    - longitude
+    freshness_column: event_time
+    primary_keys:
+    - event_id
+

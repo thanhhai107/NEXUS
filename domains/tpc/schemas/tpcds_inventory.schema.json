@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcds_inventory",
+  "type": "object",
+  "properties": {
+    "inv_date_sk": { "type": "integer" },
+    "inv_item_sk": { "type": "integer" },
+    "inv_warehouse_sk": { "type": "integer" },
+    "inv_quantity_on_hand": { "type": "integer" }
+  },
+  "required": ["inv_date_sk", "inv_item_sk", "inv_warehouse_sk", "inv_quantity_on_hand"],
+  "additionalProperties": false
+}

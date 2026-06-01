@@ -205,6 +205,15 @@ set_env_value() {
   fi
 }
 
+set_env_if_nonempty() {
+  local env_file="$1"
+  local key="$2"
+  local value="$${3:-}"
+  if [ -n "$value" ]; then
+    set_env_value "$env_file" "$key" "$value"
+  fi
+}
+
 cd "$NEXUS_APP_DIR"
 if [ ! -f .env ] && [ -f .env.example ]; then
   cp .env.example .env
@@ -276,8 +285,13 @@ done
 set_env_value .env NEXUS_RUNTIME_MODE vm
 set_env_value .env NEXUS_RUNTIME_DIR "$NEXUS_DATA"
 set_env_value .env NEXUS_ACTOR vm
-set_env_value .env NEXUS_GOVERNANCE_STORAGE postgres
+set_env_value .env NEXUS_GOVERNANCE_STORAGE "$${NEXUS_GOVERNANCE_STORAGE:-local}"
 set_env_value .env NEXUS_GX_ENABLED true
+set_env_value .env AWS_DEFAULT_REGION "$${AWS_DEFAULT_REGION:-us-east-1}"
+set_env_value .env NEXUS_AGENT_MODEL "$${NEXUS_AGENT_MODEL:-amazon.nova-pro-v1:0}"
+set_env_if_nonempty .env AWS_ACCESS_KEY_ID "$${AWS_ACCESS_KEY_ID:-}"
+set_env_if_nonempty .env AWS_SECRET_ACCESS_KEY "$${AWS_SECRET_ACCESS_KEY:-}"
+set_env_if_nonempty .env AWS_SESSION_TOKEN "$${AWS_SESSION_TOKEN:-}"
 set_env_value .env MINIO_ENDPOINT "http://$${master_ip}:9000"
 set_env_value .env MINIO_ROOT_USER "$${MINIO_ROOT_USER:-minioadmin}"
 set_env_value .env MINIO_ROOT_PASSWORD "$${MINIO_ROOT_PASSWORD:-minioadmin}"
@@ -306,7 +320,6 @@ set_env_value .env AIRFLOW_ADMIN_USERNAME "$${AIRFLOW_ADMIN_USERNAME:-admin}"
 set_env_value .env AIRFLOW_ADMIN_PASSWORD "$${AIRFLOW_ADMIN_PASSWORD:-admin}"
 set_env_value .env AIRFLOW_DB_URL "postgresql+psycopg2://airflow:airflow@$${master_ip}:5433/airflow"
 set_env_value .env AIRFLOW_CELERY_BROKER_URL "redis://:@$${master_ip}:6379/0"
-set_env_value .env NEXUS_GOVERNANCE_STORAGE "local"
 set_env_value .env NEXUS_MASTER_PRIVATE_IP "$master_ip"
 set_env_value .env NEXUS_NODE_IP "$NEXUS_NODE_IP"
 

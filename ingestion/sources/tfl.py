@@ -83,9 +83,10 @@ def _tfl_line_endpoint_base(base: str, opts: dict[str, Any]) -> str:
     if line_ids:
         return f"{base}/Line/{','.join(line_ids)}"
 
+    default_modes = os.getenv("TFL_DEFAULT_MODES", "tube,dlr,overground,elizabeth-line").split(",")
     modes = ",".join(
         str(mode).strip()
-        for mode in opts.get("selected_modes", ["tube", "dlr", "overground", "elizabeth-line"])
+        for mode in opts.get("selected_modes", default_modes)
         if str(mode).strip()
     )
     return f"{base}/Line/Mode/{modes}"

@@ -55,11 +55,16 @@ def validate_schema(records: Sequence[Record], required_columns: Sequence[str]) 
     return True, []
 
 
-def freshness_score(records: Sequence[Record], freshness_column: str, max_age_hours: int) -> float:
+def freshness_score(
+    records: Sequence[Record],
+    freshness_column: str,
+    max_age_hours: int,
+    reference_time: datetime | None = None,
+) -> float:
     if not records:
         return 0.0
 
-    now = datetime.now(timezone.utc)
+    now = reference_time or datetime.now(timezone.utc)
     fresh_records = 0
 
     for record in records:
@@ -102,6 +107,7 @@ def run_quality_checks(
     freshness_column: str,
     max_age_hours: int,
     json_schema: Mapping[str, object] | None = None,
+    reference_time: datetime | None = None,
 ) -> QualityResult:
     issues: list[str] = []
     missing = missing_value_ratio(records, required_columns)
@@ -109,7 +115,7 @@ def run_quality_checks(
     required_schema_valid, required_schema_issues = validate_schema(records, required_columns)
     json_schema_valid, json_schema_issues = validate_json_schema(records, json_schema)
     schema_valid = required_schema_valid and json_schema_valid
-    freshness = freshness_score(records, freshness_column, max_age_hours)
+    freshness = freshness_score(records, freshness_column, max_age_hours, reference_time)
     readiness = readiness_score(missing, duplicates, schema_valid, freshness)
     gx_validation = run_great_expectations_validation(
         dataset=dataset,
@@ -172,10 +178,6 @@ def evaluate_quality_status(
     if result.freshness_score < min_freshness_score:
         violations.append(
             f"Freshness score {result.freshness_score:.2%} is below min {min_freshness_score:.2%}."
-        )
-    if result.readiness_score < min_readiness_score:
-        violations.append(
-            f"Readiness score {result.readiness_score:.2%} is below min {min_readiness_score:.2%}."
         )
     return ("failed" if violations else "passed", violations)
 

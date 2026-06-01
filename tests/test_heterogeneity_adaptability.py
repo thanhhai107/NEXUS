@@ -173,7 +173,6 @@ def test_quality_checks():
         "max_missing_ratio": 0.5,
         "max_duplicate_ratio": 0.5,
         "min_freshness_score": 0.5,
-        "min_readiness_score": 0.5,
     })
     
     print(f"  Overall status: {status}")

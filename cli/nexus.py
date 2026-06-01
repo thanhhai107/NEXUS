@@ -6,6 +6,7 @@ import json
 import os
 import socket
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -80,6 +81,14 @@ from ingestion.batch.api_ingestion import ingest_api_records
 from ingestion.batch.common import read_csv_records, write_jsonl
 from ingestion.batch.csv_download_ingestion import download_csv
 from ingestion.streaming.producer import default_key, default_url, event_stream
+from ingestion.data_caterer.runner import (
+    DataCatererConfig,
+    ERROR_PRESETS,
+    generate_all,
+    generate_tpcds,
+    list_plans,
+    run_plan,
+)
 
 AUTH_STYLES = {
     "openaq_measurements": "x-api-key",
@@ -249,6 +258,185 @@ def schema_invalid_records(records: list[dict[str, Any]], schema: dict[str, Any]
     return records_failing_json_schema(records, schema)
 
 
+def run_quality_pipeline(
+    *,
+    records: list[dict[str, Any]],
+    dataset: str,
+    rules: dict[str, Any],
+    dataset_config: dict[str, Any],
+    quality_config: dict[str, Any],
+    batch_id: str,
+    run_id: str | None = None,
+    source_path: str | None = None,
+    actor: str | None = None,
+    event_type: str = "quality_check",
+    extra_details: dict[str, Any] | None = None,
+    retries: int = 0,
+    retry_delay_seconds: int = 5,
+) -> tuple[str, dict[str, Any], Any, Any]:
+    """Shared quality pipeline: auto-fix → coercion → checks → drift → quarantine → evaluate.
+
+    Returns (status, details, quality_result, drift_result).
+    Implements retry with exponential backoff for transient failures.
+    """
+    last_error: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            return _run_quality_pipeline_inner(
+                records=records,
+                dataset=dataset,
+                rules=rules,
+                dataset_config=dataset_config,
+                quality_config=quality_config,
+                batch_id=batch_id,
+                run_id=run_id,
+                source_path=source_path,
+                actor=actor,
+                event_type=event_type,
+                extra_details=extra_details,
+            )
+        except (OSError, IOError, ConnectionError) as exc:
+            last_error = exc
+            if attempt < retries:
+                delay = retry_delay_seconds * (2 ** attempt)
+                print(f"Quality pipeline transient error (attempt {attempt+1}/{retries+1}): {exc}. "
+                      f"Retrying in {delay}s...", file=sys.stderr)
+                time.sleep(delay)
+    raise last_error  # type: ignore[misc]
+
+
+def _run_quality_pipeline_inner(
+    *,
+    records: list[dict[str, Any]],
+    dataset: str,
+    rules: dict[str, Any],
+    dataset_config: dict[str, Any],
+    quality_config: dict[str, Any],
+    batch_id: str,
+    run_id: str | None = None,
+    source_path: str | None = None,
+    actor: str | None = None,
+    event_type: str = "quality_check",
+    extra_details: dict[str, Any] | None = None,
+) -> tuple[str, dict[str, Any], Any, Any]:
+    auto_fix_result = apply_auto_fix(records, rules.get("auto_fix"))
+    json_schema = effective_schema(dataset_config, rules)
+    schema_coercion_result = coerce_records_to_schema(auto_fix_result.records, json_schema)
+    checked_records = schema_coercion_result.records
+
+    required_columns = normalize_field_names(rules["required_columns"], rules.get("auto_fix"))
+    primary_keys = normalize_field_names(dataset_config.get("primary_keys", []), rules.get("auto_fix"))
+    freshness_column = normalize_field_name(rules["freshness_column"], rules.get("auto_fix"))
+
+    result = run_quality_checks(
+        dataset=dataset,
+        records=checked_records,
+        required_columns=required_columns,
+        primary_keys=primary_keys,
+        freshness_column=freshness_column,
+        max_age_hours=int(dataset_config.get("freshness_hours", 24)),
+        json_schema=json_schema,
+    )
+    contract = load_data_contract(dataset) if dataset_config else None
+    drift_result = compare_schema_drift(
+        json_schema,
+        checked_records,
+        required_fields=required_columns,
+        primary_keys=primary_keys,
+        downstream_fields=contract.semantic_dedup_keys if contract else (),
+    )
+
+    invalid_records = [
+        record
+        for record in checked_records
+        if any(record.get(column) in (None, "") for column in required_columns)
+    ]
+    if invalid_records:
+        quarantine_records(
+            dataset,
+            invalid_records,
+            reason="missing_required_values",
+            batch_id=batch_id,
+            run_id=run_id,
+            source_path=source_path,
+            actor=actor,
+        )
+
+    schema_invalid = schema_invalid_records(checked_records, json_schema)
+    if schema_invalid:
+        quarantine_records(
+            dataset,
+            schema_invalid,
+            reason="json_schema_validation_failed",
+            batch_id=batch_id,
+            run_id=run_id,
+            source_path=source_path,
+            actor=actor,
+        )
+
+    thresholds = dict(quality_config.get("default_rules", {}))
+    status, threshold_violations = evaluate_quality_status(result, thresholds)
+    if drift_result.status == "failed":
+        status = "failed"
+        threshold_violations = [*threshold_violations, "Schema drift policy failed."]
+
+    details = quality_details(
+        result,
+        auto_fix_result.summary,
+        schema_coercion_result.summary,
+        thresholds,
+        threshold_violations,
+        drift_result.to_dict(),
+    )
+    if extra_details:
+        details = {**details, **extra_details}
+
+    if json_schema:
+        save_schema_snapshot(
+            dataset,
+            json_schema,
+            batch_id=batch_id,
+            run_id=run_id,
+            source_path=source_path,
+            actor=actor,
+        )
+
+    write_audit_event(
+        event_type=event_type,
+        dataset=dataset,
+        status=status,
+        details=details,
+        batch_id=batch_id,
+        run_id=run_id,
+        source_path=source_path,
+        actor=actor,
+    )
+    write_quality_metric(
+        dataset=dataset,
+        batch_id=batch_id,
+        status=status,
+        quality=result.__dict__,
+        auto_fix=auto_fix_result.summary,
+        schema_coercion=schema_coercion_result.summary,
+        thresholds=thresholds,
+        threshold_violations=threshold_violations,
+        run_id=run_id,
+        source_path=source_path,
+        actor=actor,
+    )
+    publish_quality_result(
+        dataset=dataset,
+        status=status,
+        quality=details,
+        batch_id=batch_id,
+        run_id=run_id,
+        source_path=source_path,
+        actor=actor,
+    )
+
+    return status, details, result, drift_result
+
+
 def run_batch(args: argparse.Namespace) -> None:
     datasets = load_dataset_catalog().get("datasets", {})
     quality_config = load_quality_config()
@@ -261,112 +449,19 @@ def run_batch(args: argparse.Namespace) -> None:
         raise SystemExit(f"No quality rules configured for dataset: {args.dataset}")
 
     records, source_label = resolve_records(dataset_config, args.dataset, args.source)
-    auto_fix_result = apply_auto_fix(records, rules.get("auto_fix"))
-    json_schema = effective_schema(dataset_config, rules)
-    schema_coercion_result = coerce_records_to_schema(auto_fix_result.records, json_schema)
-    records = schema_coercion_result.records
+    records = coerce_records_to_schema(
+        apply_auto_fix(records, rules.get("auto_fix")).records,
+        effective_schema(dataset_config, rules),
+    ).records
     raw_path = write_jsonl(args.dataset, records, source_label)
     print(f"Ingested {len(records)} auto-fixed records for dataset={args.dataset} into {raw_path}")
 
-    required_columns = normalize_field_names(rules["required_columns"], rules.get("auto_fix"))
-    primary_keys = normalize_field_names(dataset_config.get("primary_keys", []), rules.get("auto_fix"))
-    freshness_column = normalize_field_name(rules["freshness_column"], rules.get("auto_fix"))
-
-    result = run_quality_checks(
-        dataset=args.dataset,
+    status, details, _result, _drift = run_quality_pipeline(
         records=records,
-        required_columns=required_columns,
-        primary_keys=primary_keys,
-        freshness_column=freshness_column,
-        max_age_hours=int(dataset_config.get("freshness_hours", 24)),
-        json_schema=json_schema,
-    )
-    drift_result = compare_schema_drift(
-        json_schema,
-        records,
-        required_fields=required_columns,
-        primary_keys=primary_keys,
-        downstream_fields=load_data_contract(args.dataset).semantic_dedup_keys,
-    )
-
-    if json_schema:
-        save_schema_snapshot(
-            args.dataset,
-            json_schema,
-            batch_id=args.batch_id,
-            run_id=args.run_id,
-            source_path=source_label,
-            actor=args.actor,
-        )
-
-    invalid_records = [
-        record
-        for record in records
-        if any(record.get(column) in (None, "") for column in required_columns)
-    ]
-    if invalid_records:
-        quarantine_records(
-            args.dataset,
-            invalid_records,
-            reason="missing_required_values",
-            batch_id=args.batch_id,
-            run_id=args.run_id,
-            source_path=source_label,
-            actor=args.actor,
-        )
-
-    schema_invalid = schema_invalid_records(records, json_schema)
-    if schema_invalid:
-        quarantine_records(
-            args.dataset,
-            schema_invalid,
-            reason="json_schema_validation_failed",
-            batch_id=args.batch_id,
-            run_id=args.run_id,
-            source_path=source_label,
-            actor=args.actor,
-        )
-
-    thresholds = dict(quality_config.get("default_rules", {}))
-    status, threshold_violations = evaluate_quality_status(result, thresholds)
-    if drift_result.status == "failed":
-        status = "failed"
-        threshold_violations = [*threshold_violations, "Schema drift policy failed."]
-    details = quality_details(
-        result,
-        auto_fix_result.summary,
-        schema_coercion_result.summary,
-        thresholds,
-        threshold_violations,
-        drift_result.to_dict(),
-    )
-    write_audit_event(
-        event_type="quality_check",
         dataset=args.dataset,
-        status=status,
-        details=details,
-        batch_id=args.batch_id,
-        run_id=args.run_id,
-        source_path=source_label,
-        actor=args.actor,
-    )
-    write_quality_metric(
-        dataset=args.dataset,
-        batch_id=args.batch_id,
-        status=status,
-        quality=result.__dict__,
-        auto_fix=auto_fix_result.summary,
-        schema_coercion=schema_coercion_result.summary,
-        thresholds=thresholds,
-        threshold_violations=threshold_violations,
-        run_id=args.run_id,
-        source_path=source_label,
-        actor=args.actor,
-    )
-    openmetadata_result = publish_quality_result(
-        dataset=args.dataset,
-        status=status,
-        quality=details,
+        rules=rules,
+        dataset_config=dataset_config,
+        quality_config=quality_config,
         batch_id=args.batch_id,
         run_id=args.run_id,
         source_path=source_label,
@@ -380,10 +475,6 @@ def run_batch(args: argparse.Namespace) -> None:
         "raw_path": str(raw_path),
         "quality_status": status,
         "quality": details,
-        "openmetadata": {
-            "published": openmetadata_result.get("published"),
-            "publish_target": openmetadata_result.get("publish_target"),
-        },
         "agent_decision": decision.to_dict() if decision else None,
     }
     print(json.dumps(output, indent=2))
@@ -396,115 +487,31 @@ def check_quality(args: argparse.Namespace) -> None:
     records = read_csv(args.source)
     quality_config = load_quality_config()
     rules = quality_config.get("datasets", {}).get(args.dataset, {})
-    auto_fix_result = apply_auto_fix(records, rules.get("auto_fix"))
+    rules = {
+        **rules,
+        "required_columns": args.required_columns,
+        "freshness_column": args.freshness_column,
+    }
     dataset_config = load_dataset_catalog().get("datasets", {}).get(args.dataset, {})
-    json_schema = effective_schema(dataset_config, rules) if dataset_config else None
-    schema_coercion_result = coerce_records_to_schema(auto_fix_result.records, json_schema)
-    records = schema_coercion_result.records
-    required_columns = normalize_field_names(args.required_columns, rules.get("auto_fix"))
-    primary_keys = normalize_field_names(args.primary_keys, rules.get("auto_fix"))
-    freshness_column = normalize_field_name(args.freshness_column, rules.get("auto_fix"))
+    if not dataset_config:
+        dataset_config = {}
+    dataset_config = {**dataset_config, "primary_keys": args.primary_keys,
+                     "freshness_hours": args.max_age_hours}
 
-    result = run_quality_checks(
-        dataset=args.dataset,
+    records = coerce_records_to_schema(
+        apply_auto_fix(records, rules.get("auto_fix")).records,
+        effective_schema(dataset_config, rules),
+    ).records
+
+    status, details, _result, _drift = run_quality_pipeline(
         records=records,
-        required_columns=required_columns,
-        primary_keys=primary_keys,
-        freshness_column=freshness_column,
-        max_age_hours=args.max_age_hours,
-        json_schema=json_schema,
-    )
-    contract = load_data_contract(args.dataset) if dataset_config else None
-    drift_result = compare_schema_drift(
-        json_schema,
-        records,
-        required_fields=required_columns,
-        primary_keys=primary_keys,
-        downstream_fields=contract.semantic_dedup_keys if contract else (),
-    )
-
-    if json_schema:
-        save_schema_snapshot(
-            args.dataset,
-            json_schema,
-            batch_id=args.batch_id,
-            run_id=args.run_id,
-            source_path=args.source,
-            actor=args.actor,
-        )
-
-    invalid_records = [
-        record
-        for record in records
-        if any(record.get(column) in (None, "") for column in required_columns)
-    ]
-    if invalid_records:
-        quarantine_records(
-            args.dataset,
-            invalid_records,
-            reason="missing_required_values",
-            batch_id=args.batch_id,
-            run_id=args.run_id,
-            source_path=args.source,
-            actor=args.actor,
-        )
-
-    schema_invalid = schema_invalid_records(records, json_schema)
-    if schema_invalid:
-        quarantine_records(
-            args.dataset,
-            schema_invalid,
-            reason="json_schema_validation_failed",
-            batch_id=args.batch_id,
-            run_id=args.run_id,
-            source_path=args.source,
-            actor=args.actor,
-        )
-
-    thresholds = dict(quality_config.get("default_rules", {}))
-    thresholds["min_readiness_score"] = args.min_readiness_score
-    status, threshold_violations = evaluate_quality_status(result, thresholds)
-    if drift_result.status == "failed":
-        status = "failed"
-        threshold_violations = [*threshold_violations, "Schema drift policy failed."]
-    details = quality_details(
-        result,
-        auto_fix_result.summary,
-        schema_coercion_result.summary,
-        thresholds,
-        threshold_violations,
-        drift_result.to_dict(),
-    )
-    write_audit_event(
-        event_type="quality_check",
         dataset=args.dataset,
-        status=status,
-        details=details,
+        rules=rules,
+        dataset_config=dataset_config,
+        quality_config=quality_config,
         batch_id=args.batch_id,
         run_id=args.run_id,
-        source_path=args.source,
-        actor=args.actor,
-    )
-    write_quality_metric(
-        dataset=args.dataset,
-        batch_id=args.batch_id,
-        status=status,
-        quality=result.__dict__,
-        auto_fix=auto_fix_result.summary,
-        schema_coercion=schema_coercion_result.summary,
-        thresholds=thresholds,
-        threshold_violations=threshold_violations,
-        run_id=args.run_id,
-        source_path=args.source,
-        actor=args.actor,
-    )
-    publish_quality_result(
-        dataset=args.dataset,
-        status=status,
-        quality=details,
-        batch_id=args.batch_id,
-        run_id=args.run_id,
-        source_path=args.source,
+        source_path=str(args.source),
         actor=args.actor,
     )
 
@@ -533,119 +540,22 @@ def check_stream_quality(args: argparse.Namespace) -> None:
             args.sample_events,
         )
     )
-    auto_fix_result = apply_auto_fix(records, rules.get("auto_fix"))
-    json_schema = effective_schema(dataset_config, rules) if dataset_config else None
-    schema_coercion_result = coerce_records_to_schema(auto_fix_result.records, json_schema)
-    records = schema_coercion_result.records
-    required_columns = normalize_field_names(rules["required_columns"], rules.get("auto_fix"))
-    primary_keys = normalize_field_names(dataset_config.get("primary_keys", ["event_id"]), rules.get("auto_fix"))
-    freshness_column = normalize_field_name(rules["freshness_column"], rules.get("auto_fix"))
+    source_path = str(args.events_jsonl or args.api_url or args.source)
+    dataset_config = {**dataset_config, "primary_keys": dataset_config.get("primary_keys", ["event_id"]),
+                     "freshness_hours": dataset_config.get("freshness_hours", 1)}
 
-    result = run_quality_checks(
-        dataset=dataset,
+    status, details, _result, _drift = run_quality_pipeline(
         records=records,
-        required_columns=required_columns,
-        primary_keys=primary_keys,
-        freshness_column=freshness_column,
-        max_age_hours=int(dataset_config.get("freshness_hours", 1)),
-        json_schema=json_schema,
-    )
-    contract = load_data_contract(dataset) if dataset_config else None
-    drift_result = compare_schema_drift(
-        json_schema,
-        records,
-        required_fields=required_columns,
-        primary_keys=primary_keys,
-        downstream_fields=contract.semantic_dedup_keys if contract else (),
-    )
-
-    if json_schema:
-        save_schema_snapshot(
-            dataset,
-            json_schema,
-            batch_id=args.batch_id,
-            run_id=args.run_id,
-            source_path=args.events_jsonl or args.api_url or args.source,
-            actor=args.actor,
-        )
-
-    invalid_records = [
-        record
-        for record in records
-        if any(record.get(column) in (None, "") for column in required_columns)
-    ]
-    if invalid_records:
-        quarantine_records(
-            dataset,
-            invalid_records,
-            reason="stream_missing_required_values",
-            batch_id=args.batch_id,
-            run_id=args.run_id,
-            source_path=args.events_jsonl or args.api_url or args.source,
-            actor=args.actor,
-        )
-
-    schema_invalid = schema_invalid_records(records, json_schema)
-    if schema_invalid:
-        quarantine_records(
-            dataset,
-            schema_invalid,
-            reason="json_schema_validation_failed",
-            batch_id=args.batch_id,
-            run_id=args.run_id,
-            source_path=args.events_jsonl or args.api_url or args.source,
-            actor=args.actor,
-        )
-
-    thresholds = dict(quality_config.get("default_rules", {}))
-    status, threshold_violations = evaluate_quality_status(result, thresholds)
-    if drift_result.status == "failed":
-        status = "failed"
-        threshold_violations = [*threshold_violations, "Schema drift policy failed."]
-    details = quality_details(
-        result,
-        auto_fix_result.summary,
-        schema_coercion_result.summary,
-        thresholds,
-        threshold_violations,
-        drift_result.to_dict(),
-    )
-    write_audit_event(
+        dataset=dataset,
+        rules=rules,
+        dataset_config=dataset_config,
+        quality_config=quality_config,
+        batch_id=args.batch_id,
+        run_id=args.run_id,
+        source_path=source_path,
+        actor=args.actor,
         event_type="streaming_quality_check",
-        dataset=dataset,
-        status=status,
-        details={
-            **details,
-            "source": args.source,
-            "sample_events": len(records),
-        },
-        batch_id=args.batch_id,
-        run_id=args.run_id,
-        source_path=args.events_jsonl or args.api_url or args.source,
-        actor=args.actor,
-    )
-    write_quality_metric(
-        dataset=dataset,
-        batch_id=args.batch_id,
-        status=status,
-        quality=result.__dict__,
-        event_type="streaming_quality_check",
-        auto_fix=auto_fix_result.summary,
-        schema_coercion=schema_coercion_result.summary,
-        thresholds=thresholds,
-        threshold_violations=threshold_violations,
-        run_id=args.run_id,
-        source_path=args.events_jsonl or args.api_url or args.source,
-        actor=args.actor,
-    )
-    publish_quality_result(
-        dataset=dataset,
-        status=status,
-        quality=details,
-        batch_id=args.batch_id,
-        run_id=args.run_id,
-        source_path=args.events_jsonl or args.api_url or args.source,
-        actor=args.actor,
+        extra_details={"source": args.source, "sample_events": len(records)},
     )
 
     print(json.dumps({
@@ -897,6 +807,28 @@ def worker_heartbeats(_args: argparse.Namespace) -> None:
     print(json.dumps(records, indent=2))
 
 
+def generate_tpc_data(args: argparse.Namespace) -> None:
+    """Generate TPC-DS benchmark data via Data Caterer (SF=10)."""
+    scale = args.scale_factor
+    error = args.error_profile
+    run_id = args.run_id or f"tpcds-sf{scale}-{error}"
+    dry = args.dry_run
+
+    result = generate_tpcds(
+        scale_factor=scale,
+        error_profile=error,
+        output_formats=args.output_formats,
+        run_id=run_id,
+        dry_run=dry,
+    )
+    print(json.dumps(result, indent=2))
+
+
+def list_dc_plans(_args: argparse.Namespace) -> None:
+    plans = list_plans()
+    print(json.dumps({"plans": plans}, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="NEXUS operational CLI.")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -922,7 +854,6 @@ def build_parser() -> argparse.ArgumentParser:
     quality_check.add_argument("--primary-keys", nargs="+", required=True)
     quality_check.add_argument("--freshness-column", required=True)
     quality_check.add_argument("--max-age-hours", type=int, default=24)
-    quality_check.add_argument("--min-readiness-score", type=float, default=0.75)
     quality_check.add_argument("--batch-id", default="manual")
     quality_check.add_argument("--run-id")
     quality_check.add_argument("--actor")
@@ -1139,6 +1070,28 @@ def build_parser() -> argparse.ArgumentParser:
     worker_list_parser = worker_subcommands.add_parser("list", help="List recent worker heartbeats")
     worker_list_parser.add_argument("--max-age", type=int, default=300, help="Max heartbeat age in seconds")
     worker_list_parser.set_defaults(func=worker_heartbeats)
+
+    generate = subcommands.add_parser("generate", help="Generate TPC-DS benchmark data via Data Caterer")
+    generate_subcommands = generate.add_subparsers(dest="generate_command", required=True)
+
+    gen_tpc = generate_subcommands.add_parser("tpcds", help="Generate TPC-DS data (SF=10)")
+    gen_tpc.add_argument("--scale-factor", type=int, default=10, help="Scale factor (default SF=10)")
+    gen_tpc.add_argument(
+        "--error-profile", default="moderate",
+        choices=list(ERROR_PRESETS.keys()),
+        help="Error injection profile for testing data quality",
+    )
+    gen_tpc.add_argument(
+        "--output-formats", nargs="+", default=["csv", "parquet"],
+        choices=["csv", "parquet", "json", "orc"],
+        help="Output data formats",
+    )
+    gen_tpc.add_argument("--run-id", help="Unique run identifier")
+    gen_tpc.add_argument("--dry-run", action="store_true", help="Print command without executing")
+    gen_tpc.set_defaults(func=generate_tpc_data)
+
+    gen_list = generate_subcommands.add_parser("list-plans", help="List available Data Caterer plans")
+    gen_list.set_defaults(func=list_dc_plans)
 
     return parser
 

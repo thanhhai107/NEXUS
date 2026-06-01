@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from common.config import RUNTIME_DIR, is_vm_mode
-from common.storage import get_storage
+from common.storage import get_governance_storage
 from governance.quality.quarantine import quarantine_records
 
 
@@ -302,7 +302,7 @@ class BronzeSchemaValidator:
         
         if is_vm_mode():
             # Use S3 storage
-            storage = get_storage()
+            storage = get_governance_storage()
             storage_path = f"validation/bronze/{self.source_id}/{self.run_id}.validation.json"
             return storage.write(storage_path, data, is_json=True)
         else:

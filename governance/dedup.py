@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from common.config import RUNTIME_DIR, is_vm_mode
-from common.storage import get_storage
+from common.storage import get_governance_storage
 
 
 DEDUP_DIR = RUNTIME_DIR / "dedup"
@@ -237,7 +237,7 @@ class Deduplicator:
         
         if is_vm_mode():
             # Use S3 storage
-            storage = get_storage()
+            storage = get_governance_storage()
             storage_path = f"dedup/{source_id}/{run_id}.dedup.json"
             return storage.write(storage_path, data, is_json=True)
         else:
@@ -259,7 +259,7 @@ class Deduplicator:
         """
         if is_vm_mode():
             # Use S3 storage
-            storage = get_storage()
+            storage = get_governance_storage()
             storage_path = f"dedup/{source_id}/{run_id}.dedup.json"
             
             if not storage.exists(storage_path):

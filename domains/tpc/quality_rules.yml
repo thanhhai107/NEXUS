@@ -1,0 +1,127 @@
+# =============================================================================
+# TPC Benchmark Domain — Quality Rules
+# =============================================================================
+
+default_rules:
+  max_missing_ratio: 0.05
+  max_duplicate_ratio: 0.02
+  min_freshness_score: 0.9
+  # ---------------------------------------------------------------------------
+  # TPC-DS Quality Rules
+  # ---------------------------------------------------------------------------
+  tpcds_date_dim:
+    required_columns:
+      - d_date_sk
+      - d_date
+      - d_year
+    freshness_column: d_date
+    primary_keys:
+      - d_date_sk
+
+  tpcds_time_dim:
+    required_columns:
+      - t_time_sk
+      - t_time
+    freshness_column: t_time_sk
+    primary_keys:
+      - t_time_sk
+
+  tpcds_item:
+    required_columns:
+      - i_item_sk
+      - i_item_id
+      - i_current_price
+    freshness_column: i_rec_start_date
+    primary_keys:
+      - i_item_sk
+
+  tpcds_customer:
+    required_columns:
+      - c_customer_sk
+      - c_customer_id
+      - c_first_name
+      - c_last_name
+    freshness_column: c_last_review_date
+    primary_keys:
+      - c_customer_sk
+
+  tpcds_customer_address:
+    required_columns:
+      - ca_address_sk
+      - ca_city
+      - ca_state
+    freshness_column: ca_address_sk
+    primary_keys:
+      - ca_address_sk
+
+  tpcds_customer_demographics:
+    required_columns:
+      - cd_demo_sk
+      - cd_gender
+      - cd_marital_status
+    freshness_column: cd_demo_sk
+    primary_keys:
+      - cd_demo_sk
+
+  tpcds_store:
+    required_columns:
+      - s_store_sk
+      - s_store_name
+      - s_number_employees
+    freshness_column: s_rec_start_date
+    primary_keys:
+      - s_store_sk
+
+  tpcds_store_sales:
+    required_columns:
+      - ss_item_sk
+      - ss_ticket_number
+      - ss_quantity
+      - ss_sales_price
+    freshness_column: ss_sold_date_sk
+    primary_keys:
+      - ss_item_sk
+      - ss_ticket_number
+
+  tpcds_web_sales:
+    required_columns:
+      - ws_item_sk
+      - ws_order_number
+      - ws_quantity
+      - ws_sales_price
+    freshness_column: ws_sold_date_sk
+    primary_keys:
+      - ws_item_sk
+      - ws_order_number
+
+  tpcds_catalog_sales:
+    required_columns:
+      - cs_item_sk
+      - cs_order_number
+      - cs_quantity
+      - cs_sales_price
+    freshness_column: cs_sold_date_sk
+    primary_keys:
+      - cs_item_sk
+      - cs_order_number
+
+  tpcds_inventory:
+    required_columns:
+      - inv_date_sk
+      - inv_item_sk
+      - inv_warehouse_sk
+      - inv_quantity_on_hand
+    freshness_column: inv_date_sk
+    primary_keys:
+      - inv_date_sk
+      - inv_item_sk
+      - inv_warehouse_sk
+
+  tpcds_warehouse:
+    required_columns:
+      - w_warehouse_sk
+      - w_warehouse_name
+      - w_warehouse_sq_ft
+    freshness_column: w_warehouse_sk
+    primary_keys:
+      - w_warehouse_sk

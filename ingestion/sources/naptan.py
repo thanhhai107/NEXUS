@@ -27,6 +27,6 @@ def download_naptan(run: SourceRun, context: DownloadContext) -> None:
         params=params,
         relative_path="snapshot=current/atco_area=490/naptan_stops.csv",
         max_bytes=int(opts.get("max_bytes", 200_000_000)),
-        timeout=180,
+        timeout=int(os.getenv("NAPTAN_DOWNLOAD_TIMEOUT", "180")),
     )
     run.mark_complete(chunk_id, {"record_count": row_count, "path": str(path)})

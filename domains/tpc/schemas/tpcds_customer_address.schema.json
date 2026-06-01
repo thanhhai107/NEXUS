@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcds_customer_address",
+  "type": "object",
+  "properties": {
+    "ca_address_sk": { "type": "integer" },
+    "ca_address_id": { "type": "string" },
+    "ca_street_number": { "type": "string" },
+    "ca_street_name": { "type": "string" },
+    "ca_street_type": { "type": "string" },
+    "ca_suite_number": { "type": "string" },
+    "ca_city": { "type": "string" },
+    "ca_county": { "type": "string" },
+    "ca_state": { "type": "string" },
+    "ca_zip": { "type": "string" },
+    "ca_country": { "type": "string" },
+    "ca_gmt_offset": { "type": "number" },
+    "ca_location_type": { "type": "string" }
+  },
+  "required": ["ca_address_sk", "ca_address_id", "ca_street_number", "ca_street_name", "ca_street_type", "ca_suite_number", "ca_city", "ca_county", "ca_state", "ca_zip", "ca_country", "ca_gmt_offset", "ca_location_type"],
+  "additionalProperties": false
+}

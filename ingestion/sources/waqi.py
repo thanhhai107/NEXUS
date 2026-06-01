@@ -6,6 +6,7 @@ Downloads air quality measurements from WAQI stations within the configured boun
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
@@ -23,8 +24,8 @@ def download_waqi(run: SourceRun, context: DownloadContext) -> None:
     """Download WAQI air quality measurements for stations in bounding box."""
     env = require_env(run, "WAQI_API_TOKEN")
     opts = source_options(context, "waqi")
-    base = str(opts.get("base_url", "https://api.waqi.info")).rstrip("/")
-    map_path = str(opts.get("map_path", "/v2/map/bounds"))
+    base = (os.environ.get("WAQI_API_URL") or opts.get("base_url", "https://api.waqi.info")).rstrip("/")
+    map_path = str(os.environ.get("WAQI_MAP_PATH", opts.get("map_path", "/v2/map/bounds")))
     bbox = context.bbox
     token = env["WAQI_API_TOKEN"]
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
@@ -25,11 +26,12 @@ NCEI_REFERENCE_ENDPOINTS = {
 def download_ncei(run: SourceRun, context: DownloadContext) -> None:
     env = require_env(run, "NCEI_API_TOKEN")
     opts = source_options(context, "ncei")
-    base = str(opts.get("base_url", "https://www.ncei.noaa.gov/cdo-web/api/v2")).rstrip("/")
+    base = (os.environ.get("NCEI_API_URL") or opts.get("base_url", "https://www.ncei.noaa.gov/cdo-web/api/v2")).rstrip("/")
     headers = {"token": env["NCEI_API_TOKEN"]}
-    dataset_id = str(opts.get("dataset_id", "GHCND"))
-    datatypes = [str(value) for value in opts.get("datatypes", ["TMAX", "TMIN", "TAVG", "PRCP", "AWND"])]
-    page_limit = min(int(opts.get("page_limit", 1000)), 1000)
+    dataset_id = os.environ.get("NCEI_DATASET_ID") or str(opts.get("dataset_id", "GHCND"))
+    default_datatypes = (os.environ.get("NCEI_DATATYPES") or "TMAX,TMIN,TAVG,PRCP,AWND").split(",")
+    datatypes = [str(value) for value in opts.get("datatypes", default_datatypes)]
+    page_limit = min(int(os.environ.get("NCEI_PAGE_LIMIT", opts.get("page_limit", 1000))), 1000)
     units = str(opts.get("units", "metric"))
 
     download_ncei_reference_metadata(run, context, base, headers, dataset_id, datatypes, page_limit, opts)

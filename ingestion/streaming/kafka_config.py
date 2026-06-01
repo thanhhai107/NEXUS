@@ -14,13 +14,14 @@ from typing import Any
 
 # Default NEXUS streaming topics (can be overridden via KAFKA_TOPIC_* env vars)
 KAFKA_TOPIC_PREFIX = "KAFKA_TOPIC_"
-TFL_LINE_IDS = (
+TFL_LINE_IDS = os.getenv(
+    "TFL_LINE_IDS",
     "bakerloo,central,circle,district,hammersmith-city,jubilee,metropolitan,"
     "northern,piccadilly,victoria,waterloo-city,dlr,elizabeth,liberty,lioness,"
-    "mildmay,suffragette,weaver,windrush"
+    "mildmay,suffragette,weaver,windrush",
 )
-TFL_DEFAULT_LINE_STATUS_URL = f"https://api.tfl.gov.uk/Line/{TFL_LINE_IDS}/Status"
-TFL_DEFAULT_ARRIVALS_STOP_ID = "940GZZLUKSX"
+TFL_DEFAULT_LINE_STATUS_URL = os.getenv("TFL_LINE_STATUS_URL", f"https://api.tfl.gov.uk/Line/{TFL_LINE_IDS}/Status")
+TFL_DEFAULT_ARRIVALS_STOP_ID = os.getenv("TFL_ARRIVALS_STOP_ID", "940GZZLUKSX")
 
 def _get_topic_env(source_key: str) -> str:
     """Get topic from environment variable KAFKA_TOPIC_{SOURCE_KEY}."""
@@ -111,6 +112,21 @@ class ProducerConfig:
     max_block_ms: int = 1000
     enable_idempotence: bool = False
 
+    @classmethod
+    def from_env(cls) -> "ProducerConfig":
+        """Create ProducerConfig from environment variables with overrides."""
+        return cls(
+            acks=int(os.getenv("KAFKA_PRODUCER_ACKS", "1")),
+            retries=int(os.getenv("KAFKA_PRODUCER_RETRIES", "3")),
+            retry_backoff_ms=int(os.getenv("KAFKA_PRODUCER_RETRY_BACKOFF_MS", "100")),
+            max_in_flight_requests_per_connection=int(os.getenv("KAFKA_PRODUCER_MAX_IN_FLIGHT", "5")),
+            compression_type=os.getenv("KAFKA_PRODUCER_COMPRESSION", "gzip"),
+            linger_ms=int(os.getenv("KAFKA_PRODUCER_LINGER_MS", "5")),
+            batch_size=int(os.getenv("KAFKA_PRODUCER_BATCH_SIZE", "16384")),
+            max_block_ms=int(os.getenv("KAFKA_PRODUCER_MAX_BLOCK_MS", "1000")),
+            enable_idempotence=os.getenv("KAFKA_PRODUCER_IDEMPOTENCE", "false").lower() == "true",
+        )
+
 
 @dataclass(frozen=True)
 class ConsumerConfig:
@@ -129,6 +145,23 @@ class ConsumerConfig:
     fetch_min_bytes: int = 1
     fetch_max_wait_ms: int = 500
     max_partition_fetch_bytes: int = 1048576  # 1MB
+
+    @classmethod
+    def from_env(cls) -> "ConsumerConfig":
+        """Create ConsumerConfig from environment variables with overrides."""
+        return cls(
+            group_id=os.getenv("NEXUS_CONSUMER_GROUP", "nexus-streaming"),
+            auto_offset_reset=os.getenv("KAFKA_CONSUMER_AUTO_OFFSET_RESET", "earliest"),
+            enable_auto_commit=os.getenv("KAFKA_CONSUMER_AUTO_COMMIT", "false").lower() == "true",
+            auto_commit_interval_ms=int(os.getenv("KAFKA_CONSUMER_AUTO_COMMIT_INTERVAL_MS", "5000")),
+            max_poll_records=int(os.getenv("KAFKA_CONSUMER_MAX_POLL_RECORDS", "100")),
+            max_poll_interval_ms=int(os.getenv("KAFKA_CONSUMER_MAX_POLL_INTERVAL_MS", "300000")),
+            session_timeout_ms=int(os.getenv("KAFKA_CONSUMER_SESSION_TIMEOUT_MS", "10000")),
+            heartbeat_interval_ms=int(os.getenv("KAFKA_CONSUMER_HEARTBEAT_INTERVAL_MS", "3000")),
+            fetch_min_bytes=int(os.getenv("KAFKA_CONSUMER_FETCH_MIN_BYTES", "1")),
+            fetch_max_wait_ms=int(os.getenv("KAFKA_CONSUMER_FETCH_MAX_WAIT_MS", "500")),
+            max_partition_fetch_bytes=int(os.getenv("KAFKA_CONSUMER_MAX_PARTITION_FETCH_BYTES", "1048576")),
+        )
 
 
 @dataclass(frozen=True)

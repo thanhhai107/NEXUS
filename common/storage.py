@@ -22,8 +22,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Iterator, TypeVar
 
@@ -54,8 +55,8 @@ class StorageConfig:
     base_path: Path | None = None
     # Options
     secure: bool = False  # Use HTTPS for S3
-    retry_attempts: int = 3
-    retry_backoff: float = 1.0
+    retry_attempts: int = field(default_factory=lambda: int(os.getenv("STORAGE_RETRY_ATTEMPTS", "3")))
+    retry_backoff: float = field(default_factory=lambda: float(os.getenv("STORAGE_RETRY_BACKOFF", "1.0")))
 
 
 def get_storage_config() -> StorageConfig:
@@ -386,11 +387,11 @@ class S3StorageBackend(StorageBackend):
         region: str | None = None,
         secure: bool = False,
     ):
-        self.endpoint = endpoint or "http://localhost:9000"
-        self.access_key = access_key or "minioadmin"
-        self.secret_key = secret_key or "minioadmin"
-        self.bucket = bucket or "nexus-lakehouse"
-        self.region = region or "us-east-1"
+        self.endpoint = endpoint or os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
+        self.access_key = access_key or os.getenv("MINIO_ROOT_USER", "minioadmin")
+        self.secret_key = secret_key or os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
+        self.bucket = bucket or os.getenv("NEXUS_BUCKET", "nexus-lakehouse")
+        self.region = region or os.getenv("AWS_REGION", "us-east-1")
         self.secure = secure
         
         self._init_client()
@@ -665,35 +666,58 @@ class S3StorageBackend(StorageBackend):
 # =============================================================================
 
 _storage_backend: StorageBackend | None = None
+_storage_backends: dict[str, StorageBackend] = {}
 
 
-def get_storage(force_refresh: bool = False) -> StorageBackend:
-    """Get storage backend singleton.
-    
+def get_storage(bucket: str | None = None, force_refresh: bool = False) -> StorageBackend:
+    """Get storage backend singleton per bucket.
+
     Args:
+        bucket: Target bucket name. Defaults to NEXUS_BUCKET env var.
         force_refresh: Force re-initialization
-        
+
     Returns:
         StorageBackend instance
     """
     global _storage_backend
-    
-    if _storage_backend is None or force_refresh:
+    target_bucket = bucket or os.getenv("NEXUS_BUCKET", "nexus-lakehouse")
+
+    if force_refresh:
+        _storage_backends.pop(target_bucket, None)
+        _storage_backend = None
+
+    if target_bucket not in _storage_backends:
         config = get_storage_config()
-        
+
         if config.mode == "vm":
-            _storage_backend = S3StorageBackend(
+            _storage_backends[target_bucket] = S3StorageBackend(
                 endpoint=config.endpoint,
                 access_key=config.access_key,
                 secret_key=config.secret_key,
-                bucket=config.bucket,
+                bucket=target_bucket,
                 region=config.region,
                 secure=config.secure,
             )
         else:
-            _storage_backend = LocalStorageBackend(base_path=config.base_path)
-    
-    return _storage_backend
+            _storage_backends[target_bucket] = LocalStorageBackend(base_path=config.base_path)
+
+    return _storage_backends[target_bucket]
+
+
+def get_raw_storage() -> StorageBackend:
+    """Get storage backend for raw data (bronze, quarantine).
+
+    Reads NEXUS_RAW_BUCKET env var.
+    """
+    return get_storage(os.getenv("NEXUS_RAW_BUCKET", "nexus-lakehouse"))
+
+
+def get_governance_storage() -> StorageBackend:
+    """Get storage backend for governance metadata (DLQ, dedup, validation).
+
+    Reads NEXUS_GOVERNANCE_BUCKET env var.
+    """
+    return get_storage(os.getenv("NEXUS_GOVERNANCE_BUCKET", "nexus-lakehouse"))
 
 
 def reset_storage() -> None:

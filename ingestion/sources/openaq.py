@@ -66,7 +66,7 @@ def download_openaq(run: SourceRun, context: DownloadContext) -> None:
 
 def openaq_base_url(configured_url: Any = None) -> str:
     """Normalize OpenAQ host/base/endpoint config to the v3 API base."""
-    base = str(configured_url or "https://api.openaq.org/v3").strip().rstrip("/")
+    base = str(configured_url or os.environ.get("OPENAQ_API_URL", "https://api.openaq.org/v3")).strip().rstrip("/")
     for suffix in ("/measurements", "/locations", "/sensors", "/parameters", "/hours"):
         if base.endswith(suffix):
             base = base[: -len(suffix)]

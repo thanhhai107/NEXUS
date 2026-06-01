@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any, Generator, Iterable, Iterator, Mapping
 
 from common.config import RAW_DIR, is_vm_mode
-from common.storage import get_storage
+from common.storage import get_raw_storage, get_storage
 from common.worker import (
     get_worker_count,
     get_worker_index,
@@ -120,7 +120,7 @@ def _write_s3_envelopes(
     normalize_payload: bool = False,
 ) -> str:
     """Write envelopes to S3 using streaming (memory efficient)."""
-    storage = get_storage()
+    storage = get_raw_storage()
     dataset_id = context.dataset_id
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     storage_path = f"bronze/{dataset_id}/{stamp}.jsonl"
@@ -209,7 +209,7 @@ def _stream_s3_envelopes(
     normalize_payload: bool = False,
 ) -> Generator[tuple[str, int], None, None]:
     """Stream envelopes to S3."""
-    storage = get_storage()
+    storage = get_raw_storage()
     dataset_id = context.dataset_id
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     storage_path = f"bronze/{dataset_id}/{stamp}.jsonl"
@@ -346,7 +346,7 @@ def _write_partitioned_s3(
     num_partitions: int,
 ) -> dict[int, str]:
     """Write partitioned envelopes to S3."""
-    storage = get_storage()
+    storage = get_raw_storage()
     dataset_id = context.dataset_id
     
     # Group records by partition
@@ -512,7 +512,7 @@ def read_partitioned_envelopes(
     Yields:
         Tuples of (partition_index, envelope)
     """
-    storage = get_storage()
+    storage = get_raw_storage()
     
     # List partitions
     if is_vm_mode():

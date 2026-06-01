@@ -9,6 +9,7 @@ normalization into Silver can be handled by downstream processing.
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass
 from typing import Any, Iterable
 
@@ -16,7 +17,7 @@ from ingestion.base.core import DownloadContext, SourceFailure, SourceRun
 from ingestion.base.http import download_file
 from ingestion.base.utils import sanitize_segment, source_options
 
-DEFAULT_ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
+DEFAULT_ARCHIVE_URL = os.getenv("OPENMETEO_HISTORICAL_ARCHIVE_URL", "https://archive-api.open-meteo.com/v1/archive")
 DEFAULT_GRID_SPACING_KM = 10.0
 DEFAULT_MAX_LOCATIONS_PER_REQUEST = 50
 KM_PER_LAT_DEGREE = 111.32

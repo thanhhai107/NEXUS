@@ -25,6 +25,7 @@ import os
 import socket
 import threading
 from dataclasses import dataclass, field
+from functools import partial
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, TypeVar
@@ -320,8 +321,8 @@ class PartitionedWriteConfig:
     num_partitions: int
     partition_prefix: str = "partition"
     file_pattern: str = "data_{partition}.jsonl"
-    records_per_file: int = 100_000  # Rotate files after this many records
-    bytes_per_file: int = 100 * 1024 * 1024  # Or after this size
+    records_per_file: int = field(default_factory=lambda: int(os.getenv("NEXUS_RECORDS_PER_FILE", "100000")))
+    bytes_per_file: int = field(default_factory=lambda: int(os.getenv("NEXUS_BYTES_PER_FILE", "104857600")))
 
 
 class PartitionedWriter:
@@ -847,14 +848,14 @@ def _remote_docker_check(ssh_host: str, role: str, timeout: int) -> tuple[bool, 
         "print(json.dumps([s.__dict__ for s in svcs]))"
     ).format(role=role)
 
-    cmd = [
-        "ssh", "-o", "StrictHostKeyChecking=no",
-        "-o", "ConnectTimeout=10",
-        "-o", "BatchMode=yes",
-        f"ConnectTimeout={min(timeout // 2, 15)}",
+    ssh_options = os.getenv("NEXUS_SSH_OPTIONS", "StrictHostKeyChecking=no,ConnectTimeout=10,BatchMode=yes")
+    cmd = ["ssh"]
+    for opt in ssh_options.split(","):
+        cmd.extend(["-o", opt])
+    cmd.extend([
         ssh_host,
-        f"cd /opt/nexus/NEXUS && source .venv/bin/activate && python -c \"{script}\"",
-    ]
+        f"{os.getenv('NEXUS_REMOTE_PYTHON_CMD', 'cd /opt/nexus/NEXUS && source .venv/bin/activate && python')} -c \"{script}\"",
+    ])
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)

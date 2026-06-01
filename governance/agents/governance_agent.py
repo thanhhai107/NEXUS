@@ -100,30 +100,38 @@ def _rule_decision(evidence: dict[str, Any]) -> AgentDecision:
     quality = evidence["quality_report"]
     details = quality.get("details") or {}
     status = quality.get("status", "unknown")
-    readiness = _score_100(details.get("readiness_score"))
     record_count = int(details.get("record_count") or 0)
     quarantine_count = int(evidence["quarantine_summary"].get("quarantine_count") or 0)
     schema_breaking = bool(evidence["schema_history"].get("breaking_changes"))
+    schema_valid = bool(details.get("schema_valid", True))
+    missing_ratio = float(details.get("missing_ratio") or 0)
+    duplicate_ratio = float(details.get("duplicate_ratio") or 0)
+    freshness_score = float(details.get("freshness_score") or 1.0)
+    threshold_violations = details.get("threshold_violations") or []
+    has_violations = bool(threshold_violations) or not schema_valid
 
     decision = "PASS"
     confidence = 0.88
     reason = "Quality metadata is acceptable and no blocking governance risk was detected."
     action = "Continue the batch through Bronze, Silver, and Gold processing."
 
-    if status == "failed" or readiness < 50:
+    if status == "failed" or has_violations:
         decision = "FAIL"
         confidence = 0.92
-        reason = "Quality gate failed or readiness score is below 50."
+        reason = f"Quality gate failed. Violations: {'; '.join(threshold_violations) if threshold_violations else 'Schema validation failed'}."
         action = "Stop the batch and keep invalid data in quarantine for review."
     elif schema_breaking:
         decision = "FAIL"
         confidence = 0.90
         reason = "Schema history indicates breaking changes."
         action = "Stop the batch and review schema changes before loading trusted tables."
-    elif readiness < 80:
+    elif missing_ratio > 0.15 or duplicate_ratio > 0.05 or freshness_score < 0.7:
         decision = "WARNING"
         confidence = 0.86
-        reason = "Readiness score is between 50 and 80."
+        reason = (
+            f"Quality metrics near thresholds: "
+            f"missing={missing_ratio:.2%}, duplicate={duplicate_ratio:.2%}, freshness={freshness_score:.2%}."
+        )
         action = "Continue the batch, but review quality issues before broad consumption."
     elif quarantine_count > 0 and record_count > quarantine_count:
         decision = "WARNING"

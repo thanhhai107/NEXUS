@@ -1,4 +1,4 @@
-﻿"""Lineage Module.
+"""Lineage Module.
 
 Provides OpenLineage-compatible lineage tracking for NEXUS data pipelines.
 Records transformations and data flow between datasets.
@@ -35,7 +35,7 @@ from governance.storage import append_governance_event
 
 DEFAULT_LINEAGE_LOG = LOGS_DIR / "lineage.jsonl"
 OPENLINEAGE_SCHEMA_URL = "https://openlineage.io/spec/2-0-2/OpenLineage.json"
-OPENLINEAGE_PRODUCER = "https://github.com/nexus-lakehouse/nexus"
+OPENLINEAGE_PRODUCER = os.getenv("OPENLINEAGE_PRODUCER_URL", "https://github.com/nexus-lakehouse/nexus")
 
 
 def record_lineage(

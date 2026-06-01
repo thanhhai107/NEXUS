@@ -61,7 +61,8 @@ def download_stats19(run: SourceRun, context: DownloadContext) -> None:
             f"group={sanitize_segment(group)}/table={sanitize_segment(table_name)}"
             f"/period={sanitize_segment(period)}/stats19_{table_name}_{sanitize_segment(period)}.csv"
         )
-        path, row_count = download_file(run, url, relative_path=rel, max_bytes=max_bytes, timeout=180)
+        timeout = int(os.getenv("STATS19_DOWNLOAD_TIMEOUT", "180"))
+        path, row_count = download_file(run, url, relative_path=rel, max_bytes=max_bytes, timeout=timeout)
         run.mark_complete(
             chunk_id,
             {

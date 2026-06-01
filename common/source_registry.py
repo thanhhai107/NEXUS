@@ -13,6 +13,9 @@ INGESTION_METHOD_BY_SOURCE_TYPE: dict[str, str] = {
     "api_stream": "stream_api",
     "arcgis_hub": "batch_api",
     "gtfs_realtime": "stream_gtfs_realtime",
+    "data_caterer": "batch_data_caterer",
+    "data_caterer_stream": "stream_data_caterer",
+    "data_caterer_api": "api_data_caterer",
 }
 
 

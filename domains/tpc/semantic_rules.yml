@@ -1,0 +1,309 @@
+# =============================================================================
+# TPC Benchmark Domain — Semantic Rules
+# =============================================================================
+
+datasets:
+  # ---------------------------------------------------------------------------
+  # TPC-H Semantic Rules
+  # ---------------------------------------------------------------------------
+  # TPC-DS Semantic Rules (key tables)
+  # ---------------------------------------------------------------------------
+  tpcds_date_dim:
+    domain: tpc
+    business_glossary:
+      - term: Date Dimension
+        definition: Calendar date dimension for multi-channel analytics
+        scope: TPC-DS benchmark dimension table
+    field_mappings:
+      d_date_sk:
+        business_name: Date Surrogate Key
+        semantic_type: primary_key
+      d_date:
+        business_name: Calendar Date
+        semantic_type: date
+        format: YYYY-MM-DD
+      d_year:
+        business_name: Year
+        semantic_type: temporal_part
+    time_standards:
+      d_date:
+        timezone: UTC
+        granularity: day
+    grain:
+      description: One row per calendar date
+      dimensions: [date]
+
+  tpcds_time_dim:
+    domain: tpc
+    business_glossary:
+      - term: Time Dimension
+        definition: Time-of-day dimension (86,400 seconds)
+        scope: TPC-DS benchmark dimension table
+    field_mappings:
+      t_time_sk:
+        business_name: Time Surrogate Key
+        semantic_type: primary_key
+      t_time:
+        business_name: Seconds Since Midnight
+        semantic_type: time_component
+    grain:
+      description: One row per second of the day
+      dimensions: [time_of_day]
+
+  tpcds_item:
+    domain: tpc
+    business_glossary:
+      - term: Item (TPC-DS)
+        definition: Multi-channel product catalog
+        scope: TPC-DS benchmark dimension table
+    field_mappings:
+      i_item_sk:
+        business_name: Item Surrogate Key
+        semantic_type: primary_key
+      i_current_price:
+        business_name: Current Price
+        semantic_type: monetary_amount
+        unit: currency_units
+      i_category:
+        business_name: Category
+        semantic_type: categorical
+    unit_standards:
+      i_current_price: currency_units
+      i_wholesale_cost: currency_units
+    grain:
+      description: One row per item
+      dimensions: [item]
+
+  tpcds_customer:
+    domain: tpc
+    business_glossary:
+      - term: Customer (TPC-DS)
+        definition: Multi-channel customer with demographic attributes
+        scope: TPC-DS benchmark dimension table
+    field_mappings:
+      c_customer_sk:
+        business_name: Customer Surrogate Key
+        semantic_type: primary_key
+      c_first_name:
+        business_name: First Name
+        semantic_type: person_name
+        sensitivity: pii_name
+      c_last_name:
+        business_name: Last Name
+        semantic_type: person_name
+        sensitivity: pii_name
+      c_email_address:
+        business_name: Email Address
+        semantic_type: email
+        sensitivity: pii_contact
+    grain:
+      description: One row per customer
+      dimensions: [customer]
+
+  tpcds_customer_address:
+    domain: tpc
+    business_glossary:
+      - term: Customer Address (TPC-DS)
+        definition: Customer physical address
+        scope: TPC-DS benchmark dimension table
+    field_mappings:
+      ca_address_sk:
+        business_name: Address Surrogate Key
+        semantic_type: primary_key
+      ca_city:
+        business_name: City
+        semantic_type: city_name
+      ca_state:
+        business_name: State/Province
+        semantic_type: administrative_area
+      ca_zip:
+        business_name: Postal Code
+        semantic_type: postal_code
+        sensitivity: pii_location
+    grain:
+      description: One row per address
+      dimensions: [address]
+
+  tpcds_customer_demographics:
+    domain: tpc
+    business_glossary:
+      - term: Customer Demographics
+        definition: Customer demographic profile for analytics
+        scope: TPC-DS benchmark dimension table
+    field_mappings:
+      cd_demo_sk:
+        business_name: Demographics Surrogate Key
+        semantic_type: primary_key
+      cd_gender:
+        business_name: Gender
+        semantic_type: categorical
+        sensitivity: pii_demographic
+      cd_marital_status:
+        business_name: Marital Status
+        semantic_type: categorical
+        sensitivity: pii_demographic
+    grain:
+      description: One row per demographic profile
+      dimensions: [demographic_profile]
+
+  tpcds_store:
+    domain: tpc
+    business_glossary:
+      - term: Store (TPC-DS)
+        definition: Physical retail store location
+        scope: TPC-DS benchmark dimension table
+    field_mappings:
+      s_store_sk:
+        business_name: Store Surrogate Key
+        semantic_type: primary_key
+      s_store_name:
+        business_name: Store Name
+        semantic_type: business_name
+      s_number_employees:
+        business_name: Employee Count
+        semantic_type: count
+    grain:
+      description: One row per store
+      dimensions: [store]
+
+  tpcds_store_sales:
+    domain: tpc
+    business_glossary:
+      - term: Store Sales
+        definition: In-store purchase transactions — largest TPC-DS fact table
+        scope: TPC-DS benchmark fact table
+    field_mappings:
+      ss_item_sk:
+        business_name: Item Key
+        semantic_type: foreign_key
+        references: tpcds_item.i_item_sk
+      ss_ticket_number:
+        business_name: Ticket Number
+        semantic_type: transaction_id
+      ss_quantity:
+        business_name: Quantity Sold
+        semantic_type: quantity
+        unit: units
+      ss_sales_price:
+        business_name: Sales Price
+        semantic_type: monetary_amount
+        unit: currency_units
+    unit_standards:
+      ss_quantity: units
+      ss_sales_price: currency_units
+      ss_net_profit: currency_units
+    grain:
+      description: One row per store sales transaction line
+      dimensions: [date, time, item, customer, store]
+
+  tpcds_web_sales:
+    domain: tpc
+    business_glossary:
+      - term: Web Sales
+        definition: Online purchase transactions
+        scope: TPC-DS benchmark fact table
+    field_mappings:
+      ws_item_sk:
+        business_name: Item Key
+        semantic_type: foreign_key
+        references: tpcds_item.i_item_sk
+      ws_order_number:
+        business_name: Web Order Number
+        semantic_type: transaction_id
+      ws_quantity:
+        business_name: Quantity Sold
+        semantic_type: quantity
+        unit: units
+      ws_sales_price:
+        business_name: Sales Price
+        semantic_type: monetary_amount
+        unit: currency_units
+    unit_standards:
+      ws_quantity: units
+      ws_sales_price: currency_units
+      ws_net_profit: currency_units
+    grain:
+      description: One row per web sales transaction line
+      dimensions: [date, time, item, customer, web_site]
+
+  tpcds_catalog_sales:
+    domain: tpc
+    business_glossary:
+      - term: Catalog Sales
+        definition: Catalog/mail-order purchase transactions
+        scope: TPC-DS benchmark fact table
+    field_mappings:
+      cs_item_sk:
+        business_name: Item Key
+        semantic_type: foreign_key
+        references: tpcds_item.i_item_sk
+      cs_order_number:
+        business_name: Catalog Order Number
+        semantic_type: transaction_id
+      cs_quantity:
+        business_name: Quantity Sold
+        semantic_type: quantity
+        unit: units
+      cs_sales_price:
+        business_name: Sales Price
+        semantic_type: monetary_amount
+        unit: currency_units
+    unit_standards:
+      cs_quantity: units
+      cs_sales_price: currency_units
+      cs_net_profit: currency_units
+    grain:
+      description: One row per catalog sales transaction line
+      dimensions: [date, time, item, customer, catalog_page]
+
+  tpcds_inventory:
+    domain: tpc
+    business_glossary:
+      - term: Inventory (TPC-DS)
+        definition: Warehouse inventory position snapshots
+        scope: TPC-DS benchmark semi-additive fact table
+    field_mappings:
+      inv_date_sk:
+        business_name: Inventory Date Key
+        semantic_type: foreign_key
+        references: tpcds_date_dim.d_date_sk
+      inv_item_sk:
+        business_name: Item Key
+        semantic_type: foreign_key
+        references: tpcds_item.i_item_sk
+      inv_warehouse_sk:
+        business_name: Warehouse Key
+        semantic_type: foreign_key
+        references: tpcds_warehouse.w_warehouse_sk
+      inv_quantity_on_hand:
+        business_name: Quantity On Hand
+        semantic_type: inventory_quantity
+        unit: units
+    unit_standards:
+      inv_quantity_on_hand: units
+    grain:
+      description: One row per warehouse-item-date combination
+      dimensions: [date, item, warehouse]
+
+  tpcds_warehouse:
+    domain: tpc
+    business_glossary:
+      - term: Warehouse (TPC-DS)
+        definition: Distribution warehouse facility
+        scope: TPC-DS benchmark dimension table
+    field_mappings:
+      w_warehouse_sk:
+        business_name: Warehouse Surrogate Key
+        semantic_type: primary_key
+      w_warehouse_name:
+        business_name: Warehouse Name
+        semantic_type: business_name
+      w_warehouse_sq_ft:
+        business_name: Square Footage
+        semantic_type: area_measure
+        unit: square_feet
+    unit_standards:
+      w_warehouse_sq_ft: square_feet
+    grain:
+      description: One row per warehouse
+      dimensions: [warehouse]

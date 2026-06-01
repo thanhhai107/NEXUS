@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcds_customer_demographics",
+  "type": "object",
+  "properties": {
+    "cd_demo_sk": { "type": "integer" },
+    "cd_gender": { "type": "string" },
+    "cd_marital_status": { "type": "string" },
+    "cd_education_status": { "type": "string" },
+    "cd_purchase_estimate": { "type": "integer" },
+    "cd_credit_rating": { "type": "string" },
+    "cd_dep_count": { "type": "integer" },
+    "cd_dep_employed_count": { "type": "integer" },
+    "cd_dep_college_count": { "type": "integer" }
+  },
+  "required": ["cd_demo_sk", "cd_gender", "cd_marital_status", "cd_education_status", "cd_purchase_estimate", "cd_credit_rating", "cd_dep_count", "cd_dep_employed_count", "cd_dep_college_count"],
+  "additionalProperties": false
+}

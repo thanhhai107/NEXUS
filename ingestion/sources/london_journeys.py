@@ -25,6 +25,6 @@ def download_london_journeys(run: SourceRun, context: DownloadContext) -> None:
         url,
         relative_path="snapshot=current/london_journeys.csv",
         max_bytes=int(opts.get("max_bytes", 50_000_000)),
-        timeout=180,
+        timeout=int(os.getenv("LONDON_JOURNEYS_DOWNLOAD_TIMEOUT", "180")),
     )
     run.mark_complete(chunk_id, {"record_count": row_count, "path": str(path)})

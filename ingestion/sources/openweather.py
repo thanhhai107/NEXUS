@@ -27,7 +27,7 @@ def download_openweather(run: SourceRun, context: DownloadContext) -> None:
     env = require_env(run, "OPENWEATHER_API_KEY")
     opts = source_options(context, "openweather")
     base = (os.environ.get("OPENWEATHER_API_URL") or opts.get("base_url", "https://api.openweathermap.org")).rstrip("/")
-    history_base = str(opts.get("history_base_url", "https://history.openweathermap.org")).rstrip("/")
+    history_base = (os.environ.get("OPENWEATHER_HISTORY_API_URL") or opts.get("history_base_url", "https://history.openweathermap.org")).rstrip("/")
     appid = env["OPENWEATHER_API_KEY"]
     units = opts.get("units", "metric")
     lang = opts.get("lang")

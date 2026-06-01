@@ -527,10 +527,30 @@ def is_polling_enabled(source: str) -> bool:
     return get_polling_interval(source) > 0
 
 
+def _get_active_domains() -> set[str] | None:
+    env_mode = os.getenv("NEXUS_DATASET_MODE", "").lower()
+    if env_mode == "london":
+        return {"environment", "transport"}
+    if env_mode == "tpc":
+        return {"tpc"}
+    config = load_yaml(PROJECT_ROOT / "ingestion" / "config" / "data_caterer_config.yml")
+    mode = config.get("dataset_mode", "tpc")
+    active = config.get("active_domains", ["tpc"])
+    if mode == "london":
+        return {"environment", "transport"}
+    return set(active)
+
+
 def load_dataset_catalog(domains_dir: Path = DOMAINS_DIR) -> dict[str, Any]:
     """Load dataset catalog from domains/ directory."""
+    active = _get_active_domains()
     datasets: dict[str, Any] = {}
     for path in sorted(domains_dir.glob("*/datasets.yml")):
+        if path.name.startswith("datasets.yml.bak"):
+            continue
+        domain = path.parent.name
+        if active is not None and domain not in active:
+            continue
         datasets.update(load_yaml(path).get("datasets", {}))
     return {"datasets": datasets}
 
@@ -542,8 +562,14 @@ def load_quality_config(
     """Load quality rules from domains/ and governance/config/ directories."""
     config_dir = config_dir or (PROJECT_ROOT / "governance" / "config")
     default_rules = load_yaml(config_dir / "quality_defaults.yml").get("default_rules", {})
+    active = _get_active_domains()
     datasets: dict[str, Any] = {}
     for path in sorted(domains_dir.glob("*/quality_rules.yml")):
+        if path.name.startswith("quality_rules.yml.bak"):
+            continue
+        domain = path.parent.name
+        if active is not None and domain not in active:
+            continue
         datasets.update(load_yaml(path).get("datasets", {}))
     return {"default_rules": default_rules, "datasets": datasets}
 
@@ -555,8 +581,14 @@ def load_semantic_config(
     """Load semantic rules from domains/ and governance/config/ directories."""
     config_dir = config_dir or (PROJECT_ROOT / "governance" / "config")
     default_semantic = load_yaml(config_dir / "semantic_defaults.yml").get("default_semantic", {})
+    active = _get_active_domains()
     datasets: dict[str, Any] = {}
     for path in sorted(domains_dir.glob("*/semantic_rules.yml")):
+        if path.name.startswith("semantic_rules.yml.bak"):
+            continue
+        domain = path.parent.name
+        if active is not None and domain not in active:
+            continue
         datasets.update(load_yaml(path).get("datasets", {}))
     return {"default_semantic": default_semantic, "datasets": datasets}
 

@@ -66,8 +66,8 @@ def append_governance_event(
         return None
 
     if _is_s3_storage():
-        from common.storage import get_storage
-        storage = get_storage()
+        from common.storage import get_governance_storage
+        storage = get_governance_storage()
         s3_key = _s3_key(stream, local_path)
         storage.append_jsonl(s3_key, dict(payload))
         return local_path or Path(s3_key)
@@ -86,8 +86,8 @@ def read_governance_events(stream: str, local_path: Path | None = None) -> list[
         return _read_postgres_events(stream)
 
     if _is_s3_storage():
-        from common.storage import get_storage
-        storage = get_storage()
+        from common.storage import get_governance_storage
+        storage = get_governance_storage()
         s3_key = _s3_key(stream, local_path)
         if not storage.exists(s3_key):
             return []

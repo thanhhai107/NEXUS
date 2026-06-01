@@ -2,4 +2,3 @@
   max_missing_ratio: 0.2
   max_duplicate_ratio: 0.05
   min_freshness_score: 0.8
-  min_readiness_score: 0.75

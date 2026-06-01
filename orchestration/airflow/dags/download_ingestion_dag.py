@@ -65,7 +65,7 @@ with DAG(
             BashOperator(
                 task_id=f"download_{source}",
                 bash_command=(
-                    "python /opt/airflow/ingestion/downloaders/london_downloader.py "
+                    f"python {os.getenv('NEXUS_DOWNLOADER_PATH', '/opt/airflow/ingestion/downloaders')}/london_downloader.py "
                     f"--source {source} "
                     f"--mode {DEFAULT_MODE} "
                     "--run-id {{ ts_nodash }}"

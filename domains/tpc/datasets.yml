@@ -1,0 +1,404 @@
+datasets:
+  # TPC-DS — Decision Support Benchmark (complex star/snowflake schemas)
+  # Key tables for analytics workloads
+  # =========================================================================
+  tpcds_date_dim:
+    domain: tpc
+    description: TPC-DS Date dimension.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: data_caterer
+    data_caterer_plan: tpcds_plan
+    schema_path: domains/tpc/schemas/tpcds_date_dim.schema.json
+    freshness_hours: 8760
+    primary_keys:
+      - d_date_sk
+    governance:
+      owner: tpc-data-platform
+      steward: tpc-data-steward
+      sensitivity: public
+      retention:
+        policy: benchmark-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+          - admin
+          - steward
+          - analyst
+        denied_roles: []
+        api_access: true
+        trino_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/bronze/tpcds/date_dim/
+      bronze_table: nexus.bronze.tpcds_date_dim
+      silver_table: nexus.silver.tpcds_date_dim
+      gold_table: nexus.gold.tpcds_date_dim_summary
+
+  tpcds_time_dim:
+    domain: tpc
+    description: TPC-DS Time dimension (86,400 records — one per second).
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: data_caterer
+    data_caterer_plan: tpcds_plan
+    schema_path: domains/tpc/schemas/tpcds_time_dim.schema.json
+    freshness_hours: 8760
+    primary_keys:
+      - t_time_sk
+    governance:
+      owner: tpc-data-platform
+      steward: tpc-data-steward
+      sensitivity: public
+      retention:
+        policy: benchmark-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+          - admin
+          - steward
+          - analyst
+        denied_roles: []
+        api_access: true
+        trino_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/bronze/tpcds/time_dim/
+      bronze_table: nexus.bronze.tpcds_time_dim
+      silver_table: nexus.silver.tpcds_time_dim
+      gold_table: nexus.gold.tpcds_time_dim_summary
+
+  tpcds_item:
+    domain: tpc
+    description: TPC-DS Item dimension — catalog and store products.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: data_caterer
+    data_caterer_plan: tpcds_plan
+    schema_path: domains/tpc/schemas/tpcds_item.schema.json
+    freshness_hours: 8760
+    primary_keys:
+      - i_item_sk
+    governance:
+      owner: tpc-data-platform
+      steward: tpc-data-steward
+      sensitivity: public
+      retention:
+        policy: benchmark-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+          - admin
+          - steward
+          - analyst
+        denied_roles: []
+        api_access: true
+        trino_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/bronze/tpcds/item/
+      bronze_table: nexus.bronze.tpcds_item
+      silver_table: nexus.silver.tpcds_item
+      gold_table: nexus.gold.tpcds_item_summary
+
+  tpcds_customer:
+    domain: tpc
+    description: TPC-DS Customer dimension with demographics.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: data_caterer
+    data_caterer_plan: tpcds_plan
+    schema_path: domains/tpc/schemas/tpcds_customer.schema.json
+    freshness_hours: 8760
+    primary_keys:
+      - c_customer_sk
+    governance:
+      owner: tpc-data-platform
+      steward: tpc-data-steward
+      sensitivity: public
+      retention:
+        policy: benchmark-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+          - admin
+          - steward
+          - analyst
+        denied_roles: []
+        api_access: true
+        trino_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/bronze/tpcds/customer/
+      bronze_table: nexus.bronze.tpcds_customer
+      silver_table: nexus.silver.tpcds_customer
+      gold_table: nexus.gold.tpcds_customer_summary
+
+  tpcds_customer_address:
+    domain: tpc
+    description: TPC-DS Customer address dimension.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: data_caterer
+    data_caterer_plan: tpcds_plan
+    schema_path: domains/tpc/schemas/tpcds_customer_address.schema.json
+    freshness_hours: 8760
+    primary_keys:
+      - ca_address_sk
+    governance:
+      owner: tpc-data-platform
+      steward: tpc-data-steward
+      sensitivity: public
+      retention:
+        policy: benchmark-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+          - admin
+          - steward
+          - analyst
+        denied_roles: []
+        api_access: true
+        trino_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/bronze/tpcds/customer_address/
+      bronze_table: nexus.bronze.tpcds_customer_address
+      silver_table: nexus.silver.tpcds_customer_address
+      gold_table: nexus.gold.tpcds_customer_address_summary
+
+  tpcds_customer_demographics:
+    domain: tpc
+    description: TPC-DS Customer demographics dimension.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: data_caterer
+    data_caterer_plan: tpcds_plan
+    schema_path: domains/tpc/schemas/tpcds_customer_demographics.schema.json
+    freshness_hours: 8760
+    primary_keys:
+      - cd_demo_sk
+    governance:
+      owner: tpc-data-platform
+      steward: tpc-data-steward
+      sensitivity: public
+      retention:
+        policy: benchmark-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+          - admin
+          - steward
+          - analyst
+        denied_roles: []
+        api_access: true
+        trino_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/bronze/tpcds/customer_demographics/
+      bronze_table: nexus.bronze.tpcds_customer_demographics
+      silver_table: nexus.silver.tpcds_customer_demographics
+      gold_table: nexus.gold.tpcds_customer_demographics_summary
+
+  tpcds_store:
+    domain: tpc
+    description: TPC-DS Store dimension.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: data_caterer
+    data_caterer_plan: tpcds_plan
+    schema_path: domains/tpc/schemas/tpcds_store.schema.json
+    freshness_hours: 8760
+    primary_keys:
+      - s_store_sk
+    governance:
+      owner: tpc-data-platform
+      steward: tpc-data-steward
+      sensitivity: public
+      retention:
+        policy: benchmark-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+          - admin
+          - steward
+          - analyst
+        denied_roles: []
+        api_access: true
+        trino_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/bronze/tpcds/store/
+      bronze_table: nexus.bronze.tpcds_store
+      silver_table: nexus.silver.tpcds_store
+      gold_table: nexus.gold.tpcds_store_summary
+
+  tpcds_store_sales:
+    domain: tpc
+    description: TPC-DS Store sales fact — largest fact table.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: data_caterer
+    data_caterer_plan: tpcds_plan
+    schema_path: domains/tpc/schemas/tpcds_store_sales.schema.json
+    freshness_hours: 8760
+    primary_keys:
+      - ss_item_sk
+      - ss_ticket_number
+    governance:
+      owner: tpc-data-platform
+      steward: tpc-data-steward
+      sensitivity: public
+      retention:
+        policy: benchmark-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+          - admin
+          - steward
+          - analyst
+        denied_roles: []
+        api_access: true
+        trino_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/bronze/tpcds/store_sales/
+      bronze_table: nexus.bronze.tpcds_store_sales
+      silver_table: nexus.silver.tpcds_store_sales
+      gold_table: nexus.gold.tpcds_store_sales_summary
+
+  tpcds_web_sales:
+    domain: tpc
+    description: TPC-DS Web sales fact.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: data_caterer
+    data_caterer_plan: tpcds_plan
+    schema_path: domains/tpc/schemas/tpcds_web_sales.schema.json
+    freshness_hours: 8760
+    primary_keys:
+      - ws_item_sk
+      - ws_order_number
+    governance:
+      owner: tpc-data-platform
+      steward: tpc-data-steward
+      sensitivity: public
+      retention:
+        policy: benchmark-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+          - admin
+          - steward
+          - analyst
+        denied_roles: []
+        api_access: true
+        trino_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/bronze/tpcds/web_sales/
+      bronze_table: nexus.bronze.tpcds_web_sales
+      silver_table: nexus.silver.tpcds_web_sales
+      gold_table: nexus.gold.tpcds_web_sales_summary
+
+  tpcds_catalog_sales:
+    domain: tpc
+    description: TPC-DS Catalog sales fact.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: data_caterer
+    data_caterer_plan: tpcds_plan
+    schema_path: domains/tpc/schemas/tpcds_catalog_sales.schema.json
+    freshness_hours: 8760
+    primary_keys:
+      - cs_item_sk
+      - cs_order_number
+    governance:
+      owner: tpc-data-platform
+      steward: tpc-data-steward
+      sensitivity: public
+      retention:
+        policy: benchmark-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+          - admin
+          - steward
+          - analyst
+        denied_roles: []
+        api_access: true
+        trino_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/bronze/tpcds/catalog_sales/
+      bronze_table: nexus.bronze.tpcds_catalog_sales
+      silver_table: nexus.silver.tpcds_catalog_sales
+      gold_table: nexus.gold.tpcds_catalog_sales_summary
+
+  tpcds_inventory:
+    domain: tpc
+    description: TPC-DS Inventory fact — warehouse inventory snapshots.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: data_caterer
+    data_caterer_plan: tpcds_plan
+    schema_path: domains/tpc/schemas/tpcds_inventory.schema.json
+    freshness_hours: 8760
+    primary_keys:
+      - inv_date_sk
+      - inv_item_sk
+      - inv_warehouse_sk
+    governance:
+      owner: tpc-data-platform
+      steward: tpc-data-steward
+      sensitivity: public
+      retention:
+        policy: benchmark-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+          - admin
+          - steward
+          - analyst
+        denied_roles: []
+        api_access: true
+        trino_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/bronze/tpcds/inventory/
+      bronze_table: nexus.bronze.tpcds_inventory
+      silver_table: nexus.silver.tpcds_inventory
+      gold_table: nexus.gold.tpcds_inventory_summary
+
+  tpcds_warehouse:
+    domain: tpc
+    description: TPC-DS Warehouse dimension.
+    nexus_demo:
+      status: primary
+      default_download: true
+    source_type: data_caterer
+    data_caterer_plan: tpcds_plan
+    schema_path: domains/tpc/schemas/tpcds_warehouse.schema.json
+    freshness_hours: 8760
+    primary_keys:
+      - w_warehouse_sk
+    governance:
+      owner: tpc-data-platform
+      steward: tpc-data-steward
+      sensitivity: public
+      retention:
+        policy: benchmark-standard
+        days: 365
+      access_policy:
+        allowed_roles:
+          - admin
+          - steward
+          - analyst
+        denied_roles: []
+        api_access: true
+        trino_access: true
+    target:
+      raw_path: s3a://nexus-lakehouse/bronze/tpcds/warehouse/
+      bronze_table: nexus.bronze.tpcds_warehouse
+      silver_table: nexus.silver.tpcds_warehouse
+      gold_table: nexus.gold.tpcds_warehouse_summary

@@ -1,0 +1,90 @@
+# Data Caterer service for NEXUS TPC-DS SF=10 benchmark data generation.
+# Run with: docker compose -f data-caterer-compose.yml up
+# PLAN_NAME defaults to tpcds_tasks, SCALE_FACTOR defaults to 10.
+
+version: "3.8"
+
+services:
+  datacaterer:
+    image: pflooky/data-caterer:0.5.0
+    container_name: nexus-datacaterer
+    environment:
+      - PLAN_NAME=${DC_PLAN_NAME:-tpcds_tasks}
+      - SCALE_FACTOR=${DC_SCALE_FACTOR:-10}
+      - ERROR_PROFILE=${DC_ERROR_PROFILE:-moderate}
+      - OUTPUT_FORMATS=${DC_OUTPUT_FORMATS:-csv,parquet}
+      - OUTPUT_DIR=/opt/app/data/datasets
+      - RUN_ID=${DC_RUN_ID:-local}
+      - SPARK_MASTER=${DC_SPARK_MASTER:-local[*]}
+      - SPARK_LOCAL_DIR=/opt/app/spark-temp
+      - JAVA_OPTS=-Xmx8g
+    volumes:
+      - ../../ingestion/data_caterer/plans:/opt/app/plans:ro
+      - ../../runtime:/opt/app/data
+    networks:
+      - nexus-network
+    restart: "no"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # Optional: Postgres target for data-caterer database insertion
+  datacaterer-postgres:
+    image: postgres:16-alpine
+    container_name: nexus-datacaterer-postgres
+    environment:
+      POSTGRES_DB: nexus_tpc
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: ${DC_POSTGRES_PASSWORD:-nexus123}
+    ports:
+      - "5433:5432"
+    volumes:
+      - datacaterer_pgdata:/var/lib/postgresql/data
+    networks:
+      - nexus-network
+    profiles:
+      - db-target
+
+  # Optional: Kafka for streaming data generation (TPC-DI)
+  datacaterer-kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: nexus-datacaterer-kafka
+    depends_on:
+      - datacaterer-zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: datacaterer-zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://datacaterer-kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "29092:29092"
+      - "9092:9092"
+    networks:
+      - nexus-network
+    profiles:
+      - streaming
+
+  datacaterer-zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: nexus-datacaterer-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - nexus-network
+    profiles:
+      - streaming
+
+networks:
+  nexus-network:
+    external: true
+    name: nexus_default
+
+volumes:
+  datacaterer_pgdata:

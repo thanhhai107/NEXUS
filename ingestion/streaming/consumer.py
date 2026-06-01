@@ -224,71 +224,97 @@ def consume_to_raw(
     group_id: str = DEFAULT_GROUP_ID,
     max_messages: int = 100,
 ) -> dict[str, Any]:
-    """Backward-compatible kafka-python consumer path used by older CLI/tests."""
-    try:
-        from kafka import KafkaConsumer
-    except ImportError:
-        raise ImportError(
-            "kafka-python is required for consume_to_raw. "
-            "Install with: pip install kafka-python"
-        )
-
-    consumer = KafkaConsumer(
-        topic,
+    """Backward-compatible path delegating to consume_events (confluent-kafka)."""
+    result = consume_events(
+        topic=topic,
+        dataset=dataset,
         bootstrap_servers=bootstrap_servers,
         group_id=group_id,
-        auto_offset_reset="earliest",
-        enable_auto_commit=False,
+        max_messages=max_messages,
+        consume_timeout_ms=15_000,
+        write_to_raw=True,
     )
-    records: list[dict[str, Any]] = []
-    consumed = 0
-    dlq = 0
+    return {
+        "consumed": result.consumed,
+        "landed": result.landed,
+        "dlq": result.dlq,
+        "raw_path": result.raw_path,
+    }
 
+
+def _validate_streaming_records(
+    records: list[dict[str, Any]],
+    dataset: str,
+    topic: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str, dict[str, Any]]:
+    """Run quality gate on streaming records before writing to raw.
+
+    Returns (valid_records, invalid_records, status, details).
+    Records that fail quality are NOT written to raw.
+    """
     try:
-        for message in consumer:
-            if consumed >= max_messages:
-                break
-            consumed += 1
-            try:
-                event = decode_event(message.value)
-                if not isinstance(event, dict):
-                    raise ValueError(f"Event is not a dict: {type(event)}")
-                records.append(event)
-            except Exception as exc:
-                dlq += 1
-                _route_to_dlq(
-                    raw_payload=message.value,
-                    source=topic,
-                    dataset=dataset,
-                    error=str(exc),
-                    error_type=type(exc).__name__,
-                    topic=topic,
-                )
-    finally:
-        try:
-            consumer.commit()
-        except Exception as exc:
-            print(f"Warning: consumer commit failed for topic {topic}: {exc}")
-        consumer.close()
+        from common.config import load_quality_config, load_dataset_catalog
+        from governance.quality.auto_fix import apply_auto_fix, normalize_field_name, normalize_field_names
+        from governance.quality.schema import coerce_records_to_schema, records_failing_json_schema
+        from governance.quality.checks import run_quality_checks, evaluate_quality_status
+        from governance.schema_drift import compare_schema_drift
+        from common.data_contract import load_data_contract
 
-    raw_path = None
-    if records:
-        from ingestion.batch.common import write_jsonl
+        quality_config = load_quality_config()
+        rules = quality_config.get("datasets", {}).get(dataset)
+        if not rules:
+            return records, [], "passed", {"warning": "no quality rules configured for streaming dataset"}
 
-        raw_path = write_jsonl(
-            dataset,
-            records,
-            source=f"kafka://{topic}",
-            ingestion_type="streaming",
-            source_key=topic,
+        dataset_config = load_dataset_catalog().get("datasets", {}).get(dataset, {})
+        auto_fix_result = apply_auto_fix(records, rules.get("auto_fix"))
+        schema = _load_schema_for_stream(dataset_config, rules)
+        coercion = coerce_records_to_schema(auto_fix_result.records, schema)
+        checked = coercion.records
+
+        required = normalize_field_names(rules["required_columns"], rules.get("auto_fix"))
+        primary = normalize_field_names(dataset_config.get("primary_keys", ["event_id"]), rules.get("auto_fix"))
+        freshness = normalize_field_name(rules["freshness_column"], rules.get("auto_fix"))
+
+        quality = run_quality_checks(
+            dataset=dataset,
+            records=checked,
+            required_columns=required,
+            primary_keys=primary,
+            freshness_column=freshness,
+            max_age_hours=int(dataset_config.get("freshness_hours", 1)),
+            json_schema=schema,
         )
 
-    return {
-        "consumed": consumed,
-        "landed": len(records),
-        "dlq": dlq,
-        "raw_path": str(raw_path) if raw_path else None,
-    }
+        thresholds = dict(quality_config.get("default_rules", {}))
+        status, violations = evaluate_quality_status(quality, thresholds)
+
+        invalid: list[dict[str, Any]] = [
+            rec for rec in checked
+            if any(rec.get(col) in (None, "") for col in required)
+        ]
+        invalid.extend(records_failing_json_schema(checked, schema))
+
+        valid = [rec for rec in checked if rec not in invalid]
+        return valid, invalid, status, {
+            "record_count": quality.record_count,
+            "missing_ratio": quality.missing_ratio,
+            "duplicate_ratio": quality.duplicate_ratio,
+            "freshness_score": quality.freshness_score,
+            "schema_valid": quality.schema_valid,
+            "threshold_violations": violations,
+            "invalid_count": len(invalid),
+        }
+    except Exception as exc:
+        return records, [], "skipped", {"validation_error": str(exc)}
+
+
+def _load_schema_for_stream(dataset_config: dict, rules: dict) -> dict | None:
+    try:
+        from governance.quality.schema import normalize_json_schema
+        from cli.nexus import load_schema
+        return normalize_json_schema(load_schema(dataset_config.get("schema_path")), rules.get("auto_fix"))
+    except Exception:
+        return None
 
 
 def consume_events(
@@ -300,6 +326,7 @@ def consume_events(
     consume_timeout_ms: int = 10_000,
     auto_offset_reset: str = "earliest",
     write_to_raw: bool = True,
+    validate_quality: bool = False,
 ) -> ConsumerResult:
     """Consume events from a Kafka topic and optionally write to raw layer.
 
@@ -312,6 +339,8 @@ def consume_events(
         consume_timeout_ms: Consumer timeout
         auto_offset_reset: Where to start if no offset
         write_to_raw: Whether to write to raw layer
+        validate_quality: Run quality gate before writing to raw.
+            Invalid records are routed to quarantine, not written.
 
     Returns:
         ConsumerResult with counts
@@ -375,17 +404,37 @@ def consume_events(
             print(f"Warning: consumer async commit failed: {exc}")
         consumer.close()
 
-    # Write to raw layer
+    # Write to raw layer (with optional quality gate)
     if write_to_raw and landed_records:
-        try:
-            raw_path = write_events_to_raw(landed_records, dataset, f"kafka://{topic}")
-            result.raw_path = str(raw_path)
-            
-            # Stamp a published manifest and adapt the streaming artifact into the shared raw envelope zone.
-            _publish_streaming_raw_envelope(raw_path, dataset)
-            
-        except Exception as exc:
-            result.errors.append(f"Failed to write to raw: {exc}")
+        records_to_write = landed_records
+
+        if validate_quality:
+            valid_records, invalid_records, q_status, q_details = _validate_streaming_records(
+                landed_records, dataset, topic,
+            )
+            records_to_write = valid_records
+            if invalid_records:
+                try:
+                    from governance.quality.quarantine import quarantine_records
+                    quarantine_records(
+                        dataset, invalid_records,
+                        reason="streaming_quality_validation_failed",
+                        source_path=f"kafka://{topic}",
+                    )
+                except Exception as exc:
+                    result.errors.append(f"Quarantine failed: {exc}")
+            if q_status == "failed":
+                result.errors.append(
+                    f"Streaming quality gate failed: {q_details.get('threshold_violations', [])}"
+                )
+
+        if records_to_write:
+            try:
+                raw_path = write_events_to_raw(records_to_write, dataset, f"kafka://{topic}")
+                result.raw_path = str(raw_path)
+                _publish_streaming_raw_envelope(raw_path, dataset)
+            except Exception as exc:
+                result.errors.append(f"Failed to write to raw: {exc}")
 
     return result
 
