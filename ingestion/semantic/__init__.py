@@ -8,8 +8,8 @@ Usage:
 
     pipeline = SemanticAnnotationPipeline(cache_dir="semantic_cache")
     result = pipeline.process(
-        source_id="tfl_arrivals",
-        source_key="tfl_arrivals",
+        source_id="tpcds_store_sales",
+        source_key="tpcds_store_sales",
         inferred_schema=schema,
         docs_url="https://api.tfl.gov.uk/"
     )

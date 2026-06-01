@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcdi_fact_market_history",
+  "type": "object",
+  "properties": {
+    "sk_securityid": { "type": "integer" },
+    "sk_companyid": { "type": "integer" },
+    "sk_date": { "type": "integer" },
+    "pe_ratio": { "type": "number" },
+    "yield_pct": { "type": "number" },
+    "fifty_two_week_high": { "type": "number" },
+    "sk_fifty_two_week_high_date": { "type": "integer" },
+    "fifty_two_week_low": { "type": "number" },
+    "sk_fifty_two_week_low_date": { "type": "integer" },
+    "close_price": { "type": "number" },
+    "day_high": { "type": "number" },
+    "day_low": { "type": "number" },
+    "volume": { "type": "integer" },
+    "batchid": { "type": "integer" }
+  },
+  "required": ["sk_securityid", "sk_companyid", "sk_date", "pe_ratio", "yield_pct", "fifty_two_week_high", "sk_fifty_two_week_high_date", "fifty_two_week_low", "sk_fifty_two_week_low_date", "close_price", "day_high", "day_low", "volume", "batchid"],
+  "additionalProperties": false
+}

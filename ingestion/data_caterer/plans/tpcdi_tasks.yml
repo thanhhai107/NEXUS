@@ -1,0 +1,2323 @@
+plan:
+  name: "tpcdi_tasks"
+  description: "TPC-DI Data Integration benchmark tables — SF=1"
+  options:
+    format: "csv"
+    delimiter: "|"
+    header: true
+    saveMode: "overwrite"
+
+tasks:
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 1. tpcdi_dim_date — 2,557 rows
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_dim_date"
+    steps:
+      - name: "dim_date"
+        type: "batch"
+        count:
+          total: 2557
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "sk_date"
+            type: "integer"
+            generator: "increment"
+            options:
+              start: 1
+              step: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "date"
+            type: "date"
+            generator: "sequence"
+            options:
+              start: "2015-01-01"
+              end: "2021-12-31"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+          - name: "day_name"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "Monday"
+                - "Tuesday"
+                - "Wednesday"
+                - "Thursday"
+                - "Friday"
+                - "Saturday"
+                - "Sunday"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "day_of_week"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 7
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "day_of_month"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 31
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "day_of_year"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 366
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "week_of_year"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 53
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "month_name"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "January"
+                - "February"
+                - "March"
+                - "April"
+                - "May"
+                - "June"
+                - "July"
+                - "August"
+                - "September"
+                - "October"
+                - "November"
+                - "December"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "month_of_year"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 12
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "quarter"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 4
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "year"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 2015
+              max: 2021
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "holiday_flag"
+            type: "boolean"
+            generator: "random"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "weekend_flag"
+            type: "boolean"
+            generator: "random"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "season"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "Spring"
+                - "Summer"
+                - "Fall"
+                - "Winter"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 2. tpcdi_dim_time — 86,400 rows
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_dim_time"
+    steps:
+      - name: "dim_time"
+        type: "batch"
+        count:
+          total: 86400
+          perBatch: 8640
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "sk_time"
+            type: "integer"
+            generator: "increment"
+            options:
+              start: 0
+              step: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "time"
+            type: "string"
+            generator: "sequence"
+            options:
+              start: "00:00:00"
+              end: "23:59:59"
+              step: "PT1S"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "hour"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 0
+              max: 23
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "minute"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 0
+              max: 59
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "second"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 0
+              max: 59
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "am_pm"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "AM"
+                - "PM"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 3. tpcdi_dim_account — 50,000 rows
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_dim_account"
+    steps:
+      - name: "dim_account"
+        type: "batch"
+        count:
+          total: 50000
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "sk_accountid"
+            type: "integer"
+            generator: "increment"
+            options:
+              start: 1
+              step: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "accountid"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 50000
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "sk_customerid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_customer"
+              referenceField: "sk_customerid"
+              min: 1
+              max: 50000
+            foreignKey:
+              parentTask: "tpcdi_dim_customer"
+              parentStep: "dim_customer"
+              parentField: "sk_customerid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_brokerid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_broker"
+              referenceField: "sk_brokerid"
+              min: 1
+              max: 10
+            foreignKey:
+              parentTask: "tpcdi_dim_broker"
+              parentStep: "dim_broker"
+              parentField: "sk_brokerid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "status"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "ACTIVE"
+                - "CLOSED"
+                - "PENDING"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "accountdesc"
+            type: "string"
+            generator: "random"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "taxstatus"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 0
+              max: 2
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "iscurrent"
+            type: "boolean"
+            generator: "static"
+            options:
+              value: true
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "batchid"
+            type: "integer"
+            generator: "static"
+            options:
+              value: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "effectivedate"
+            type: "date"
+            generator: "static"
+            options:
+              value: "2015-01-01"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+          - name: "enddate"
+            type: "date"
+            generator: "static"
+            options:
+              value: "9999-12-31"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 4. tpcdi_dim_customer — 50,000 rows (SCD Type 2)
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_dim_customer"
+    steps:
+      - name: "dim_customer"
+        type: "batch"
+        count:
+          total: 50000
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "sk_customerid"
+            type: "integer"
+            generator: "increment"
+            options:
+              start: 1
+              step: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "customerid"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 50000
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "taxid"
+            type: "string"
+            generator: "regex"
+            options:
+              min: 11
+              max: 11
+              regex: "[0-9]{3}-[0-9]{2}-[0-9]{4}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "status"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "ACTIVE"
+                - "INACTIVE"
+                - "SUSPENDED"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "lastname"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Name.last_name}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "firstname"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Name.first_name}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "middleinitial"
+            type: "string"
+            generator: "random"
+            options:
+              min: 1
+              max: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "gender"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "M"
+                - "F"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "tier"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 3
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "dob"
+            type: "date"
+            generator: "random"
+            options:
+              min: "1940-01-01"
+              max: "2005-12-31"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+          - name: "email"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{FirstName}.#{LastName}@example.com"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "phone1"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{PhoneNumber.cellPhone}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "phone2"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{PhoneNumber.cellPhone}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "phone3"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{PhoneNumber.cellPhone}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "address1"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.fullAddress}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "address2"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.secondaryAddress}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "postalcode"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.zipCode}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "city"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.city}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "state_prov"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.stateAbbr}"
+            minLength: 2
+            maxLength: 2
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "country"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "USA"
+                - "CAN"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "c_credit_score"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 300
+              max: 850
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "iscurrent"
+            type: "boolean"
+            generator: "static"
+            options:
+              value: true
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "batchid"
+            type: "integer"
+            generator: "static"
+            options:
+              value: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "effectivedate"
+            type: "date"
+            generator: "static"
+            options:
+              value: "2015-01-01"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+          - name: "enddate"
+            type: "date"
+            generator: "static"
+            options:
+              value: "9999-12-31"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 5. tpcdi_dim_broker — 10 rows
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_dim_broker"
+    steps:
+      - name: "dim_broker"
+        type: "batch"
+        count:
+          total: 10
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "sk_brokerid"
+            type: "integer"
+            generator: "increment"
+            options:
+              start: 1
+              step: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "brokerid"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 10
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "managerid"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 5
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "lastname"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Name.last_name}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "firstname"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Name.first_name}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "middleinitial"
+            type: "string"
+            generator: "random"
+            options:
+              min: 1
+              max: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "branch"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "Main Office"
+                - "Downtown"
+                - "Uptown"
+                - "Suburban"
+                - "Westside"
+                - "Eastside"
+                - "North"
+                - "South"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "office"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Company.name}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "phone"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{PhoneNumber.cellPhone}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "email"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Internet.emailAddress}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "status"
+            type: "string"
+            generator: "static"
+            options:
+              value: "ACTIVE"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "iscurrent"
+            type: "boolean"
+            generator: "static"
+            options:
+              value: true
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "batchid"
+            type: "integer"
+            generator: "static"
+            options:
+              value: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "effectivedate"
+            type: "date"
+            generator: "static"
+            options:
+              value: "2015-01-01"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+          - name: "enddate"
+            type: "date"
+            generator: "static"
+            options:
+              value: "9999-12-31"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 6. tpcdi_dim_security — 6,850 rows (SCD Type 2)
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_dim_security"
+    steps:
+      - name: "dim_security"
+        type: "batch"
+        count:
+          total: 6850
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "sk_securityid"
+            type: "integer"
+            generator: "increment"
+            options:
+              start: 1
+              step: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "symbol"
+            type: "string"
+            generator: "regex"
+            options:
+              min: 3
+              max: 5
+              regex: "[A-Z]{3,5}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "issue"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "COMMON"
+                - "PREFERRED"
+                - "BOND"
+                - "ETF"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "status"
+            type: "string"
+            generator: "static"
+            options:
+              value: "ACTIVE"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "name"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Company.name}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "exchangeid"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "NYSE"
+                - "NASDAQ"
+                - "AMEX"
+                - "LSE"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_companyid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_company"
+              referenceField: "sk_companyid"
+              min: 1
+              max: 5000
+            foreignKey:
+              parentTask: "tpcdi_dim_company"
+              parentStep: "dim_company"
+              parentField: "sk_companyid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sharesoutstanding"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 100000
+              max: 10000000000
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "firsttrade"
+            type: "date"
+            generator: "random"
+            options:
+              min: "2015-01-01"
+              max: "2019-12-31"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+          - name: "firsttradeexch"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "NYSE"
+                - "NASDAQ"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "dividend"
+            type: "decimal"
+            generator: "random"
+            options:
+              min: 0.00
+              max: 10.00
+              decimals: 4
+            edgeCases:
+              - type: "negativeAmount"
+                probability: 0.005
+          - name: "conameororg"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Company.name}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "iscurrent"
+            type: "boolean"
+            generator: "static"
+            options:
+              value: true
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "batchid"
+            type: "integer"
+            generator: "static"
+            options:
+              value: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "effectivedate"
+            type: "date"
+            generator: "static"
+            options:
+              value: "2015-01-01"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+          - name: "enddate"
+            type: "date"
+            generator: "static"
+            options:
+              value: "9999-12-31"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 7. tpcdi_dim_company — 5,000 rows (SCD Type 2)
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_dim_company"
+    steps:
+      - name: "dim_company"
+        type: "batch"
+        count:
+          total: 5000
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "sk_companyid"
+            type: "integer"
+            generator: "increment"
+            options:
+              start: 1
+              step: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "companyid"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 5000
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "status"
+            type: "string"
+            generator: "static"
+            options:
+              value: "ACTIVE"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "name"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Company.name}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "industryid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "industry"
+              referenceField: "in_id"
+              min: 1
+              max: 100
+            foreignKey:
+              parentTask: "tpcdi_industry"
+              parentStep: "industry"
+              parentField: "in_id"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sprating"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "AAA"
+                - "AA+"
+                - "AA"
+                - "AA-"
+                - "A+"
+                - "A"
+                - "A-"
+                - "BBB+"
+                - "BBB"
+                - "BBB-"
+                - "BB+"
+                - "BB"
+                - "BB-"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "islowgrade"
+            type: "boolean"
+            generator: "random"
+            options:
+              trueProbability: 0.10
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "ceo"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Name.name}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "addressline1"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.fullAddress}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "addressline2"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.secondaryAddress}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "postalcode"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.zipCode}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "city"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.city}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "state_prov"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.stateAbbr}"
+            minLength: 2
+            maxLength: 2
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "country"
+            type: "string"
+            generator: "static"
+            options:
+              value: "USA"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "description"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Lorem.sentence}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "foundingdate"
+            type: "date"
+            generator: "random"
+            options:
+              min: "1900-01-01"
+              max: "2015-12-31"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+          - name: "iscurrent"
+            type: "boolean"
+            generator: "static"
+            options:
+              value: true
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "batchid"
+            type: "integer"
+            generator: "static"
+            options:
+              value: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "effectivedate"
+            type: "date"
+            generator: "static"
+            options:
+              value: "2015-01-01"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+          - name: "enddate"
+            type: "date"
+            generator: "static"
+            options:
+              value: "9999-12-31"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 8. tpcdi_dim_trade — 865,000 rows (SCD Type 2, per-batch 10,000)
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_dim_trade"
+    steps:
+      - name: "dim_trade"
+        type: "batch"
+        count:
+          total: 865000
+          perBatch: 10000
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "sk_tradeid"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 865000
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "tradeid"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "T#{String.format('%015d', sk_tradeid)}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_orderid"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 865000
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "orderid"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "O#{String.format('%015d', sk_orderid)}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_accountid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_account"
+              referenceField: "sk_accountid"
+              min: 1
+              max: 50000
+            foreignKey:
+              parentTask: "tpcdi_dim_account"
+              parentStep: "dim_account"
+              parentField: "sk_accountid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_securityid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_security"
+              referenceField: "sk_securityid"
+              min: 1
+              max: 6850
+            foreignKey:
+              parentTask: "tpcdi_dim_security"
+              parentStep: "dim_security"
+              parentField: "sk_securityid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_companyid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_company"
+              referenceField: "sk_companyid"
+              min: 1
+              max: 5000
+            foreignKey:
+              parentTask: "tpcdi_dim_company"
+              parentStep: "dim_company"
+              parentField: "sk_companyid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_closed_customerid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_customer"
+              referenceField: "sk_customerid"
+              min: 1
+              max: 50000
+            foreignKey:
+              parentTask: "tpcdi_dim_customer"
+              parentStep: "dim_customer"
+              parentField: "sk_customerid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_traded_customerid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_customer"
+              referenceField: "sk_customerid"
+              min: 1
+              max: 50000
+            foreignKey:
+              parentTask: "tpcdi_dim_customer"
+              parentStep: "dim_customer"
+              parentField: "sk_customerid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "trade_price"
+            type: "decimal"
+            generator: "random"
+            options:
+              min: 1.00
+              max: 500.00
+              decimals: 4
+            edgeCases:
+              - type: "negativeAmount"
+                probability: 0.005
+          - name: "trade_quantity"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 10000
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "trade_dts"
+            type: "timestamp"
+            generator: "random"
+            options:
+              min: "2019-01-01 00:00:00"
+              max: "2021-12-31 23:59:59"
+              format: "yyyy-MM-dd HH:mm:ss.SSS"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+          - name: "trade_status"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "COMPLETED"
+                - "CANCELLED"
+                - "PENDING"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "trade_type"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "BUY"
+                - "SELL"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "batchid"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 3
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "iscurrent"
+            type: "boolean"
+            generator: "static"
+            options:
+              value: true
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "effectivedate"
+            type: "date"
+            generator: "static"
+            options:
+              value: "2015-01-01"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+          - name: "enddate"
+            type: "date"
+            generator: "static"
+            options:
+              value: "9999-12-31"
+              format: "yyyy-MM-dd"
+            edgeCases:
+              - type: "dateFormatError"
+                probability: 0.002
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 9. tpcdi_fact_cash_balances — 250,000 rows (per-batch 50,000)
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_fact_cash_balances"
+    steps:
+      - name: "fact_cash_balances"
+        type: "batch"
+        count:
+          total: 250000
+          perBatch: 50000
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+          negativeAmountProbability: 0.005
+          wrongTypeProbability: 0.003
+        fields:
+          - name: "sk_customerid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_customer"
+              referenceField: "sk_customerid"
+              min: 1
+              max: 50000
+            foreignKey:
+              parentTask: "tpcdi_dim_customer"
+              parentStep: "dim_customer"
+              parentField: "sk_customerid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_accountid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_account"
+              referenceField: "sk_accountid"
+              min: 1
+              max: 50000
+            foreignKey:
+              parentTask: "tpcdi_dim_account"
+              parentStep: "dim_account"
+              parentField: "sk_accountid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_date"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_date"
+              referenceField: "sk_date"
+              min: 1
+              max: 2557
+            foreignKey:
+              parentTask: "tpcdi_dim_date"
+              parentStep: "dim_date"
+              parentField: "sk_date"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "cash"
+            type: "decimal"
+            generator: "random"
+            options:
+              min: -50000.00
+              max: 10000000.00
+              decimals: 2
+            edgeCases:
+              - type: "negativeAmount"
+                probability: 0.005
+          - name: "batchid"
+            type: "integer"
+            generator: "static"
+            options:
+              value: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 10. tpcdi_fact_holdings — 500,000 rows (per-batch 100,000)
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_fact_holdings"
+    steps:
+      - name: "fact_holdings"
+        type: "batch"
+        count:
+          total: 500000
+          perBatch: 100000
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+          negativeAmountProbability: 0.005
+          wrongTypeProbability: 0.003
+        fields:
+          - name: "sk_tradeid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_trade"
+              referenceField: "sk_tradeid"
+              min: 1
+              max: 865000
+            foreignKey:
+              parentTask: "tpcdi_dim_trade"
+              parentStep: "dim_trade"
+              parentField: "sk_tradeid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_customerid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_customer"
+              referenceField: "sk_customerid"
+              min: 1
+              max: 50000
+            foreignKey:
+              parentTask: "tpcdi_dim_customer"
+              parentStep: "dim_customer"
+              parentField: "sk_customerid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_accountid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_account"
+              referenceField: "sk_accountid"
+              min: 1
+              max: 50000
+            foreignKey:
+              parentTask: "tpcdi_dim_account"
+              parentStep: "dim_account"
+              parentField: "sk_accountid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_securityid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_security"
+              referenceField: "sk_securityid"
+              min: 1
+              max: 6850
+            foreignKey:
+              parentTask: "tpcdi_dim_security"
+              parentStep: "dim_security"
+              parentField: "sk_securityid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_companyid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_company"
+              referenceField: "sk_companyid"
+              min: 1
+              max: 5000
+            foreignKey:
+              parentTask: "tpcdi_dim_company"
+              parentStep: "dim_company"
+              parentField: "sk_companyid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_closedate"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_date"
+              referenceField: "sk_date"
+              min: 1
+              max: 2557
+            foreignKey:
+              parentTask: "tpcdi_dim_date"
+              parentStep: "dim_date"
+              parentField: "sk_date"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_closetime"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_time"
+              referenceField: "sk_time"
+              min: 0
+              max: 86399
+            foreignKey:
+              parentTask: "tpcdi_dim_time"
+              parentStep: "dim_time"
+              parentField: "sk_time"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "holding_quantity"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1
+              max: 1000000
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "holding_price"
+            type: "decimal"
+            generator: "random"
+            options:
+              min: 1.00
+              max: 500.00
+              decimals: 4
+            edgeCases:
+              - type: "negativeAmount"
+                probability: 0.005
+          - name: "batchid"
+            type: "integer"
+            generator: "static"
+            options:
+              value: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 11. tpcdi_fact_market_history — 34,250 rows
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_fact_market_history"
+    steps:
+      - name: "fact_market_history"
+        type: "batch"
+        count:
+          total: 34250
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+          negativeAmountProbability: 0.005
+          wrongTypeProbability: 0.003
+        fields:
+          - name: "sk_securityid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_security"
+              referenceField: "sk_securityid"
+              min: 1
+              max: 6850
+            foreignKey:
+              parentTask: "tpcdi_dim_security"
+              parentStep: "dim_security"
+              parentField: "sk_securityid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_companyid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_company"
+              referenceField: "sk_companyid"
+              min: 1
+              max: 5000
+            foreignKey:
+              parentTask: "tpcdi_dim_company"
+              parentStep: "dim_company"
+              parentField: "sk_companyid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_date"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_date"
+              referenceField: "sk_date"
+              min: 1
+              max: 2557
+            foreignKey:
+              parentTask: "tpcdi_dim_date"
+              parentStep: "dim_date"
+              parentField: "sk_date"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "pe_ratio"
+            type: "decimal"
+            generator: "random"
+            options:
+              min: 1.00
+              max: 500.00
+              decimals: 4
+            edgeCases:
+              - type: "negativeAmount"
+                probability: 0.005
+          - name: "yield_pct"
+            type: "decimal"
+            generator: "random"
+            options:
+              min: 0.00
+              max: 20.00
+              decimals: 2
+            edgeCases:
+              - type: "negativeAmount"
+                probability: 0.005
+          - name: "fifty_two_week_high"
+            type: "decimal"
+            generator: "random"
+            options:
+              min: 10.00
+              max: 1000.00
+              decimals: 2
+            edgeCases:
+              - type: "negativeAmount"
+                probability: 0.005
+          - name: "sk_fifty_two_week_high_date"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_date"
+              referenceField: "sk_date"
+              min: 1
+              max: 2557
+            foreignKey:
+              parentTask: "tpcdi_dim_date"
+              parentStep: "dim_date"
+              parentField: "sk_date"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "fifty_two_week_low"
+            type: "decimal"
+            generator: "random"
+            options:
+              min: 1.00
+              max: 500.00
+              decimals: 2
+            edgeCases:
+              - type: "negativeAmount"
+                probability: 0.005
+          - name: "sk_fifty_two_week_low_date"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_date"
+              referenceField: "sk_date"
+              min: 1
+              max: 2557
+            foreignKey:
+              parentTask: "tpcdi_dim_date"
+              parentStep: "dim_date"
+              parentField: "sk_date"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "close_price"
+            type: "decimal"
+            generator: "random"
+            options:
+              min: 1.00
+              max: 1000.00
+              decimals: 2
+            edgeCases:
+              - type: "negativeAmount"
+                probability: 0.005
+          - name: "day_high"
+            type: "decimal"
+            generator: "random"
+            options:
+              min: 1.00
+              max: 1000.00
+              decimals: 2
+            edgeCases:
+              - type: "negativeAmount"
+                probability: 0.005
+          - name: "day_low"
+            type: "decimal"
+            generator: "random"
+            options:
+              min: 1.00
+              max: 1000.00
+              decimals: 2
+            edgeCases:
+              - type: "negativeAmount"
+                probability: 0.005
+          - name: "volume"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 1000
+              max: 100000000
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "batchid"
+            type: "integer"
+            generator: "static"
+            options:
+              value: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 12. tpcdi_fact_watches — 500 rows
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_fact_watches"
+    steps:
+      - name: "fact_watches"
+        type: "batch"
+        count:
+          total: 500
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+          negativeAmountProbability: 0.005
+          wrongTypeProbability: 0.003
+        fields:
+          - name: "sk_customerid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_customer"
+              referenceField: "sk_customerid"
+              min: 1
+              max: 50000
+            foreignKey:
+              parentTask: "tpcdi_dim_customer"
+              parentStep: "dim_customer"
+              parentField: "sk_customerid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_securityid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_security"
+              referenceField: "sk_securityid"
+              min: 1
+              max: 6850
+            foreignKey:
+              parentTask: "tpcdi_dim_security"
+              parentStep: "dim_security"
+              parentField: "sk_securityid"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_closedate"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_date"
+              referenceField: "sk_date"
+              min: 1
+              max: 2557
+            foreignKey:
+              parentTask: "tpcdi_dim_date"
+              parentStep: "dim_date"
+              parentField: "sk_date"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "batchid"
+            type: "integer"
+            generator: "static"
+            options:
+              value: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 13. tpcdi_industry — 100 rows
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_industry"
+    steps:
+      - name: "industry"
+        type: "batch"
+        count:
+          total: 100
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "in_id"
+            type: "integer"
+            generator: "increment"
+            options:
+              start: 1
+              step: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "in_name"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "Technology"
+                - "Finance"
+                - "Healthcare"
+                - "Energy"
+                - "Consumer"
+                - "Industrial"
+                - "Materials"
+                - "Utilities"
+                - "Real Estate"
+                - "Telecom"
+                - "Automotive"
+                - "Pharma"
+                - "Retail"
+                - "Food"
+                - "Media"
+                - "Insurance"
+                - "Aerospace"
+                - "Chemical"
+                - "Mining"
+                - "Banking"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "in_sc_id"
+            type: "string"
+            generator: "regex"
+            options:
+              min: 2
+              max: 2
+              regex: "[A-Z]{2}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 14. tpcdi_status_type — 10 rows
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_status_type"
+    steps:
+      - name: "status_type"
+        type: "batch"
+        count:
+          total: 10
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "st_id"
+            type: "integer"
+            generator: "increment"
+            options:
+              start: 1
+              step: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "st_name"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "ACTIVE"
+                - "INACTIVE"
+                - "PENDING"
+                - "SUSPENDED"
+                - "CLOSED"
+                - "COMPLETED"
+                - "CANCELLED"
+                - "SUBMITTED"
+                - "APPROVED"
+                - "REJECTED"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 15. tpcdi_tax_rate — 15 rows
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_tax_rate"
+    steps:
+      - name: "tax_rate"
+        type: "batch"
+        count:
+          total: 15
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "tx_id"
+            type: "integer"
+            generator: "increment"
+            options:
+              start: 1
+              step: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "tx_name"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "Long-Term Capital Gains"
+                - "Short-Term Capital Gains"
+                - "Qualified Dividend"
+                - "Ordinary Dividend"
+                - "Tax-Free Muni"
+                - "Tax-Deferred"
+                - "Federal"
+                - "State"
+                - "Local"
+                - "Social Security"
+                - "Medicare"
+                - "Estate"
+                - "Gift"
+                - "Excise"
+                - "Property"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "tx_rate"
+            type: "decimal"
+            generator: "random"
+            options:
+              min: 0.0000
+              max: 0.4000
+              decimals: 4
+            edgeCases:
+              - type: "negativeAmount"
+                probability: 0.005
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 16. tpcdi_trade_type — 5 rows
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_trade_type"
+    steps:
+      - name: "trade_type"
+        type: "batch"
+        count:
+          total: 5
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "tt_id"
+            type: "integer"
+            generator: "increment"
+            options:
+              start: 1
+              step: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "tt_name"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "Market Buy"
+                - "Market Sell"
+                - "Limit Buy"
+                - "Limit Sell"
+                - "Stop Loss"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "tt_is_sell"
+            type: "boolean"
+            generator: "random"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "tt_is_mrkt"
+            type: "boolean"
+            generator: "random"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # 17. tpcdi_prospect — 1,000 rows
+  # ══════════════════════════════════════════════════════════════════════════════
+  - name: "tpcdi_prospect"
+    steps:
+      - name: "prospect"
+        type: "batch"
+        count:
+          total: 1000
+        error:
+          nullProbability: 0.005
+          missingForeignKeyProbability: 0.01
+        fields:
+          - name: "agencyid"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "'A' || LPAD(CAST(monotonically_increasing_id() + 1 AS STRING), 5, '0')"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_recorddateid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_date"
+              referenceField: "sk_date"
+              min: 1
+              max: 2557
+            foreignKey:
+              parentTask: "tpcdi_dim_date"
+              parentStep: "dim_date"
+              parentField: "sk_date"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "sk_updatedateid"
+            type: "integer"
+            generator: "foreignKey"
+            options:
+              referenceTable: "dim_date"
+              referenceField: "sk_date"
+              min: 1
+              max: 2557
+            foreignKey:
+              parentTask: "tpcdi_dim_date"
+              parentStep: "dim_date"
+              parentField: "sk_date"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "batchid"
+            type: "integer"
+            generator: "static"
+            options:
+              value: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "iscustomer"
+            type: "boolean"
+            generator: "random"
+            options:
+              trueProbability: 0.20
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "lastname"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Name.last_name}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "firstname"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Name.first_name}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "middleinitial"
+            type: "string"
+            generator: "random"
+            options:
+              min: 1
+              max: 1
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "gender"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "M"
+                - "F"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "addressline1"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.fullAddress}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "addressline2"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.secondaryAddress}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "postalcode"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.zipCode}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "city"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.city}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "state"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Address.stateAbbr}"
+            minLength: 2
+            maxLength: 2
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "country"
+            type: "string"
+            generator: "static"
+            options:
+              value: "USA"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "phone"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{PhoneNumber.cellPhone}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "income"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 15000
+              max: 500000
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "numbercars"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 0
+              max: 5
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "numberchildren"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 0
+              max: 6
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "maritalstatus"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "SINGLE"
+                - "MARRIED"
+                - "DIVORCED"
+                - "WIDOWED"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "age"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 18
+              max: 90
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "education"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "High School"
+                - "Bachelor"
+                - "Master"
+                - "Doctorate"
+                - "Associate"
+                - "Professional"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "ownsorrents"
+            type: "string"
+            generator: "oneOf"
+            options:
+              values:
+                - "Owns"
+                - "Rents"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "employer"
+            type: "string"
+            generator: "sql"
+            options:
+              expression: "#{Company.name}"
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+          - name: "creditrating"
+            type: "integer"
+            generator: "random"
+            options:
+              min: 300
+              max: 850
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001
+          - name: "networth"
+            type: "integer"
+            generator: "random"
+            options:
+              min: -100000
+              max: 10000000
+            edgeCases:
+              - type: "null"
+                probability: 0.005
+              - type: "maxInt"
+                probability: 0.001

@@ -1,6 +1,6 @@
 """Source Download Hook for Airflow.
 
-Provides a reusable hook for downloading data from various sources.
+Provides a reusable hook for generating TPC-DS benchmark data.
 """
 
 from __future__ import annotations
@@ -20,18 +20,18 @@ from orchestration.airflow.pools import get_pool_name
 
 
 class SourceDownloadHook(BaseHook):
-    """Hook for downloading data from sources.
-    
-    This hook provides a clean interface for source downloads,
+    """Hook for generating TPC-DS benchmark data.
+
+    This hook provides a clean interface for TPC-DS data generation,
     pulling configuration from centralized config files.
     """
 
     def __init__(self, source: str | None = None, mode: str = "small_demo"):
         """Initialize the hook.
-        
+
         Args:
-            source: Source identifier (e.g., 'openaq', 'tfl_arrivals')
-            mode: Download mode (e.g., 'small_demo', 'full_demo')
+            source: Source identifier (unused, kept for API compat)
+            mode: Scale profile hint (unused, kept for API compat)
         """
         super().__init__()
         self.source = source
@@ -44,31 +44,27 @@ class SourceDownloadHook(BaseHook):
         run_id: str | None = None,
         backfill: bool = False,
     ) -> str:
-        """Build the download command for this source.
-        
+        """Build the TPC-DS generation command.
+
         Args:
             run_id: Run ID (defaults to Airflow ts_nodash)
-            backfill: Whether to run in backfill mode
-        
+            backfill: Whether to run in backfill mode (ignored for TPC-DS)
+
         Returns:
             Bash command string to execute
         """
         cmd_parts = [
             f"cd {self.nexus_repo_path}",
             "&&",
-            "python ingestion/downloaders/london_downloader.py",
-            f"--source {self.source}",
-            f"--mode {self.mode}",
+            "python -m cli.nexus generate tpcdi",
+            "--scale-factor 1",
         ]
-        
+
         if run_id:
             cmd_parts.append(f"--run-id {run_id}")
         else:
             cmd_parts.append("--run-id {{ ts_nodash }}")
-        
-        if backfill:
-            cmd_parts.append("--backfill")
-        
+
         return " ".join(cmd_parts)
 
     def get_pool(self) -> str:

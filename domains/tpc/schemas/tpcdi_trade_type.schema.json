@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcdi_trade_type",
+  "type": "object",
+  "properties": {
+    "tt_id": { "type": "integer" },
+    "tt_name": { "type": "string" },
+    "tt_is_sell": { "type": "boolean" },
+    "tt_is_mrkt": { "type": "boolean" }
+  },
+  "required": ["tt_id", "tt_name", "tt_is_sell", "tt_is_mrkt"],
+  "additionalProperties": false
+}

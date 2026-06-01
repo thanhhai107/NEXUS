@@ -80,15 +80,18 @@ class BronzeSchemaValidator:
     
     # Default required fields by source type
     REQUIRED_FIELDS: dict[str, list[str]] = {
-        "tfl_arrivals": ["stop_id", "line_id", "timestamp", "expected_arrival"],
-        "tfl_line_status": ["line_id", "status_timestamp", "status"],
-        "openaq": ["location", "parameter", "value", "date_utc"],
-        "waqi": ["station", "time", "aqi"],
-        "londonair": ["site_code", "species", "measurement_date", "value"],
-        "openweather": ["lat", "lon", "dt", "temp"],
-        "openmeteo": ["latitude", "longitude", "hour"],
-        "dft": ["count_point_id", "year", "count_date"],
-        "stats19": ["accident_index", "date", "location"],
+        "tpcdi_dim_date": ["sk_date", "date", "year"],
+        "tpcdi_dim_time": ["sk_time", "time"],
+        "tpcdi_dim_account": ["sk_accountid", "sk_customerid", "status"],
+        "tpcdi_dim_customer": ["sk_customerid", "customerid", "lastname", "firstname"],
+        "tpcdi_dim_broker": ["sk_brokerid", "lastname", "firstname"],
+        "tpcdi_dim_security": ["sk_securityid", "symbol", "issue"],
+        "tpcdi_dim_company": ["sk_companyid", "name", "industryid"],
+        "tpcdi_dim_trade": ["sk_tradeid", "tradeid", "sk_securityid", "trade_price", "trade_dts"],
+        "tpcdi_fact_cash_balances": ["sk_customerid", "sk_accountid", "sk_date", "cash"],
+        "tpcdi_fact_holdings": ["sk_tradeid", "sk_customerid", "sk_securityid", "holding_quantity"],
+        "tpcdi_fact_market_history": ["sk_securityid", "sk_date", "close_price"],
+        "tpcdi_fact_watches": ["sk_customerid", "sk_securityid"],
     }
     
     # Field type expectations

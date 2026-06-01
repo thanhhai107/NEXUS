@@ -351,7 +351,7 @@ def get_bronze_path(
     """Get bronze path for a dataset run.
     
     Args:
-        dataset: Dataset name (e.g., 'londonair_monitoring', 'tfl_arrivals')
+        dataset: Dataset name (e.g., 'tpcds_store_sales', 'tpcds_customer')
         run_id: Run ID (e.g., '20260527T033320Z')
         subdir: Subdirectory ('raw', 'staging', 'metadata', 'published')
     
@@ -528,17 +528,7 @@ def is_polling_enabled(source: str) -> bool:
 
 
 def _get_active_domains() -> set[str] | None:
-    env_mode = os.getenv("NEXUS_DATASET_MODE", "").lower()
-    if env_mode == "london":
-        return {"environment", "transport"}
-    if env_mode == "tpc":
-        return {"tpc"}
-    config = load_yaml(PROJECT_ROOT / "ingestion" / "config" / "data_caterer_config.yml")
-    mode = config.get("dataset_mode", "tpc")
-    active = config.get("active_domains", ["tpc"])
-    if mode == "london":
-        return {"environment", "transport"}
-    return set(active)
+    return {"tpc"}
 
 
 def load_dataset_catalog(domains_dir: Path = DOMAINS_DIR) -> dict[str, Any]:

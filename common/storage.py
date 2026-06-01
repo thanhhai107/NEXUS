@@ -854,7 +854,7 @@ def storage_context(prefix: str) -> StorageContext:
         prefix: Path prefix for all operations
         
     Usage:
-        with storage_context("bronze/tfl_arrivals") as ctx:
+        with storage_context("bronze/tpcds_store_sales") as ctx:
             ctx.write("data.json", records)
             files = ctx.list()
     """

@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcdi_status_type",
+  "type": "object",
+  "properties": {
+    "st_id": { "type": "integer" },
+    "st_name": { "type": "string" }
+  },
+  "required": ["st_id", "st_name"],
+  "additionalProperties": false
+}

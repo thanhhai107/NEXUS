@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcdi_fact_watches",
+  "type": "object",
+  "properties": {
+    "sk_customerid": { "type": "integer" },
+    "sk_securityid": { "type": "integer" },
+    "sk_closedate": { "type": "integer" },
+    "batchid": { "type": "integer" }
+  },
+  "required": ["sk_customerid", "sk_securityid", "sk_closedate", "batchid"],
+  "additionalProperties": false
+}

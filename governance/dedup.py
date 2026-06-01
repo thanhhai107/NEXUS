@@ -98,24 +98,23 @@ class Deduplicator:
     
     # Default dedup keys by source type
     DEFAULT_KEYS: dict[str, list[str]] = {
-        # Transport
-        "tfl_arrivals": ["stop_id", "line_id", "timestamp"],
-        "tfl_line_status": ["line_id", "status_timestamp"],
-        "tfl_status": ["id", "modified"],
-        
-        # Air Quality
-        "openaq": ["location", "parameter", "date_utc"],
-        "waqi": ["station", "time"],
-        "londonair": ["site_code", "species", "measurement_date"],
-        
-        # Weather
-        "openweather": ["lat", "lon", "dt"],
-        "openmeteo": ["latitude", "longitude", "hour"],
-        
-        # Traffic
-        "dft": ["count_point_id", "year", "count_date"],
-        "stats19": ["accident_index"],
-        "ncei": ["station", "date"],
+        "tpcdi_dim_date": ["sk_date"],
+        "tpcdi_dim_time": ["sk_time"],
+        "tpcdi_dim_account": ["sk_accountid"],
+        "tpcdi_dim_customer": ["sk_customerid"],
+        "tpcdi_dim_broker": ["sk_brokerid"],
+        "tpcdi_dim_security": ["sk_securityid"],
+        "tpcdi_dim_company": ["sk_companyid"],
+        "tpcdi_dim_trade": ["sk_tradeid"],
+        "tpcdi_fact_cash_balances": ["sk_customerid", "sk_accountid", "sk_date"],
+        "tpcdi_fact_holdings": ["sk_tradeid", "sk_customerid", "sk_securityid", "sk_closedate"],
+        "tpcdi_fact_market_history": ["sk_securityid", "sk_date"],
+        "tpcdi_fact_watches": ["sk_customerid", "sk_securityid"],
+        "tpcdi_industry": ["in_id"],
+        "tpcdi_status_type": ["st_id"],
+        "tpcdi_tax_rate": ["tx_id"],
+        "tpcdi_trade_type": ["tt_id"],
+        "tpcdi_prospect": ["agencyid"],
     }
     
     def __init__(self, dedup_dir: Path | None = None):

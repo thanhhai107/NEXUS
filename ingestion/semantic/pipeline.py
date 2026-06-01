@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ingestion.downloaders.schema_inference import InferredSchema
+    from governance.schema.inference import InferredSchema
 
 # Default settings
 DEFAULT_CACHE_DIR = "semantic_cache"
@@ -69,8 +69,8 @@ class SemanticAnnotationPipeline:
         )
         
         result = pipeline.process(
-            source_id="tfl_arrivals",
-            source_key="tfl_arrivals",
+            source_id="tpcds_store_sales",
+            source_key="tpcds_store_sales",
             inferred_schema=schema,
             docs_url="https://api.tfl.gov.uk/"
         )
@@ -405,7 +405,7 @@ def run_pipeline(
     Returns:
         AnnotationResult
     """
-    from ingestion.downloaders.schema_inference import InferredSchema
+    from governance.schema.inference import InferredSchema
     
     # Load schema
     schema_data = json.loads(Path(schema_path).read_text(encoding="utf-8"))
@@ -421,7 +421,7 @@ def run_pipeline(
     
     # Load fields
     for field_name, field_data in schema_data.get("properties", {}).items():
-        from ingestion.downloaders.schema_inference import FieldSchema
+        from governance.schema.inference import FieldSchema
         
         schema.fields[field_name] = FieldSchema(
             name=field_name,

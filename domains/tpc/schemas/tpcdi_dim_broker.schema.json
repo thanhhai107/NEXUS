@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcdi_dim_broker",
+  "type": "object",
+  "properties": {
+    "sk_brokerid": { "type": "integer" },
+    "brokerid": { "type": "integer" },
+    "managerid": { "type": "integer" },
+    "lastname": { "type": "string" },
+    "firstname": { "type": "string" },
+    "middleinitial": { "type": "string" },
+    "branch": { "type": "string" },
+    "office": { "type": "string" },
+    "phone": { "type": "string" },
+    "email": { "type": "string" },
+    "status": { "type": "string" },
+    "iscurrent": { "type": "boolean" },
+    "batchid": { "type": "integer" },
+    "effectivedate": { "type": "string" },
+    "enddate": { "type": "string" }
+  },
+  "required": ["sk_brokerid", "brokerid", "managerid", "lastname", "firstname", "middleinitial", "branch", "office", "phone", "email", "status", "iscurrent", "batchid", "effectivedate", "enddate"],
+  "additionalProperties": false
+}

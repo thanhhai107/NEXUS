@@ -5,7 +5,7 @@ Supports local filesystem, PostgreSQL, and S3/MinIO storage.
 
 Usage:
     quarantine_records(
-        dataset="tfl_bus",
+        dataset="tpcds_store_sales",
         invalid_records=[record],
         reason="null_value",
         rule_id="not_null_check",

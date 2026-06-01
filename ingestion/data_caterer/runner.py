@@ -97,7 +97,7 @@ class DataCatererConfig:
     plan_dir: Path = field(default=PLANS_DIR)
     output_dir: Path = field(default=DEFAULT_OUTPUT_DIR)
     output_formats: list[str] = field(default_factory=lambda: ["csv", "parquet"])
-    scale_factor: int = 10
+    scale_factor: int = 1
     error_profile: str = "moderate"
     mode: str = "batch"
     kafka_bootstrap: str = "localhost:29092"
@@ -279,66 +279,22 @@ def _count_records(file_list: list[str]) -> dict[str, int]:
     return counts
 
 
-def generate_tpch(
+def generate_tpcdi(
     scale_factor: int = 1,
     error_profile: str = "moderate",
     output_formats: list[str] | None = None,
     run_id: str = "",
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Generate TPC-H benchmark data (8 tables)."""
+    """Generate TPC-DI benchmark data (SF=1 by default)."""
     if output_formats is None:
         output_formats = ["csv", "parquet"]
     config = DataCatererConfig(
-        plan_name="tpch_tasks",
+        plan_name="tpcdi_tasks",
         scale_factor=scale_factor,
         error_profile=error_profile,
         output_formats=output_formats,
-        output_dir=DEFAULT_OUTPUT_DIR / "tpch",
-        mode="batch",
-        run_id=run_id,
-    )
-    return run_plan(config, dry_run=dry_run)
-
-
-def generate_tpcc(
-    scale_factor: int = 1,
-    error_profile: str = "moderate",
-    output_formats: list[str] | None = None,
-    run_id: str = "",
-    dry_run: bool = False,
-) -> dict[str, Any]:
-    """Generate TPC-C benchmark data (9 tables)."""
-    if output_formats is None:
-        output_formats = ["csv", "parquet"]
-    config = DataCatererConfig(
-        plan_name="tpcc_tasks",
-        scale_factor=scale_factor,
-        error_profile=error_profile,
-        output_formats=output_formats,
-        output_dir=DEFAULT_OUTPUT_DIR / "tpcc",
-        mode="batch",
-        run_id=run_id,
-    )
-    return run_plan(config, dry_run=dry_run)
-
-
-def generate_tpcds(
-    scale_factor: int = 10,
-    error_profile: str = "moderate",
-    output_formats: list[str] | None = None,
-    run_id: str = "",
-    dry_run: bool = False,
-) -> dict[str, Any]:
-    """Generate TPC-DS benchmark data (SF=10 by default)."""
-    if output_formats is None:
-        output_formats = ["csv", "parquet"]
-    config = DataCatererConfig(
-        plan_name="tpcds_tasks",
-        scale_factor=scale_factor,
-        error_profile=error_profile,
-        output_formats=output_formats,
-        output_dir=DEFAULT_OUTPUT_DIR / "tpcds",
+        output_dir=DEFAULT_OUTPUT_DIR / "tpcdi",
         mode="batch",
         run_id=run_id,
     )
@@ -350,7 +306,7 @@ def generate_all(
     run_id: str = "",
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    return {"tpcds": generate_tpcds(error_profile=error_profile, run_id=run_id, dry_run=dry_run)}
+    return {"tpcdi": generate_tpcdi(error_profile=error_profile, run_id=run_id, dry_run=dry_run)}
 
 
 # =============================================================================

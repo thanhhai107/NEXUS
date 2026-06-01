@@ -1,7 +1,8 @@
-# Data Caterer integration package for NEXUS — TPC-DS SF=10
+# Data Caterer integration package for NEXUS — TPC-DI SF=1
 from ingestion.data_caterer.runner import (
     DataCatererConfig,
-    generate_tpcds,
+    generate_tpcdi,
+    generate_all,
     list_plans,
     run_plan,
     ERROR_PRESETS,
@@ -26,10 +27,9 @@ from ingestion.data_caterer.generators import (
     random_phone,
     random_quantity,
     random_tax,
-    tpcds_category,
-    tpcds_education,
-    tpcds_marital_status,
-    tpcds_gender,
+    tpcdi_sp_rating,
+    tpcdi_status,
+    tpcdi_issue_type,
 )
 
 __all__ = [
@@ -38,7 +38,8 @@ __all__ = [
     "ERROR_PRESETS",
     "EXPORT_FORMATS",
     "apply_error_profile",
-    "generate_tpcds",
+    "generate_all",
+    "generate_tpcdi",
     "get_generator",
     "inject_duplicates",
     "inject_fk_violations",
@@ -55,8 +56,7 @@ __all__ = [
     "random_quantity",
     "random_tax",
     "run_plan",
-    "tpcds_category",
-    "tpcds_education",
-    "tpcds_gender",
-    "tpcds_marital_status",
+    "tpcdi_issue_type",
+    "tpcdi_sp_rating",
+    "tpcdi_status",
 ]

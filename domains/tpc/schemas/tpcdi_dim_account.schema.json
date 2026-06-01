@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcdi_dim_account",
+  "type": "object",
+  "properties": {
+    "sk_accountid": { "type": "integer" },
+    "accountid": { "type": "integer" },
+    "sk_customerid": { "type": "integer" },
+    "sk_brokerid": { "type": "integer" },
+    "status": { "type": "string" },
+    "accountdesc": { "type": "string" },
+    "taxstatus": { "type": "integer" },
+    "iscurrent": { "type": "boolean" },
+    "batchid": { "type": "integer" },
+    "effectivedate": { "type": "string" },
+    "enddate": { "type": "string" }
+  },
+  "required": ["sk_accountid", "accountid", "sk_customerid", "sk_brokerid", "status", "accountdesc", "taxstatus", "iscurrent", "batchid", "effectivedate", "enddate"],
+  "additionalProperties": false
+}

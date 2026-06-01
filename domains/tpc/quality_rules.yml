@@ -1,127 +1,97 @@
 # =============================================================================
-# TPC Benchmark Domain — Quality Rules
+# TPC-DI Benchmark Domain — Quality Rules
 # =============================================================================
 
 default_rules:
   max_missing_ratio: 0.05
   max_duplicate_ratio: 0.02
   min_freshness_score: 0.9
-  # ---------------------------------------------------------------------------
-  # TPC-DS Quality Rules
-  # ---------------------------------------------------------------------------
-  tpcds_date_dim:
-    required_columns:
-      - d_date_sk
-      - d_date
-      - d_year
-    freshness_column: d_date
-    primary_keys:
-      - d_date_sk
 
-  tpcds_time_dim:
-    required_columns:
-      - t_time_sk
-      - t_time
-    freshness_column: t_time_sk
-    primary_keys:
-      - t_time_sk
+datasets:
+  # ── Core Dimensions ────────────────────────────────────────────────────────
+  tpcdi_dim_date:
+    required_columns: [sk_date, date, year, month_of_year, quarter]
+    freshness_column: date
+    primary_keys: [sk_date]
 
-  tpcds_item:
-    required_columns:
-      - i_item_sk
-      - i_item_id
-      - i_current_price
-    freshness_column: i_rec_start_date
-    primary_keys:
-      - i_item_sk
+  tpcdi_dim_time:
+    required_columns: [sk_time, time, hour, minute, second]
+    freshness_column: sk_time
+    primary_keys: [sk_time]
 
-  tpcds_customer:
-    required_columns:
-      - c_customer_sk
-      - c_customer_id
-      - c_first_name
-      - c_last_name
-    freshness_column: c_last_review_date
-    primary_keys:
-      - c_customer_sk
+  tpcdi_dim_account:
+    required_columns: [sk_accountid, accountid, sk_customerid, sk_brokerid, status, iscurrent]
+    freshness_column: effectivedate
+    primary_keys: [sk_accountid]
 
-  tpcds_customer_address:
-    required_columns:
-      - ca_address_sk
-      - ca_city
-      - ca_state
-    freshness_column: ca_address_sk
-    primary_keys:
-      - ca_address_sk
+  tpcdi_dim_broker:
+    required_columns: [sk_brokerid, brokerid, lastname, firstname, status, iscurrent]
+    freshness_column: effectivedate
+    primary_keys: [sk_brokerid]
 
-  tpcds_customer_demographics:
-    required_columns:
-      - cd_demo_sk
-      - cd_gender
-      - cd_marital_status
-    freshness_column: cd_demo_sk
-    primary_keys:
-      - cd_demo_sk
+  tpcdi_dim_customer:
+    required_columns: [sk_customerid, customerid, lastname, firstname, gender, status, iscurrent]
+    freshness_column: effectivedate
+    primary_keys: [sk_customerid]
 
-  tpcds_store:
-    required_columns:
-      - s_store_sk
-      - s_store_name
-      - s_number_employees
-    freshness_column: s_rec_start_date
-    primary_keys:
-      - s_store_sk
+  tpcdi_dim_security:
+    required_columns: [sk_securityid, symbol, issue, status, sk_companyid, iscurrent]
+    freshness_column: effectivedate
+    primary_keys: [sk_securityid]
 
-  tpcds_store_sales:
-    required_columns:
-      - ss_item_sk
-      - ss_ticket_number
-      - ss_quantity
-      - ss_sales_price
-    freshness_column: ss_sold_date_sk
-    primary_keys:
-      - ss_item_sk
-      - ss_ticket_number
+  tpcdi_dim_company:
+    required_columns: [sk_companyid, companyid, name, status, industryid, iscurrent]
+    freshness_column: effectivedate
+    primary_keys: [sk_companyid]
 
-  tpcds_web_sales:
-    required_columns:
-      - ws_item_sk
-      - ws_order_number
-      - ws_quantity
-      - ws_sales_price
-    freshness_column: ws_sold_date_sk
-    primary_keys:
-      - ws_item_sk
-      - ws_order_number
+  tpcdi_dim_trade:
+    required_columns: [sk_tradeid, tradeid, sk_accountid, sk_securityid, trade_status, trade_type, trade_dts]
+    freshness_column: trade_dts
+    primary_keys: [sk_tradeid]
 
-  tpcds_catalog_sales:
-    required_columns:
-      - cs_item_sk
-      - cs_order_number
-      - cs_quantity
-      - cs_sales_price
-    freshness_column: cs_sold_date_sk
-    primary_keys:
-      - cs_item_sk
-      - cs_order_number
+  # ── Fact Tables ────────────────────────────────────────────────────────────
+  tpcdi_fact_cash_balances:
+    required_columns: [sk_customerid, sk_accountid, sk_date, cash]
+    freshness_column: sk_date
+    primary_keys: [sk_customerid, sk_accountid, sk_date]
 
-  tpcds_inventory:
-    required_columns:
-      - inv_date_sk
-      - inv_item_sk
-      - inv_warehouse_sk
-      - inv_quantity_on_hand
-    freshness_column: inv_date_sk
-    primary_keys:
-      - inv_date_sk
-      - inv_item_sk
-      - inv_warehouse_sk
+  tpcdi_fact_holdings:
+    required_columns: [sk_tradeid, sk_customerid, sk_securityid, sk_closedate, holding_quantity, holding_price]
+    freshness_column: sk_closedate
+    primary_keys: [sk_tradeid, sk_customerid, sk_securityid, sk_closedate]
 
-  tpcds_warehouse:
-    required_columns:
-      - w_warehouse_sk
-      - w_warehouse_name
-      - w_warehouse_sq_ft
-    freshness_column: w_warehouse_sk
-    primary_keys:
-      - w_warehouse_sk
+  tpcdi_fact_market_history:
+    required_columns: [sk_securityid, sk_date, close_price, day_high, day_low, volume]
+    freshness_column: sk_date
+    primary_keys: [sk_securityid, sk_date]
+
+  tpcdi_fact_watches:
+    required_columns: [sk_customerid, sk_securityid]
+    freshness_column: sk_closedate
+    primary_keys: [sk_customerid, sk_securityid]
+
+  # ── Reference Tables ───────────────────────────────────────────────────────
+  tpcdi_industry:
+    required_columns: [in_id, in_name]
+    freshness_column: null
+    primary_keys: [in_id]
+
+  tpcdi_status_type:
+    required_columns: [st_id, st_name]
+    freshness_column: null
+    primary_keys: [st_id]
+
+  tpcdi_tax_rate:
+    required_columns: [tx_id, tx_name, tx_rate]
+    freshness_column: null
+    primary_keys: [tx_id]
+
+  tpcdi_trade_type:
+    required_columns: [tt_id, tt_name]
+    freshness_column: null
+    primary_keys: [tt_id]
+
+  tpcdi_prospect:
+    required_columns: [agencyid, lastname, firstname, gender, age, creditrating]
+    freshness_column: sk_updatedateid
+    primary_keys: [agencyid]

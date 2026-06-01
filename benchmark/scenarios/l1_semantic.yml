@@ -1,0 +1,33 @@
+# Level 1: Simple — Semantic Issues (M1-M4 on 2 tables)
+id: l1_semantic
+level: 1
+seed: 43
+source_count: 1
+description: "Single source with 4 semantic errors on customer and store_sales"
+source_configs:
+  - format: csv
+    tables: [tpcds_customer, tpcds_store_sales]
+errors:
+  - category: semantic_issues
+    type: different_name_same_meaning
+    table: tpcds_store_sales
+    params: { old_name: "ss_sales_price", new_name: "sale_amount" }
+    expected_detection: "synonym_detected"
+
+  - category: semantic_issues
+    type: different_units
+    table: tpcds_store_sales
+    params: { field: "ss_sales_price", multiplier: 0.85 }
+    expected_detection: "unit_mismatch"
+
+  - category: semantic_issues
+    type: different_timestamp_format
+    table: tpcds_customer
+    params: { field: "c_last_review_date", target_format: "us_format" }
+    expected_detection: "timestamp_format_mismatch"
+
+  - category: semantic_issues
+    type: entity_resolution_problems
+    table: tpcds_customer
+    params: { field: "c_customer_sk", key_offset: 1000000, probability: 1.0 }
+    expected_detection: "entity_mismatch"

@@ -5,12 +5,12 @@ Records transformations and data flow between datasets.
 
 Usage:
     # Basic lineage
-    record_lineage("bronze_to_silver", inputs=["bronze.tfl_bus"], outputs=["silver.bus"])
-    
+    record_lineage("bronze_to_silver", inputs=["bronze.tpcds_store_sales"], outputs=["silver.store_sales"])
+
     # With transform metadata
     record_lineage(
         "silver_validate",
-        inputs=["bronze.tfl_bus"],
+        inputs=["bronze.tpcds_store_sales"],
         outputs=["silver.bus_clean"],
         input_version="v1.0.0",
         output_version="v1.0.1",

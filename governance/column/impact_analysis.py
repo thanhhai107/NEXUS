@@ -8,7 +8,7 @@ Usage:
 
     # Analyze impact of dropping a column
     report = analyze_impact(
-        dataset="bronze.tfl_bus",
+        dataset="bronze.tpcds_store_sales",
         changed_column="arrival_time",
         change_type="dropped",
     )

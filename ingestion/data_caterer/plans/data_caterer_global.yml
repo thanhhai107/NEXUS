@@ -53,21 +53,12 @@ global:
   plans:
     directory: "/opt/nexus/NEXUS/ingestion/data_caterer/plans"
     files:
-      - tpch_base_plan.yml
-      - tpch_tasks.yml
-      - tpcc_tasks.yml
-      - tpcds_tasks.yml
-      - tpcdi_plan.yml
+      - tpcdi_tasks.yml
 
   runMode:
     default: "batch"
     available:
       - batch
-      - streaming
-      - api
-    planOverrides:
-      tpcdi_plan:
-        mode: "mixed"
 
   recordCount:
     tracking:

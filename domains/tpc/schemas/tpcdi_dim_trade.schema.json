@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcdi_dim_trade",
+  "type": "object",
+  "properties": {
+    "sk_tradeid": { "type": "integer" },
+    "tradeid": { "type": "string" },
+    "sk_orderid": { "type": "integer" },
+    "orderid": { "type": "string" },
+    "sk_accountid": { "type": "integer" },
+    "sk_securityid": { "type": "integer" },
+    "sk_companyid": { "type": "integer" },
+    "sk_closed_customerid": { "type": "integer" },
+    "sk_traded_customerid": { "type": "integer" },
+    "trade_price": { "type": "number" },
+    "trade_quantity": { "type": "integer" },
+    "trade_dts": { "type": "string" },
+    "trade_status": { "type": "string" },
+    "trade_type": { "type": "string" },
+    "batchid": { "type": "integer" },
+    "iscurrent": { "type": "boolean" },
+    "effectivedate": { "type": "string" },
+    "enddate": { "type": "string" }
+  },
+  "required": ["sk_tradeid", "tradeid", "sk_orderid", "orderid", "sk_accountid", "sk_securityid", "sk_companyid", "sk_closed_customerid", "sk_traded_customerid", "trade_price", "trade_quantity", "trade_dts", "trade_status", "trade_type", "batchid", "iscurrent", "effectivedate", "enddate"],
+  "additionalProperties": false
+}

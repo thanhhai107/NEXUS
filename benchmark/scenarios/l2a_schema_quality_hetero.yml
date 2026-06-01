@@ -1,0 +1,54 @@
+# Level 2: Moderate — Schema + Quality + Heterogeneity combined
+id: l2a_schema_quality_hetero
+level: 2
+seed: 50
+source_count: 3
+description: "3 sources with combined schema, quality, and heterogeneity errors"
+source_configs:
+  - format: csv
+    tables: [tpcds_customer, tpcds_store_sales]
+  - format: parquet
+    tables: [tpcds_item, tpcds_web_sales]
+  - format: jsonl
+    tables: [tpcds_catalog_sales]
+errors:
+  - category: schema_issues
+    type: field_rename
+    source_index: 0
+    table: tpcds_customer
+    params: { old_name: "c_last_name", new_name: "cust_surname" }
+    expected_detection: "field_rename_candidate"
+  - category: schema_issues
+    type: data_type_change
+    source_index: 0
+    table: tpcds_store_sales
+    params: { field: "ss_net_profit", new_type: "string" }
+    expected_detection: "field_type_change"
+  - category: data_quality
+    type: invalid_data
+    source_index: 1
+    table: tpcds_web_sales
+    params: { field: "ws_quantity", min_val: 1, max_val: 100, ratio: 0.05 }
+    expected_detection: "out_of_range"
+  - category: data_quality
+    type: missing_data_mcar
+    source_index: 1
+    table: tpcds_item
+    params: { field: "i_color", ratio: 0.10 }
+    expected_detection: "missing_value_ratio"
+  - category: data_quality
+    type: duplicate_data
+    source_index: 2
+    table: tpcds_catalog_sales
+    params: { ratio: 0.02 }
+    expected_detection: "duplicate_ratio"
+  - category: heterogeneity
+    type: different_formats
+    source_index: 1
+    params: { format: "parquet" }
+    expected_detection: "multi_format"
+  - category: heterogeneity
+    type: different_formats
+    source_index: 2
+    params: { format: "jsonl" }
+    expected_detection: "multi_format"

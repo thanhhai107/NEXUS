@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcdi_dim_security",
+  "type": "object",
+  "properties": {
+    "sk_securityid": { "type": "integer" },
+    "symbol": { "type": "string" },
+    "issue": { "type": "string" },
+    "status": { "type": "string" },
+    "name": { "type": "string" },
+    "exchangeid": { "type": "string" },
+    "sk_companyid": { "type": "integer" },
+    "sharesoutstanding": { "type": "integer" },
+    "firsttrade": { "type": "string" },
+    "firsttradeexch": { "type": "string" },
+    "dividend": { "type": "number" },
+    "conameororg": { "type": "string" },
+    "iscurrent": { "type": "boolean" },
+    "batchid": { "type": "integer" },
+    "effectivedate": { "type": "string" },
+    "enddate": { "type": "string" }
+  },
+  "required": ["sk_securityid", "symbol", "issue", "status", "name", "exchangeid", "sk_companyid", "sharesoutstanding", "firsttrade", "firsttradeexch", "dividend", "conameororg", "iscurrent", "batchid", "effectivedate", "enddate"],
+  "additionalProperties": false
+}

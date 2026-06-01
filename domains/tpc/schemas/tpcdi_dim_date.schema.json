@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcdi_dim_date",
+  "type": "object",
+  "properties": {
+    "sk_date": { "type": "integer" },
+    "date": { "type": "string" },
+    "day_name": { "type": "string" },
+    "day_of_week": { "type": "integer" },
+    "day_of_month": { "type": "integer" },
+    "day_of_year": { "type": "integer" },
+    "week_of_year": { "type": "integer" },
+    "month_name": { "type": "string" },
+    "month_of_year": { "type": "integer" },
+    "quarter": { "type": "integer" },
+    "year": { "type": "integer" },
+    "holiday_flag": { "type": "boolean" },
+    "weekend_flag": { "type": "boolean" },
+    "season": { "type": "string" }
+  },
+  "required": ["sk_date", "date", "day_name", "day_of_week", "day_of_month", "day_of_year", "week_of_year", "month_name", "month_of_year", "quarter", "year", "holiday_flag", "weekend_flag", "season"],
+  "additionalProperties": false
+}

@@ -9,19 +9,19 @@ Usage:
     record_column_lineage(
         dataset="silver.bus_clean",
         columns=["scheduled_arrival", "actual_arrival"],
-        upstream_dataset="bronze.tfl_bus",
-        upstream_columns=["arrival_time"],
+        upstream_dataset="bronze.tpcds_store_sales",
+        upstream_columns=["ss_sold_date_sk"],
     )
 
     # Get column dependencies
     from governance.column import get_column_dependencies
-    deps = get_column_dependencies("bronze.tfl_bus", "arrival_time")
+    deps = get_column_dependencies("bronze.tpcds_store_sales", "ss_sold_date_sk")
 
     # Analyze impact
     from governance.column import analyze_impact
     report = analyze_impact(
-        dataset="bronze.tfl_bus",
-        changed_column="arrival_time",
+        dataset="bronze.tpcds_store_sales",
+        changed_column="ss_sold_date_sk",
         change_type="dropped",
     )
 """

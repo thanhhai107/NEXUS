@@ -1,0 +1,39 @@
+# Level 1: Simple — Data Quality Issues (Q1-Q5 on 2 fact tables)
+id: l1_quality
+level: 1
+seed: 44
+source_count: 1
+description: "Single source with 5 quality errors on store_sales and item"
+source_configs:
+  - format: csv
+    tables: [tpcds_store_sales, tpcds_item]
+errors:
+  - category: data_quality
+    type: invalid_data
+    table: tpcds_store_sales
+    params: { field: "ss_quantity", min_val: 1, max_val: 100, ratio: 0.05 }
+    expected_detection: "out_of_range"
+
+  - category: data_quality
+    type: missing_data_mcar
+    table: tpcds_item
+    params: { field: "i_color", ratio: 0.10 }
+    expected_detection: "missing_value_ratio"
+
+  - category: data_quality
+    type: missing_data_mar
+    table: tpcds_store_sales
+    params: { field: "ss_coupon_amt", condition_field: "ss_list_price", condition_value: null, ratio: 0.08 }
+    expected_detection: "conditional_missing"
+
+  - category: data_quality
+    type: duplicate_data
+    table: tpcds_store_sales
+    params: { ratio: 0.02 }
+    expected_detection: "duplicate_ratio"
+
+  - category: data_quality
+    type: cross_source_inconsistency
+    table: tpcds_customer
+    params: { field: "c_preferred_cust_flag", ratio: 0.05 }
+    expected_detection: "cross_source_inconsistency"

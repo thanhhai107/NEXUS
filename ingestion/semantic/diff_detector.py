@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ingestion.downloaders.schema_inference import InferredSchema
+    from governance.schema.inference import InferredSchema
 
 
 @dataclass
@@ -44,7 +44,7 @@ class SchemaDiffDetector:
     
     Usage:
         detector = SchemaDiffDetector(cache_dir="semantic_cache")
-        diff = detector.detect_changes("tfl_arrivals", inferred_schema)
+        diff = detector.detect_changes("tpcds_store_sales", inferred_schema)
         
         if diff.should_reannotate:
             # Call LLM

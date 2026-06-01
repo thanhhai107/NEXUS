@@ -44,7 +44,7 @@ class BedrockAnnotator:
         annotator = BedrockAnnotator()
         
         annotations = annotator.annotate(
-            source_id="tfl_arrivals",
+            source_id="tpcds_store_sales",
             fields={"expected_arrival": field_schema},
             api_docs="API documentation text...",
             samples=[{"expected_arrival": "2024-01-01T12:00:00Z"}],

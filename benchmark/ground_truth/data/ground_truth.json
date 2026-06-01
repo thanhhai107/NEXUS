@@ -1,0 +1,1903 @@
+{
+  "schemas": {
+    "tpcds_catalog_sales": {
+      "fields": {
+        "cs_sold_date_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cs_sold_time_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cs_ship_date_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cs_bill_customer_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cs_ship_customer_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cs_item_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cs_promo_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cs_order_number": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cs_quantity": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cs_wholesale_cost": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_list_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_sales_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_ext_discount_amt": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_ext_sales_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_ext_wholesale_cost": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_ext_list_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_ext_tax": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_coupon_amt": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_ext_ship_cost": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_net_paid": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_net_paid_inc_tax": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_net_paid_inc_ship": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_net_paid_inc_ship_tax": {
+          "type": "number",
+          "nullable": false
+        },
+        "cs_net_profit": {
+          "type": "number",
+          "nullable": false
+        }
+      },
+      "primary_keys": [
+        "cs_item_sk",
+        "cs_order_number"
+      ],
+      "foreign_keys": {
+        "cs_item_sk": "tpcds_item.i_item_sk",
+        "cs_customer_sk": "tpcds_customer.c_customer_sk",
+        "cs_sold_date_sk": "tpcds_date_dim.d_date_sk",
+        "cs_sold_time_sk": "tpcds_time_dim.t_time_sk"
+      },
+      "additionalProperties": false
+    },
+    "tpcds_customer": {
+      "fields": {
+        "c_customer_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "c_customer_id": {
+          "type": "string",
+          "nullable": false
+        },
+        "c_current_cdemo_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "c_current_hdemo_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "c_current_addr_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "c_first_shipto_date_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "c_first_sales_date_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "c_salutation": {
+          "type": "string",
+          "nullable": false
+        },
+        "c_first_name": {
+          "type": "string",
+          "nullable": false
+        },
+        "c_last_name": {
+          "type": "string",
+          "nullable": false
+        },
+        "c_preferred_cust_flag": {
+          "type": "string",
+          "nullable": false
+        },
+        "c_birth_day": {
+          "type": "integer",
+          "nullable": false
+        },
+        "c_birth_month": {
+          "type": "integer",
+          "nullable": false
+        },
+        "c_birth_year": {
+          "type": "integer",
+          "nullable": false
+        },
+        "c_birth_country": {
+          "type": "string",
+          "nullable": false
+        },
+        "c_login": {
+          "type": "string",
+          "nullable": false
+        },
+        "c_email_address": {
+          "type": "string",
+          "nullable": false
+        },
+        "c_last_review_date": {
+          "type": "string",
+          "nullable": false
+        }
+      },
+      "primary_keys": [
+        "c_customer_sk"
+      ],
+      "foreign_keys": {},
+      "additionalProperties": false
+    },
+    "tpcds_customer_address": {
+      "fields": {
+        "ca_address_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ca_address_id": {
+          "type": "string",
+          "nullable": false
+        },
+        "ca_street_number": {
+          "type": "string",
+          "nullable": false
+        },
+        "ca_street_name": {
+          "type": "string",
+          "nullable": false
+        },
+        "ca_street_type": {
+          "type": "string",
+          "nullable": false
+        },
+        "ca_suite_number": {
+          "type": "string",
+          "nullable": false
+        },
+        "ca_city": {
+          "type": "string",
+          "nullable": false
+        },
+        "ca_county": {
+          "type": "string",
+          "nullable": false
+        },
+        "ca_state": {
+          "type": "string",
+          "nullable": false
+        },
+        "ca_zip": {
+          "type": "string",
+          "nullable": false
+        },
+        "ca_country": {
+          "type": "string",
+          "nullable": false
+        },
+        "ca_gmt_offset": {
+          "type": "number",
+          "nullable": false
+        },
+        "ca_location_type": {
+          "type": "string",
+          "nullable": false
+        }
+      },
+      "primary_keys": [
+        "ca_address_sk"
+      ],
+      "foreign_keys": {},
+      "additionalProperties": false
+    },
+    "tpcds_customer_demographics": {
+      "fields": {
+        "cd_demo_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cd_gender": {
+          "type": "string",
+          "nullable": false
+        },
+        "cd_marital_status": {
+          "type": "string",
+          "nullable": false
+        },
+        "cd_education_status": {
+          "type": "string",
+          "nullable": false
+        },
+        "cd_purchase_estimate": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cd_credit_rating": {
+          "type": "string",
+          "nullable": false
+        },
+        "cd_dep_count": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cd_dep_employed_count": {
+          "type": "integer",
+          "nullable": false
+        },
+        "cd_dep_college_count": {
+          "type": "integer",
+          "nullable": false
+        }
+      },
+      "primary_keys": [
+        "cd_demo_sk"
+      ],
+      "foreign_keys": {},
+      "additionalProperties": false
+    },
+    "tpcds_date_dim": {
+      "fields": {
+        "d_date_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_date_id": {
+          "type": "string",
+          "nullable": false
+        },
+        "d_date": {
+          "type": "string",
+          "nullable": false
+        },
+        "d_month_seq": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_week_seq": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_quarter_seq": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_year": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_dow": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_moy": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_dom": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_qoy": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_fy_year": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_fy_quarter_seq": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_fy_week_seq": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_day_name": {
+          "type": "string",
+          "nullable": false
+        },
+        "d_quarter_name": {
+          "type": "string",
+          "nullable": false
+        },
+        "d_holiday": {
+          "type": "string",
+          "nullable": false
+        },
+        "d_weekend": {
+          "type": "string",
+          "nullable": false
+        },
+        "d_following_holiday": {
+          "type": "string",
+          "nullable": false
+        },
+        "d_first_dom": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_last_dom": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_same_day_ly": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_same_day_lq": {
+          "type": "integer",
+          "nullable": false
+        },
+        "d_current_day": {
+          "type": "string",
+          "nullable": false
+        },
+        "d_current_week": {
+          "type": "string",
+          "nullable": false
+        },
+        "d_current_month": {
+          "type": "string",
+          "nullable": false
+        },
+        "d_current_quarter": {
+          "type": "string",
+          "nullable": false
+        },
+        "d_current_year": {
+          "type": "string",
+          "nullable": false
+        }
+      },
+      "primary_keys": [
+        "d_date_sk"
+      ],
+      "foreign_keys": {},
+      "additionalProperties": false
+    },
+    "tpcds_inventory": {
+      "fields": {
+        "inv_date_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "inv_item_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "inv_warehouse_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "inv_quantity_on_hand": {
+          "type": "integer",
+          "nullable": false
+        }
+      },
+      "primary_keys": [
+        "inv_date_sk",
+        "inv_item_sk",
+        "inv_warehouse_sk"
+      ],
+      "foreign_keys": {
+        "inv_item_sk": "tpcds_item.i_item_sk",
+        "inv_warehouse_sk": "tpcds_warehouse.w_warehouse_sk",
+        "inv_date_sk": "tpcds_date_dim.d_date_sk"
+      },
+      "additionalProperties": false
+    },
+    "tpcds_item": {
+      "fields": {
+        "i_item_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "i_item_id": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_rec_start_date": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_rec_end_date": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_item_desc": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_current_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "i_wholesale_cost": {
+          "type": "number",
+          "nullable": false
+        },
+        "i_brand_id": {
+          "type": "integer",
+          "nullable": false
+        },
+        "i_brand": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_class_id": {
+          "type": "integer",
+          "nullable": false
+        },
+        "i_class": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_category_id": {
+          "type": "integer",
+          "nullable": false
+        },
+        "i_category": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_manufact_id": {
+          "type": "integer",
+          "nullable": false
+        },
+        "i_manufact": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_size": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_formulation": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_color": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_units": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_container": {
+          "type": "string",
+          "nullable": false
+        },
+        "i_manager_id": {
+          "type": "integer",
+          "nullable": false
+        },
+        "i_product_name": {
+          "type": "string",
+          "nullable": false
+        }
+      },
+      "primary_keys": [
+        "i_item_sk"
+      ],
+      "foreign_keys": {},
+      "additionalProperties": false
+    },
+    "tpcds_store": {
+      "fields": {
+        "s_store_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "s_store_id": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_rec_start_date": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_rec_end_date": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_closed_date_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "s_store_name": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_number_employees": {
+          "type": "integer",
+          "nullable": false
+        },
+        "s_floor_space": {
+          "type": "integer",
+          "nullable": false
+        },
+        "s_hours": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_manager": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_market_id": {
+          "type": "integer",
+          "nullable": false
+        },
+        "s_geography_class": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_market_desc": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_market_manager": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_division_id": {
+          "type": "integer",
+          "nullable": false
+        },
+        "s_division_name": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_company_id": {
+          "type": "integer",
+          "nullable": false
+        },
+        "s_company_name": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_street_number": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_street_name": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_street_type": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_suite_number": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_city": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_county": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_state": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_zip": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_country": {
+          "type": "string",
+          "nullable": false
+        },
+        "s_gmt_offset": {
+          "type": "number",
+          "nullable": false
+        },
+        "s_tax_precentage": {
+          "type": "number",
+          "nullable": false
+        }
+      },
+      "primary_keys": [
+        "s_store_sk"
+      ],
+      "foreign_keys": {},
+      "additionalProperties": false
+    },
+    "tpcds_store_sales": {
+      "fields": {
+        "ss_sold_date_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ss_sold_time_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ss_item_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ss_customer_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ss_cdemo_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ss_hdemo_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ss_addr_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ss_store_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ss_promo_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ss_ticket_number": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ss_quantity": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ss_wholesale_cost": {
+          "type": "number",
+          "nullable": false
+        },
+        "ss_list_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "ss_sales_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "ss_ext_discount_amt": {
+          "type": "number",
+          "nullable": false
+        },
+        "ss_ext_sales_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "ss_ext_wholesale_cost": {
+          "type": "number",
+          "nullable": false
+        },
+        "ss_ext_list_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "ss_ext_tax": {
+          "type": "number",
+          "nullable": false
+        },
+        "ss_coupon_amt": {
+          "type": "number",
+          "nullable": false
+        },
+        "ss_net_paid": {
+          "type": "number",
+          "nullable": false
+        },
+        "ss_net_paid_inc_tax": {
+          "type": "number",
+          "nullable": false
+        },
+        "ss_net_profit": {
+          "type": "number",
+          "nullable": false
+        }
+      },
+      "primary_keys": [
+        "ss_item_sk",
+        "ss_ticket_number"
+      ],
+      "foreign_keys": {
+        "ss_item_sk": "tpcds_item.i_item_sk",
+        "ss_customer_sk": "tpcds_customer.c_customer_sk",
+        "ss_store_sk": "tpcds_store.s_store_sk",
+        "ss_addr_sk": "tpcds_customer_address.ca_address_sk",
+        "ss_cdemo_sk": "tpcds_customer_demographics.cd_demo_sk",
+        "ss_sold_date_sk": "tpcds_date_dim.d_date_sk",
+        "ss_sold_time_sk": "tpcds_time_dim.t_time_sk"
+      },
+      "additionalProperties": false
+    },
+    "tpcds_time_dim": {
+      "fields": {
+        "t_time_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "t_time_id": {
+          "type": "string",
+          "nullable": false
+        },
+        "t_time": {
+          "type": "integer",
+          "nullable": false
+        },
+        "t_hour": {
+          "type": "integer",
+          "nullable": false
+        },
+        "t_minute": {
+          "type": "integer",
+          "nullable": false
+        },
+        "t_second": {
+          "type": "integer",
+          "nullable": false
+        },
+        "t_am_pm": {
+          "type": "string",
+          "nullable": false
+        },
+        "t_shift": {
+          "type": "string",
+          "nullable": false
+        },
+        "t_sub_shift": {
+          "type": "string",
+          "nullable": false
+        },
+        "t_meal_time": {
+          "type": "string",
+          "nullable": false
+        }
+      },
+      "primary_keys": [
+        "t_time_sk"
+      ],
+      "foreign_keys": {},
+      "additionalProperties": false
+    },
+    "tpcds_warehouse": {
+      "fields": {
+        "w_warehouse_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "w_warehouse_id": {
+          "type": "string",
+          "nullable": false
+        },
+        "w_warehouse_name": {
+          "type": "string",
+          "nullable": false
+        },
+        "w_warehouse_sq_ft": {
+          "type": "integer",
+          "nullable": false
+        },
+        "w_street_number": {
+          "type": "string",
+          "nullable": false
+        },
+        "w_street_name": {
+          "type": "string",
+          "nullable": false
+        },
+        "w_street_type": {
+          "type": "string",
+          "nullable": false
+        },
+        "w_suite_number": {
+          "type": "string",
+          "nullable": false
+        },
+        "w_city": {
+          "type": "string",
+          "nullable": false
+        },
+        "w_county": {
+          "type": "string",
+          "nullable": false
+        },
+        "w_state": {
+          "type": "string",
+          "nullable": false
+        },
+        "w_zip": {
+          "type": "string",
+          "nullable": false
+        },
+        "w_country": {
+          "type": "string",
+          "nullable": false
+        },
+        "w_gmt_offset": {
+          "type": "number",
+          "nullable": false
+        }
+      },
+      "primary_keys": [
+        "w_warehouse_sk"
+      ],
+      "foreign_keys": {},
+      "additionalProperties": false
+    },
+    "tpcds_web_sales": {
+      "fields": {
+        "ws_sold_date_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_sold_time_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_ship_date_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_item_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_bill_customer_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_ship_customer_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_web_page_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_web_site_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_ship_mode_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_warehouse_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_promo_sk": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_order_number": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_quantity": {
+          "type": "integer",
+          "nullable": false
+        },
+        "ws_wholesale_cost": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_list_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_sales_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_ext_discount_amt": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_ext_sales_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_ext_wholesale_cost": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_ext_list_price": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_ext_tax": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_coupon_amt": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_ext_ship_cost": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_net_paid": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_net_paid_inc_tax": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_net_paid_inc_ship": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_net_paid_inc_ship_tax": {
+          "type": "number",
+          "nullable": false
+        },
+        "ws_net_profit": {
+          "type": "number",
+          "nullable": false
+        }
+      },
+      "primary_keys": [
+        "ws_item_sk",
+        "ws_order_number"
+      ],
+      "foreign_keys": {
+        "ws_item_sk": "tpcds_item.i_item_sk",
+        "ws_customer_sk": "tpcds_customer.c_customer_sk",
+        "ws_sold_date_sk": "tpcds_date_dim.d_date_sk",
+        "ws_sold_time_sk": "tpcds_time_dim.t_time_sk"
+      },
+      "additionalProperties": false
+    }
+  },
+  "semantics": {
+    "tpcds_customer": {
+      "business_name": "tpcds_customer",
+      "field_mappings": {
+        "c_customer_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "c_customer_id": {
+          "semantic_type": "identifier"
+        },
+        "c_current_cdemo_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "c_current_hdemo_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "c_current_addr_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "c_first_shipto_date_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "c_first_sales_date_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "c_salutation": {
+          "semantic_type": "unknown"
+        },
+        "c_first_name": {
+          "semantic_type": "person_name"
+        },
+        "c_last_name": {
+          "semantic_type": "person_name"
+        },
+        "c_preferred_cust_flag": {
+          "semantic_type": "categorical"
+        },
+        "c_birth_day": {
+          "semantic_type": "unknown"
+        },
+        "c_birth_month": {
+          "semantic_type": "unknown"
+        },
+        "c_birth_year": {
+          "semantic_type": "unknown"
+        },
+        "c_birth_country": {
+          "semantic_type": "quantity"
+        },
+        "c_login": {
+          "semantic_type": "unknown"
+        },
+        "c_email_address": {
+          "semantic_type": "email"
+        },
+        "c_last_review_date": {
+          "semantic_type": "person_name"
+        }
+      },
+      "grain": "one row per customer"
+    },
+    "tpcds_customer_address": {
+      "business_name": "tpcds_customer_address",
+      "field_mappings": {
+        "ca_address_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ca_address_id": {
+          "semantic_type": "identifier"
+        },
+        "ca_street_number": {
+          "semantic_type": "quantity"
+        },
+        "ca_street_name": {
+          "semantic_type": "person_name"
+        },
+        "ca_street_type": {
+          "semantic_type": "unknown"
+        },
+        "ca_suite_number": {
+          "semantic_type": "quantity"
+        },
+        "ca_city": {
+          "semantic_type": "unknown"
+        },
+        "ca_county": {
+          "semantic_type": "quantity"
+        },
+        "ca_state": {
+          "semantic_type": "unknown"
+        },
+        "ca_zip": {
+          "semantic_type": "unknown"
+        },
+        "ca_country": {
+          "semantic_type": "quantity"
+        },
+        "ca_gmt_offset": {
+          "semantic_type": "unknown"
+        },
+        "ca_location_type": {
+          "semantic_type": "unknown"
+        }
+      },
+      "grain": "one row per address"
+    },
+    "tpcds_customer_demographics": {
+      "business_name": "tpcds_customer_demographics",
+      "field_mappings": {
+        "cd_demo_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "cd_gender": {
+          "semantic_type": "unknown"
+        },
+        "cd_marital_status": {
+          "semantic_type": "unknown"
+        },
+        "cd_education_status": {
+          "semantic_type": "unknown"
+        },
+        "cd_purchase_estimate": {
+          "semantic_type": "unknown"
+        },
+        "cd_credit_rating": {
+          "semantic_type": "unknown"
+        },
+        "cd_dep_count": {
+          "semantic_type": "quantity"
+        },
+        "cd_dep_employed_count": {
+          "semantic_type": "quantity"
+        },
+        "cd_dep_college_count": {
+          "semantic_type": "quantity"
+        }
+      },
+      "grain": "one row per demographic profile"
+    },
+    "tpcds_date_dim": {
+      "business_name": "tpcds_date_dim",
+      "field_mappings": {
+        "d_date_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "d_date_id": {
+          "semantic_type": "identifier"
+        },
+        "d_date": {
+          "semantic_type": "temporal"
+        },
+        "d_month_seq": {
+          "semantic_type": "unknown"
+        },
+        "d_week_seq": {
+          "semantic_type": "unknown"
+        },
+        "d_quarter_seq": {
+          "semantic_type": "unknown"
+        },
+        "d_year": {
+          "semantic_type": "unknown"
+        },
+        "d_dow": {
+          "semantic_type": "unknown"
+        },
+        "d_moy": {
+          "semantic_type": "unknown"
+        },
+        "d_dom": {
+          "semantic_type": "unknown"
+        },
+        "d_qoy": {
+          "semantic_type": "unknown"
+        },
+        "d_fy_year": {
+          "semantic_type": "unknown"
+        },
+        "d_fy_quarter_seq": {
+          "semantic_type": "unknown"
+        },
+        "d_fy_week_seq": {
+          "semantic_type": "unknown"
+        },
+        "d_day_name": {
+          "semantic_type": "person_name"
+        },
+        "d_quarter_name": {
+          "semantic_type": "person_name"
+        },
+        "d_holiday": {
+          "semantic_type": "unknown"
+        },
+        "d_weekend": {
+          "semantic_type": "unknown"
+        },
+        "d_following_holiday": {
+          "semantic_type": "unknown"
+        },
+        "d_first_dom": {
+          "semantic_type": "person_name"
+        },
+        "d_last_dom": {
+          "semantic_type": "person_name"
+        },
+        "d_same_day_ly": {
+          "semantic_type": "unknown"
+        },
+        "d_same_day_lq": {
+          "semantic_type": "unknown"
+        },
+        "d_current_day": {
+          "semantic_type": "unknown"
+        },
+        "d_current_week": {
+          "semantic_type": "unknown"
+        },
+        "d_current_month": {
+          "semantic_type": "unknown"
+        },
+        "d_current_quarter": {
+          "semantic_type": "unknown"
+        },
+        "d_current_year": {
+          "semantic_type": "unknown"
+        }
+      },
+      "grain": "one row per day"
+    },
+    "tpcds_time_dim": {
+      "business_name": "tpcds_time_dim",
+      "field_mappings": {
+        "t_time_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "t_time_id": {
+          "semantic_type": "identifier"
+        },
+        "t_time": {
+          "semantic_type": "temporal"
+        },
+        "t_hour": {
+          "semantic_type": "unknown"
+        },
+        "t_minute": {
+          "semantic_type": "unknown"
+        },
+        "t_second": {
+          "semantic_type": "unknown"
+        },
+        "t_am_pm": {
+          "semantic_type": "unknown"
+        },
+        "t_shift": {
+          "semantic_type": "unknown"
+        },
+        "t_sub_shift": {
+          "semantic_type": "unknown"
+        },
+        "t_meal_time": {
+          "semantic_type": "temporal"
+        }
+      },
+      "grain": "one row per second"
+    },
+    "tpcds_item": {
+      "business_name": "tpcds_item",
+      "field_mappings": {
+        "i_item_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "i_item_id": {
+          "semantic_type": "identifier"
+        },
+        "i_rec_start_date": {
+          "semantic_type": "temporal"
+        },
+        "i_rec_end_date": {
+          "semantic_type": "temporal"
+        },
+        "i_item_desc": {
+          "semantic_type": "unknown"
+        },
+        "i_current_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "i_wholesale_cost": {
+          "semantic_type": "monetary_amount"
+        },
+        "i_brand_id": {
+          "semantic_type": "identifier"
+        },
+        "i_brand": {
+          "semantic_type": "unknown"
+        },
+        "i_class_id": {
+          "semantic_type": "identifier"
+        },
+        "i_class": {
+          "semantic_type": "unknown"
+        },
+        "i_category_id": {
+          "semantic_type": "identifier"
+        },
+        "i_category": {
+          "semantic_type": "unknown"
+        },
+        "i_manufact_id": {
+          "semantic_type": "identifier"
+        },
+        "i_manufact": {
+          "semantic_type": "unknown"
+        },
+        "i_size": {
+          "semantic_type": "unknown"
+        },
+        "i_formulation": {
+          "semantic_type": "unknown"
+        },
+        "i_color": {
+          "semantic_type": "unknown"
+        },
+        "i_units": {
+          "semantic_type": "unknown"
+        },
+        "i_container": {
+          "semantic_type": "unknown"
+        },
+        "i_manager_id": {
+          "semantic_type": "identifier"
+        },
+        "i_product_name": {
+          "semantic_type": "person_name"
+        }
+      },
+      "grain": "one row per item"
+    },
+    "tpcds_store": {
+      "business_name": "tpcds_store",
+      "field_mappings": {
+        "s_store_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "s_store_id": {
+          "semantic_type": "identifier"
+        },
+        "s_rec_start_date": {
+          "semantic_type": "temporal"
+        },
+        "s_rec_end_date": {
+          "semantic_type": "temporal"
+        },
+        "s_closed_date_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "s_store_name": {
+          "semantic_type": "person_name"
+        },
+        "s_number_employees": {
+          "semantic_type": "quantity"
+        },
+        "s_floor_space": {
+          "semantic_type": "unknown"
+        },
+        "s_hours": {
+          "semantic_type": "unknown"
+        },
+        "s_manager": {
+          "semantic_type": "unknown"
+        },
+        "s_market_id": {
+          "semantic_type": "identifier"
+        },
+        "s_geography_class": {
+          "semantic_type": "unknown"
+        },
+        "s_market_desc": {
+          "semantic_type": "unknown"
+        },
+        "s_market_manager": {
+          "semantic_type": "unknown"
+        },
+        "s_division_id": {
+          "semantic_type": "identifier"
+        },
+        "s_division_name": {
+          "semantic_type": "person_name"
+        },
+        "s_company_id": {
+          "semantic_type": "identifier"
+        },
+        "s_company_name": {
+          "semantic_type": "person_name"
+        },
+        "s_street_number": {
+          "semantic_type": "quantity"
+        },
+        "s_street_name": {
+          "semantic_type": "person_name"
+        },
+        "s_street_type": {
+          "semantic_type": "unknown"
+        },
+        "s_suite_number": {
+          "semantic_type": "quantity"
+        },
+        "s_city": {
+          "semantic_type": "unknown"
+        },
+        "s_county": {
+          "semantic_type": "quantity"
+        },
+        "s_state": {
+          "semantic_type": "unknown"
+        },
+        "s_zip": {
+          "semantic_type": "unknown"
+        },
+        "s_country": {
+          "semantic_type": "quantity"
+        },
+        "s_gmt_offset": {
+          "semantic_type": "unknown"
+        },
+        "s_tax_precentage": {
+          "semantic_type": "monetary_amount"
+        }
+      },
+      "grain": "one row per store"
+    },
+    "tpcds_warehouse": {
+      "business_name": "tpcds_warehouse",
+      "field_mappings": {
+        "w_warehouse_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "w_warehouse_id": {
+          "semantic_type": "identifier"
+        },
+        "w_warehouse_name": {
+          "semantic_type": "person_name"
+        },
+        "w_warehouse_sq_ft": {
+          "semantic_type": "unknown"
+        },
+        "w_street_number": {
+          "semantic_type": "quantity"
+        },
+        "w_street_name": {
+          "semantic_type": "person_name"
+        },
+        "w_street_type": {
+          "semantic_type": "unknown"
+        },
+        "w_suite_number": {
+          "semantic_type": "quantity"
+        },
+        "w_city": {
+          "semantic_type": "unknown"
+        },
+        "w_county": {
+          "semantic_type": "quantity"
+        },
+        "w_state": {
+          "semantic_type": "unknown"
+        },
+        "w_zip": {
+          "semantic_type": "unknown"
+        },
+        "w_country": {
+          "semantic_type": "quantity"
+        },
+        "w_gmt_offset": {
+          "semantic_type": "unknown"
+        }
+      },
+      "grain": "one row per warehouse"
+    },
+    "tpcds_store_sales": {
+      "business_name": "tpcds_store_sales",
+      "field_mappings": {
+        "ss_sold_date_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ss_sold_time_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ss_item_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ss_customer_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ss_cdemo_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ss_hdemo_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ss_addr_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ss_store_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ss_promo_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ss_ticket_number": {
+          "semantic_type": "quantity"
+        },
+        "ss_quantity": {
+          "semantic_type": "quantity"
+        },
+        "ss_wholesale_cost": {
+          "semantic_type": "monetary_amount"
+        },
+        "ss_list_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "ss_sales_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "ss_ext_discount_amt": {
+          "semantic_type": "quantity"
+        },
+        "ss_ext_sales_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "ss_ext_wholesale_cost": {
+          "semantic_type": "monetary_amount"
+        },
+        "ss_ext_list_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "ss_ext_tax": {
+          "semantic_type": "monetary_amount"
+        },
+        "ss_coupon_amt": {
+          "semantic_type": "monetary_amount"
+        },
+        "ss_net_paid": {
+          "semantic_type": "unknown"
+        },
+        "ss_net_paid_inc_tax": {
+          "semantic_type": "monetary_amount"
+        },
+        "ss_net_profit": {
+          "semantic_type": "monetary_amount"
+        }
+      },
+      "grain": "one row per line item per sale"
+    },
+    "tpcds_web_sales": {
+      "business_name": "tpcds_web_sales",
+      "field_mappings": {
+        "ws_sold_date_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ws_sold_time_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ws_ship_date_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ws_item_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ws_bill_customer_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ws_ship_customer_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ws_web_page_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ws_web_site_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ws_ship_mode_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ws_warehouse_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ws_promo_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "ws_order_number": {
+          "semantic_type": "quantity"
+        },
+        "ws_quantity": {
+          "semantic_type": "quantity"
+        },
+        "ws_wholesale_cost": {
+          "semantic_type": "monetary_amount"
+        },
+        "ws_list_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "ws_sales_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "ws_ext_discount_amt": {
+          "semantic_type": "quantity"
+        },
+        "ws_ext_sales_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "ws_ext_wholesale_cost": {
+          "semantic_type": "monetary_amount"
+        },
+        "ws_ext_list_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "ws_ext_tax": {
+          "semantic_type": "monetary_amount"
+        },
+        "ws_coupon_amt": {
+          "semantic_type": "monetary_amount"
+        },
+        "ws_ext_ship_cost": {
+          "semantic_type": "monetary_amount"
+        },
+        "ws_net_paid": {
+          "semantic_type": "unknown"
+        },
+        "ws_net_paid_inc_tax": {
+          "semantic_type": "monetary_amount"
+        },
+        "ws_net_paid_inc_ship": {
+          "semantic_type": "unknown"
+        },
+        "ws_net_paid_inc_ship_tax": {
+          "semantic_type": "monetary_amount"
+        },
+        "ws_net_profit": {
+          "semantic_type": "monetary_amount"
+        }
+      },
+      "grain": "one row per line item per web sale"
+    },
+    "tpcds_catalog_sales": {
+      "business_name": "tpcds_catalog_sales",
+      "field_mappings": {
+        "cs_sold_date_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "cs_sold_time_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "cs_ship_date_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "cs_bill_customer_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "cs_ship_customer_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "cs_item_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "cs_promo_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "cs_order_number": {
+          "semantic_type": "quantity"
+        },
+        "cs_quantity": {
+          "semantic_type": "quantity"
+        },
+        "cs_wholesale_cost": {
+          "semantic_type": "monetary_amount"
+        },
+        "cs_list_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "cs_sales_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "cs_ext_discount_amt": {
+          "semantic_type": "quantity"
+        },
+        "cs_ext_sales_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "cs_ext_wholesale_cost": {
+          "semantic_type": "monetary_amount"
+        },
+        "cs_ext_list_price": {
+          "semantic_type": "monetary_amount"
+        },
+        "cs_ext_tax": {
+          "semantic_type": "monetary_amount"
+        },
+        "cs_coupon_amt": {
+          "semantic_type": "monetary_amount"
+        },
+        "cs_ext_ship_cost": {
+          "semantic_type": "monetary_amount"
+        },
+        "cs_net_paid": {
+          "semantic_type": "unknown"
+        },
+        "cs_net_paid_inc_tax": {
+          "semantic_type": "monetary_amount"
+        },
+        "cs_net_paid_inc_ship": {
+          "semantic_type": "unknown"
+        },
+        "cs_net_paid_inc_ship_tax": {
+          "semantic_type": "monetary_amount"
+        },
+        "cs_net_profit": {
+          "semantic_type": "monetary_amount"
+        }
+      },
+      "grain": "one row per line item per catalog sale"
+    },
+    "tpcds_inventory": {
+      "business_name": "tpcds_inventory",
+      "field_mappings": {
+        "inv_date_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "inv_item_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "inv_warehouse_sk": {
+          "semantic_type": "foreign_key"
+        },
+        "inv_quantity_on_hand": {
+          "semantic_type": "quantity"
+        }
+      },
+      "grain": "one row per item per warehouse per day"
+    }
+  },
+  "entities": {
+    "customers": {
+      "table": "tpcds_customer",
+      "key": "c_customer_sk"
+    },
+    "items": {
+      "table": "tpcds_item",
+      "key": "i_item_sk"
+    },
+    "stores": {
+      "table": "tpcds_store",
+      "key": "s_store_sk"
+    },
+    "warehouses": {
+      "table": "tpcds_warehouse",
+      "key": "w_warehouse_sk"
+    }
+  },
+  "relationships": {
+    "foreign_keys": {
+      "tpcds_store_sales": {
+        "ss_item_sk": "tpcds_item.i_item_sk",
+        "ss_customer_sk": "tpcds_customer.c_customer_sk",
+        "ss_store_sk": "tpcds_store.s_store_sk",
+        "ss_addr_sk": "tpcds_customer_address.ca_address_sk",
+        "ss_cdemo_sk": "tpcds_customer_demographics.cd_demo_sk",
+        "ss_sold_date_sk": "tpcds_date_dim.d_date_sk",
+        "ss_sold_time_sk": "tpcds_time_dim.t_time_sk"
+      },
+      "tpcds_web_sales": {
+        "ws_item_sk": "tpcds_item.i_item_sk",
+        "ws_customer_sk": "tpcds_customer.c_customer_sk",
+        "ws_sold_date_sk": "tpcds_date_dim.d_date_sk",
+        "ws_sold_time_sk": "tpcds_time_dim.t_time_sk"
+      },
+      "tpcds_catalog_sales": {
+        "cs_item_sk": "tpcds_item.i_item_sk",
+        "cs_customer_sk": "tpcds_customer.c_customer_sk",
+        "cs_sold_date_sk": "tpcds_date_dim.d_date_sk",
+        "cs_sold_time_sk": "tpcds_time_dim.t_time_sk"
+      },
+      "tpcds_inventory": {
+        "inv_item_sk": "tpcds_item.i_item_sk",
+        "inv_warehouse_sk": "tpcds_warehouse.w_warehouse_sk",
+        "inv_date_sk": "tpcds_date_dim.d_date_sk"
+      }
+    }
+  },
+  "baselines": {
+    "tpcds_customer": {
+      "record_count": 0,
+      "field_count": 0,
+      "fields": [],
+      "error": "data not found"
+    },
+    "tpcds_customer_address": {
+      "record_count": 0,
+      "field_count": 0,
+      "fields": [],
+      "error": "data not found"
+    },
+    "tpcds_customer_demographics": {
+      "record_count": 0,
+      "field_count": 0,
+      "fields": [],
+      "error": "data not found"
+    },
+    "tpcds_date_dim": {
+      "record_count": 0,
+      "field_count": 0,
+      "fields": [],
+      "error": "data not found"
+    },
+    "tpcds_time_dim": {
+      "record_count": 0,
+      "field_count": 0,
+      "fields": [],
+      "error": "data not found"
+    },
+    "tpcds_item": {
+      "record_count": 0,
+      "field_count": 0,
+      "fields": [],
+      "error": "data not found"
+    },
+    "tpcds_store": {
+      "record_count": 0,
+      "field_count": 0,
+      "fields": [],
+      "error": "data not found"
+    },
+    "tpcds_warehouse": {
+      "record_count": 0,
+      "field_count": 0,
+      "fields": [],
+      "error": "data not found"
+    },
+    "tpcds_store_sales": {
+      "record_count": 0,
+      "field_count": 0,
+      "fields": [],
+      "error": "data not found"
+    },
+    "tpcds_web_sales": {
+      "record_count": 0,
+      "field_count": 0,
+      "fields": [],
+      "error": "data not found"
+    },
+    "tpcds_catalog_sales": {
+      "record_count": 0,
+      "field_count": 0,
+      "fields": [],
+      "error": "data not found"
+    },
+    "tpcds_inventory": {
+      "record_count": 0,
+      "field_count": 0,
+      "fields": [],
+      "error": "data not found"
+    }
+  },
+  "checksums": {
+    "tpcds_customer": "N/A",
+    "tpcds_customer_address": "N/A",
+    "tpcds_customer_demographics": "N/A",
+    "tpcds_date_dim": "N/A",
+    "tpcds_time_dim": "N/A",
+    "tpcds_item": "N/A",
+    "tpcds_store": "N/A",
+    "tpcds_warehouse": "N/A",
+    "tpcds_store_sales": "N/A",
+    "tpcds_web_sales": "N/A",
+    "tpcds_catalog_sales": "N/A",
+    "tpcds_inventory": "N/A"
+  }
+}

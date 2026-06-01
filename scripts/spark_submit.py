@@ -4,8 +4,8 @@
 Submits Spark jobs to a remote cluster (standalone, YARN, or K8s).
 
 Usage:
-    python scripts/spark_submit.py bronze --raw-path s3a://bucket/raw/tfl_arrivals
-    python scripts/spark_submit.py silver --bronze-table nexus.bronze.tfl_arrivals
+    python scripts/spark_submit.py bronze --raw-path s3a://bucket/raw/tpcds_store_sales
+    python scripts/spark_submit.py silver --bronze-table nexus.bronze.tpcds_store_sales
 """
 
 from __future__ import annotations

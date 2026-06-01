@@ -77,41 +77,16 @@ from common.worker import (
     write_heartbeat,
 )
 from governance.schema_history import save_schema_snapshot
-from ingestion.batch.api_ingestion import ingest_api_records
 from ingestion.batch.common import read_csv_records, write_jsonl
-from ingestion.batch.csv_download_ingestion import download_csv
-from ingestion.streaming.producer import default_key, default_url, event_stream
 from ingestion.data_caterer.runner import (
     DataCatererConfig,
     ERROR_PRESETS,
     generate_all,
-    generate_tpcds,
+    generate_tpcdi,
     list_plans,
     run_plan,
 )
 
-AUTH_STYLES = {
-    "openaq_measurements": "x-api-key",
-    "ncei_cdo_climate": "token-header",
-    "waqi_air_quality": "query-token",
-    "openweather_current": "query-appid",
-    "tfl_transport_status": "query-app_key",
-}
-
-
-SOURCE_DATASETS = {
-    "transport": "transport_events",
-    "openaq": "openaq_measurements",
-    "waqi": "waqi_air_quality",
-    "tfl": "tfl_transport_status",
-    "tfl_status": "tfl_transport_status",
-    "tfl_arrivals": "tfl_transport_status",
-    "tfl_line_status": "tfl_transport_status",
-    "gtfs": "gtfs_realtime_events",
-    "londonair": "londonair_monitoring",
-    "openmeteo": "openmeteo_air_quality",
-    "openweather": "openweather_current",
-}
 
 
 def local_source(dataset_config: dict[str, Any], override: Path | None) -> Path:
@@ -122,18 +97,6 @@ def local_source(dataset_config: dict[str, Any], override: Path | None) -> Path:
     if not source or str(source).startswith(("http://", "https://", "${")):
         raise ValueError("This runner needs a local CSV source. Pass --source for this dataset.")
     return PROJECT_ROOT / str(source)
-
-
-import re as _re
-
-
-def _expand_env(value: str) -> str:
-    """Expand ${VAR} patterns in a string using os.environ."""
-    return _re.sub(
-        r"\$\{([^}]+)\}",
-        lambda m: os.environ.get(m.group(1), ""),
-        value,
-    )
 
 
 def resolve_records(
@@ -150,53 +113,6 @@ def resolve_records(
     if override_source:
         records = read_csv_records(override_source)
         return records, str(override_source)
-
-    if source_type == "csv_download":
-        url = _expand_env(dataset_config.get("source_uri", ""))
-        if not url:
-            raise ValueError(
-                f"Dataset {dataset} is csv_download but no valid source_uri found. "
-                f"Check .env for the required URL variable."
-            )
-        downloads_dir = DATASETS_DIR
-        downloads_dir.mkdir(parents=True, exist_ok=True)
-        csv_path = download_csv(url)
-        try:
-            records = read_csv_records(csv_path)
-            return records, url
-        finally:
-            csv_path.unlink(missing_ok=True)
-
-    if source_type == "rest_api":
-        url = _expand_env(dataset_config.get("source_uri", ""))
-        if not url:
-            raise ValueError(
-                f"Dataset {dataset} is rest_api but no valid source_uri found. "
-                f"Check .env for the required URL variable."
-            )
-        api_key_env = dataset_config.get("api_key_env")
-        api_key = os.environ.get(api_key_env) if api_key_env else None
-        auth_style = AUTH_STYLES.get(dataset, "bearer")
-        records = ingest_api_records(url, api_key, auth_style=auth_style)
-        return records, url
-
-    if source_type == "api_stream":
-        url = _expand_env(dataset_config.get("source_uri", ""))
-        api_key_env = dataset_config.get("api_key_env")
-        api_key = os.environ.get(api_key_env) if api_key_env else None
-        if url:
-            try:
-                auth_style = AUTH_STYLES.get(dataset, "bearer")
-                records = ingest_api_records(url, api_key, auth_style=auth_style)
-                if records:
-                    return records, url
-            except Exception as exc:
-                print(f"Warning: API ingestion failed for {dataset}: {exc}", file=sys.stderr)
-        local_path = dataset_config.get("local_sample_uri")
-        if local_path:
-            source_path = PROJECT_ROOT / str(local_path)
-            if source_path.exists():
-                return read_csv_records(source_path), str(source_path)
 
     source_path = local_source(dataset_config, None)
     records = read_csv_records(source_path)
@@ -520,55 +436,6 @@ def check_quality(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
 
-def check_stream_quality(args: argparse.Namespace) -> None:
-    dataset = args.dataset or SOURCE_DATASETS[args.source]
-    datasets = load_dataset_catalog().get("datasets", {})
-    quality_config = load_quality_config()
-    dataset_config = datasets.get(dataset, {})
-    rules = quality_config.get("datasets", {}).get(dataset)
-
-    if not rules:
-        raise SystemExit(f"No quality rules configured for streaming dataset: {dataset}")
-
-    records = (
-        read_jsonl(args.events_jsonl)
-        if args.events_jsonl
-        else event_stream(
-            args.source,
-            args.api_url if args.api_url is not None else default_url(args.source),
-            args.api_key if args.api_key is not None else default_key(args.source),
-            args.sample_events,
-        )
-    )
-    source_path = str(args.events_jsonl or args.api_url or args.source)
-    dataset_config = {**dataset_config, "primary_keys": dataset_config.get("primary_keys", ["event_id"]),
-                     "freshness_hours": dataset_config.get("freshness_hours", 1)}
-
-    status, details, _result, _drift = run_quality_pipeline(
-        records=records,
-        dataset=dataset,
-        rules=rules,
-        dataset_config=dataset_config,
-        quality_config=quality_config,
-        batch_id=args.batch_id,
-        run_id=args.run_id,
-        source_path=source_path,
-        actor=args.actor,
-        event_type="streaming_quality_check",
-        extra_details={"source": args.source, "sample_events": len(records)},
-    )
-
-    print(json.dumps({
-        "dataset": dataset,
-        "source": args.source,
-        "status": status,
-        "quality": details,
-    }, indent=2))
-
-    if status == "failed" and not args.no_exit_on_fail:
-        raise SystemExit(1)
-
-
 def review_agent(args: argparse.Namespace) -> None:
     decision = review_batch(args.dataset, args.batch_id)
     print(decision.to_json())
@@ -808,13 +675,13 @@ def worker_heartbeats(_args: argparse.Namespace) -> None:
 
 
 def generate_tpc_data(args: argparse.Namespace) -> None:
-    """Generate TPC-DS benchmark data via Data Caterer (SF=10)."""
+    """Generate TPC-DI benchmark data via Data Caterer (SF=1)."""
     scale = args.scale_factor
     error = args.error_profile
-    run_id = args.run_id or f"tpcds-sf{scale}-{error}"
+    run_id = args.run_id or f"tpcdi-sf{scale}-{error}"
     dry = args.dry_run
 
-    result = generate_tpcds(
+    result = generate_tpcdi(
         scale_factor=scale,
         error_profile=error,
         output_formats=args.output_formats,
@@ -859,19 +726,6 @@ def build_parser() -> argparse.ArgumentParser:
     quality_check.add_argument("--actor")
     quality_check.add_argument("--no-exit-on-fail", action="store_true")
     quality_check.set_defaults(func=check_quality)
-
-    stream_check = quality_subcommands.add_parser("stream", help="Check a streaming source sample")
-    stream_check.add_argument("--source", choices=sorted(SOURCE_DATASETS), default="transport")
-    stream_check.add_argument("--dataset")
-    stream_check.add_argument("--events-jsonl", type=Path)
-    stream_check.add_argument("--sample-events", type=int, default=25)
-    stream_check.add_argument("--api-url")
-    stream_check.add_argument("--api-key")
-    stream_check.add_argument("--batch-id", default="stream-sample")
-    stream_check.add_argument("--run-id")
-    stream_check.add_argument("--actor")
-    stream_check.add_argument("--no-exit-on-fail", action="store_true")
-    stream_check.set_defaults(func=check_stream_quality)
 
     bronze_validate = quality_subcommands.add_parser(
         "bronze-validate",
@@ -1074,8 +928,8 @@ def build_parser() -> argparse.ArgumentParser:
     generate = subcommands.add_parser("generate", help="Generate TPC-DS benchmark data via Data Caterer")
     generate_subcommands = generate.add_subparsers(dest="generate_command", required=True)
 
-    gen_tpc = generate_subcommands.add_parser("tpcds", help="Generate TPC-DS data (SF=10)")
-    gen_tpc.add_argument("--scale-factor", type=int, default=10, help="Scale factor (default SF=10)")
+    gen_tpc = generate_subcommands.add_parser("tpcdi", help="Generate TPC-DI data (SF=1)")
+    gen_tpc.add_argument("--scale-factor", type=int, default=1, help="Scale factor (default SF=1)")
     gen_tpc.add_argument(
         "--error-profile", default="moderate",
         choices=list(ERROR_PRESETS.keys()),

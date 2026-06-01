@@ -57,7 +57,7 @@ def source_options(context: Any, source: str) -> dict[str, Any]:
     
     Args:
         context: DownloadContext instance
-        source: Source name (e.g., 'londonair', 'openaq')
+        source: Source name (e.g., 'tpcds_customer', 'tpcds_inventory')
     
     Returns:
         Dictionary of source options with mode-level overrides applied.

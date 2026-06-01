@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcdi_industry",
+  "type": "object",
+  "properties": {
+    "in_id": { "type": "integer" },
+    "in_name": { "type": "string" },
+    "in_sc_id": { "type": "string" }
+  },
+  "required": ["in_id", "in_name", "in_sc_id"],
+  "additionalProperties": false
+}

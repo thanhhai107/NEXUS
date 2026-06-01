@@ -1,0 +1,67 @@
+id: l3b_complex_reliability
+level: 3
+seed: 61
+source_count: 5
+description: "5 sources with reliability, lineage, and quality challenges under failure"
+source_configs:
+  - format: csv
+    tables: [tpcds_store_sales, tpcds_customer]
+  - format: csv
+    tables: [tpcds_web_sales, tpcds_item]
+  - format: parquet
+    tables: [tpcds_catalog_sales]
+  - format: csv
+    tables: [tpcds_inventory]
+  - format: jsonl
+    tables: [tpcds_date_dim, tpcds_time_dim]
+errors:
+  - category: reliability
+    type: api_failures
+    source_index: 0
+    table: tpcds_store_sales
+    params: { p_failure: 0.25 }
+  - category: reliability
+    type: timeouts
+    source_index: 1
+    table: tpcds_web_sales
+    params: { p_timeout: 0.15 }
+  - category: reliability
+    type: retry_duplicates
+    source_index: 0
+    table: tpcds_store_sales
+    params: { p_duplicate: 0.05 }
+  - category: reliability
+    type: non_idempotent_writes
+    source_index: 2
+    table: tpcds_catalog_sales
+    params: { replay_count: 2 }
+  - category: reliability
+    type: partial_downloads
+    source_index: 3
+    table: tpcds_inventory
+    params: { truncate_ratio: 0.15 }
+  - category: reliability
+    type: late_arriving_data
+    source_index: 4
+    table: tpcds_date_dim
+    params: { delay_days: 15, date_fields: ["d_date_sk"] }
+  - category: reliability
+    type: poison_records
+    source_index: 1
+    table: tpcds_item
+    params: { ratio: 0.005 }
+  - category: data_quality
+    type: missing_data_mcar
+    source_index: 0
+    table: tpcds_customer
+    params: { field: "c_email_address", ratio: 0.08 }
+  - category: data_quality
+    type: outliers
+    source_index: 3
+    table: tpcds_inventory
+    params: { field: "inv_quantity_on_hand", multiplier: 4.0, ratio: 0.03 }
+  - category: schema_issues
+    type: data_type_change
+    source_index: 2
+    table: tpcds_catalog_sales
+    params: { field: "cs_quantity", new_type: "string" }

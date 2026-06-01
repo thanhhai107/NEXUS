@@ -30,10 +30,10 @@ def get_pool_name(source: str) -> str:
     """Get Airflow pool name for a source.
     
     Args:
-        source: Source identifier (e.g., 'openaq', 'tfl_arrivals')
-    
+        source: Source identifier (e.g., 'tpcds_store_sales')
+
     Returns:
-        Pool name (e.g., 'openaq_pool', 'tfl_pool')
+        Pool name (e.g., 'tpcds_pool', 'tpc_pool')
     """
     # Check environment variable first
     env_name = f"NEXUS_AIRFLOW_POOL_{source.upper().replace('-', '_')}"

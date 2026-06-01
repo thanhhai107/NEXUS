@@ -53,7 +53,7 @@ class SemanticCache:
     
     Directory structure:
         semantic_cache/
-        ├── tfl_arrivals/
+        ├── tpcds_store_sales/
         │   ├── v1a3f/
         │   │   ├── annotations.json
         │   │   ├── metadata.json
@@ -65,12 +65,12 @@ class SemanticCache:
         cache = SemanticCache("semantic_cache")
         
         # Get cached annotations
-        cached = cache.get("tfl_arrivals")
+        cached = cache.get("tpcds_store_sales")
         if cached:
             print(f"Found {len(cached.annotations)} annotations")
         
         # Save annotations
-        cache.set("tfl_arrivals", annotations, schema_hash="v1a3f")
+        cache.set("tpcds_store_sales", annotations, schema_hash="v1a3f")
     """
     
     def __init__(self, cache_dir: Path | str):

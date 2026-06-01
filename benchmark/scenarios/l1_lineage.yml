@@ -1,0 +1,21 @@
+# Level 1: Simple — Lineage Issues (L1-L2 omissions)
+id: l1_lineage
+level: 1
+seed: 46
+source_count: 1
+description: "Single source with intentional lineage gaps"
+source_configs:
+  - format: csv
+    tables: [tpcds_store_sales, tpcds_customer, tpcds_item]
+errors:
+  - category: heterogeneity
+    type: different_formats
+    table: tpcds_store_sales
+    params: { format: "csv" }
+    expected_detection: "lineage_gap_source_to_bronze"
+
+  - category: heterogeneity
+    type: different_formats
+    table: tpcds_customer
+    params: { format: "csv" }
+    expected_detection: "lineage_gap_transform"

@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tpcdi_fact_holdings",
+  "type": "object",
+  "properties": {
+    "sk_tradeid": { "type": "integer" },
+    "sk_customerid": { "type": "integer" },
+    "sk_accountid": { "type": "integer" },
+    "sk_securityid": { "type": "integer" },
+    "sk_companyid": { "type": "integer" },
+    "sk_closedate": { "type": "integer" },
+    "sk_closetime": { "type": "integer" },
+    "holding_quantity": { "type": "integer" },
+    "holding_price": { "type": "number" },
+    "batchid": { "type": "integer" }
+  },
+  "required": ["sk_tradeid", "sk_customerid", "sk_accountid", "sk_securityid", "sk_companyid", "sk_closedate", "sk_closetime", "holding_quantity", "holding_price", "batchid"],
+  "additionalProperties": false
+}

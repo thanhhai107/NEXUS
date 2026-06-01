@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ingestion.downloaders.schema_inference import FieldSchema
+    from governance.schema.inference import FieldSchema
 
 
 # Template patterns for common field types

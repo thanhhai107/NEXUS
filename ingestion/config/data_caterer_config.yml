@@ -1,88 +1,51 @@
 # =============================================================================
-# Data Caterer Configuration — TPC-DS SF=10 (Sole Benchmark)
+# Data Caterer Configuration — TPC-DI SF=1 (Sole Benchmark)
 # =============================================================================
 
 data_caterer:
   enabled: true
-  docker_image: pflooky/data-caterer:0.5.0
-  spark_master: local[*]
-
-  output:
-    base_dir: runtime/datasets
-    formats:
-      - csv
-      - parquet
-      - json
+  default_engine: docker
+  default_mode: batch
 
   plans:
-    tpcds:
-      description: TPC-DS Decision Support (12 tables, SF=10)
-      plan_file: tpcds_tasks.yml
-      default_scale_factor: 10
+    tpcdi:
+      description: TPC-DI Data Integration (17 tables, SF=1)
+      plan_file: tpcdi_tasks.yml
+      default_scale_factor: 1
       record_counts:
-        date_dim: 73049
-        time_dim: 86400
-        item: 300000
-        customer: 2000000
-        customer_address: 1000000
-        customer_demographics: 1920800
-        store: 1000
-        store_sales: 28800000
-        web_sales: 7200000
-        catalog_sales: 14400000
-        inventory: 399330000
-        warehouse: 15
+        dim_date: 2557
+        dim_time: 86400
+        dim_account: 50000
+        dim_customer: 50000
+        dim_broker: 10
+        dim_security: 6850
+        dim_company: 5000
+        dim_trade: 865000
+        fact_cash_balances: 250000
+        fact_holdings: 500000
+        fact_market_history: 34250
+        fact_watches: 500
+        industry: 100
+        status_type: 10
+        tax_rate: 15
+        trade_type: 5
+        prospect: 1000
 
   error_injection:
     profiles:
       none:
         null_ratio: 0.0
         duplicate_ratio: 0.0
-        type_error_ratio: 0.0
         fk_violation_ratio: 0.0
-        schema_drift_ratio: 0.0
       low:
         null_ratio: 0.01
         duplicate_ratio: 0.005
-        type_error_ratio: 0.005
-        fk_violation_ratio: 0.002
-        schema_drift_ratio: 0.001
       moderate:
         null_ratio: 0.05
         duplicate_ratio: 0.02
-        type_error_ratio: 0.02
-        fk_violation_ratio: 0.01
-        schema_drift_ratio: 0.005
       high:
         null_ratio: 0.15
         duplicate_ratio: 0.05
-        type_error_ratio: 0.05
-        fk_violation_ratio: 0.03
-        schema_drift_ratio: 0.02
-
-    error_types:
-      - null_injection
-      - duplicate_keys
-      - type_mismatch
-      - overflow
-      - fk_violation
-      - schema_drift
-      - format_errors
-      - out_of_order_timestamps
-      - encoding_errors
-      - truncation
-
-  runtime:
-    retry_policy:
-      max_attempts: 3
-      backoff_seconds: 10
-    timeout_policy:
-      batch_seconds: 7200
-    monitoring:
-      track_record_counts: true
-      generate_reports: true
-      report_dir: runtime/reports/data_caterer
-
-dataset_mode: tpcds
-active_domains:
-  - tpc
+      extreme:
+        null_ratio: 0.30
+        duplicate_ratio: 0.10
