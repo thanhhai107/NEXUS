@@ -14,7 +14,7 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TPCDI_RUNTIME_DIR = PROJECT_ROOT / "runtime" / "datasets" / "tpcdi"
 BENCHMARK_DIR = PROJECT_ROOT / "benchmark"
-SCENARIOS_DIR = BENCHMARK_DIR / "scenarios"
+SCENARIOS_DIR = BENCHMARK_DIR / "platform_testing" / "scenarios"
 REPORTS_DIR = BENCHMARK_DIR / "reports"
 DERIVED_DATA_DIR = BENCHMARK_DIR / "derived_data"
 

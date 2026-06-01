@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from benchmark.evaluation.metrics import (
+from benchmark.platform_testing.evaluation.metrics import (
     MetricResult,
     schema_discovery_metrics,
     schema_drift_metrics,

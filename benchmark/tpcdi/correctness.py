@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 from benchmark.ground_truth.extractor import TPCDI_FOREIGN_KEYS, TPCDI_TABLES
 
@@ -183,38 +183,6 @@ class TpcdiCorrectnessAuditor:
     def run_referential_integrity_audit(self) -> AuditResult:
         violations: list[dict[str, Any]] = []
 
-        parent_keys: dict[str, set[str]] = {}
-        for table in TPCDI_FOREIGN_KEYS:
-            child_records = self.data.get(table, [])
-            parent_keys[table] = set()
-            for r in child_records:
-                for col in TPCDI_FOREIGN_KEYS.get(table, {}):
-                    val = _safe_str(r.get(col))
-                    if val:
-                        parent_keys.setdefault(col, set()).add(val)
-
-        parent_value_sets: dict[str, set[str]] = {}
-        for parent_table in set(
-            ref.split(".")[0]
-            for fks in TPCDI_FOREIGN_KEYS.values()
-            for ref in fks.values()
-        ):
-            records = self.data.get(parent_table, [])
-            if not records:
-                continue
-            pk_col = parent_table.split(".", 1)[1] if "." in parent_table else ""
-            parent_value_sets[parent_table] = set()
-            for r in records:
-                pk_col_name = list(TPCDI_FOREIGN_KEYS.get(parent_table, {}).keys() or [
-                    col for col, ref in [
-                        (col, ref) for tbl, fks in TPCDI_FOREIGN_KEYS.items()
-                        for col, ref in fks.items() if ref.startswith(parent_table)
-                    ]
-                ])
-                val = _safe_str(r.get(pk_col))
-                if val:
-                    parent_value_sets[parent_table].add(val)
-
         for table, fks in TPCDI_FOREIGN_KEYS.items():
             records = self.data.get(table, [])
             if not records:
@@ -321,10 +289,9 @@ class TpcdiCorrectnessAuditor:
                 continue
 
             if table in SCD_TABLES:
-                pk_candidates = [SCD_TABLES[table]]
-            else:
-                pk_candidates = self._get_pk(table)
+                continue
 
+            pk_candidates = self._get_pk(table)
             if not pk_candidates:
                 continue
 
@@ -343,7 +310,7 @@ class TpcdiCorrectnessAuditor:
         return AuditResult(
             audit_name="deduplication",
             status=status,
-            detail=f"No duplicates found" if not violations else f"{len(violations)} duplicate PK violations",
+            detail="No duplicates found" if not violations else f"{len(violations)} duplicate PK violations",
             violations=violations,
             expected=0,
             actual=len(violations),

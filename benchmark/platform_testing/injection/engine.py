@@ -13,11 +13,11 @@ from typing import Any
 
 from benchmark.utils.hashing import hash_records, InjectionLog
 from benchmark.utils.io import load_tpcdi_data, save_derived_source, save_injection_log
-from benchmark.injection.schema_injector import SchemaInjector
-from benchmark.injection.semantic_injector import SemanticInjector
-from benchmark.injection.quality_injector import QualityInjector
-from benchmark.injection.heterogeneity_injector import HeterogeneityInjector
-from benchmark.injection.reliability_injector import ReliabilityInjector
+from benchmark.platform_testing.injection.schema_injector import SchemaInjector
+from benchmark.platform_testing.injection.semantic_injector import SemanticInjector
+from benchmark.platform_testing.injection.quality_injector import QualityInjector
+from benchmark.platform_testing.injection.heterogeneity_injector import HeterogeneityInjector
+from benchmark.platform_testing.injection.reliability_injector import ReliabilityInjector
 
 
 INJECTOR_REGISTRY: dict[str, Any] = {

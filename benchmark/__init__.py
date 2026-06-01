@@ -1,18 +1,23 @@
 """
-NEXUS Multi-Source Data Ingestion & Semantic Discovery Benchmark Framework.
+NEXUS Benchmark Framework — TPC-DI pipeline metrics and platform testing.
 
-Ground-truth dataset: TPC-DS SF=1 (12 tables, ~127M rows).
-Evaluates 10 platform capabilities across 4 difficulty levels.
+Primary path:
+    benchmark/tpcdi/          — TPC-DI benchmark metrics (DIU/hr, correctness, resource)
+
+Platform testing (R&D only):
+    benchmark/platform_testing/ — Error injection + capability evaluation
 
 Architecture:
     benchmark/
-    ├── injection/      — Error Injection Framework (6 categories, 35+ error types)
-    ├── ground_truth/    — Ground truth metadata extraction from clean TPC-DS
-    ├── evaluation/      — Metric calculators for 8 capabilities
-    ├── scenarios/       — YAML scenario configs (Level 1-4)
-    ├── cli/             — CLI runner
-    ├── reports/         — Generated scorecards and aggregate reports
-    └── utils/           — Shared hashing, IO, validation
+    ├── tpcdi/                  — TPC-DI DIU/hr, correctness audits, resource monitoring
+    ├── platform_testing/
+    │   ├── injection/          — Error Injection Framework (6 categories, 35+ types)
+    │   ├── evaluation/         — Capability metric calculators (8 dimensions, F1 scores)
+    │   └── scenarios/          — YAML scenario configs (Level 1-4)
+    ├── ground_truth/           — Metadata extraction from clean data
+    ├── cli/                    — CLI runner
+    ├── reports/                — Generated scorecards and reports
+    └── utils/                  — Shared hashing, IO, validation
 """
 
 __version__ = "1.0.0"

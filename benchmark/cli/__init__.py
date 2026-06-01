@@ -19,7 +19,7 @@ def cmd_extract_ground_truth(args: argparse.Namespace) -> None:
 
 
 def cmd_inject(args: argparse.Namespace) -> None:
-    from benchmark.injection.engine import InjectionEngine
+    from benchmark.platform_testing.injection.engine import InjectionEngine
     from benchmark.utils.io import load_scenario_config
 
     config = load_scenario_config(args.scenario)
@@ -29,7 +29,7 @@ def cmd_inject(args: argparse.Namespace) -> None:
 
 
 def cmd_inject_all(args: argparse.Namespace) -> None:
-    from benchmark.injection.engine import InjectionEngine
+    from benchmark.platform_testing.injection.engine import InjectionEngine
     from benchmark.utils.io import SCENARIOS_DIR, load_scenario_config
 
     scenarios = sorted(SCENARIOS_DIR.glob("*.yml"))
@@ -47,7 +47,7 @@ def cmd_inject_all(args: argparse.Namespace) -> None:
 
 
 def cmd_evaluate(args: argparse.Namespace) -> None:
-    from benchmark.evaluation.engine import EvaluationEngine
+    from benchmark.platform_testing.evaluation.engine import EvaluationEngine
 
     gt_path = Path(args.ground_truth) if args.ground_truth else None
     engine = EvaluationEngine(ground_truth_path=gt_path)
@@ -61,7 +61,7 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
 
 
 def cmd_evaluate_all(args: argparse.Namespace) -> None:
-    from benchmark.evaluation.engine import EvaluationEngine
+    from benchmark.platform_testing.evaluation.engine import EvaluationEngine
     from benchmark.utils.io import SCENARIOS_DIR
 
     gt_path = Path(args.ground_truth) if args.ground_truth else None

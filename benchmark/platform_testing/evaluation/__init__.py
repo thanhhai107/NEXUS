@@ -1,7 +1,7 @@
 """Evaluation package — metric calculators and evaluation engine."""
 
-from benchmark.evaluation.engine import EvaluationEngine
-from benchmark.evaluation.metrics import (
+from benchmark.platform_testing.evaluation.engine import EvaluationEngine
+from benchmark.platform_testing.evaluation.metrics import (
     MetricResult,
     schema_discovery_metrics,
     schema_drift_metrics,

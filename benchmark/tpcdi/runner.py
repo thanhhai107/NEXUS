@@ -8,13 +8,12 @@ metric; resource consumption is reported alongside.
 from __future__ import annotations
 
 import json
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
 from benchmark.tpcdi.performance import TpcdiPerformanceTimer, get_diu
-from benchmark.tpcdi.correctness import TpcdiCorrectnessAuditor, AuditResult
+from benchmark.tpcdi.correctness import TpcdiCorrectnessAuditor, AuditStatus
 from benchmark.tpcdi.resource import ResourceMonitor
 from benchmark.utils.io import load_tpcdi_data, TPCDI_RUNTIME_DIR, REPORTS_DIR
 
@@ -24,9 +23,9 @@ from benchmark.ground_truth.extractor import TPCDI_TABLES
 @dataclass
 class TpcdiResult:
     scale_factor: int
-    is_valid: bool
-    correctness_all_passed: bool
-    correctness_pass_rate: float
+    is_valid: bool = False
+    correctness_all_passed: bool = False
+    correctness_pass_rate: float = 0.0
     correctness_details: list[dict[str, Any]] = field(default_factory=list)
 
     diu_per_hour: float = 0.0
@@ -49,7 +48,7 @@ class TpcdiResult:
             "is_valid": self.is_valid,
             "correctness": {
                 "all_passed": self.correctness_all_passed,
-                "pass_rate": self.correctness_pass_rate,
+                "pass_rate": round(self.correctness_pass_rate, 4),
                 "details": self.correctness_details,
             },
             "performance": {
@@ -68,10 +67,6 @@ class TpcdiResult:
             "price_per_diu": self.price_per_diu,
             "errors": self.errors,
         }
-
-
-DEFAULT_PHASE1_DURATION = 30.0
-DEFAULT_PHASE2_DURATION = 120.0
 
 
 class TpcdiRunner:
@@ -102,6 +97,7 @@ class TpcdiRunner:
         self.timer = TpcdiPerformanceTimer(scale_factor=scale_factor)
         self.auditor = TpcdiCorrectnessAuditor()
         self.monitor = ResourceMonitor(interval_seconds=0.5)
+        self._row_total = 0
 
     # ------------------------------------------------------------------
     # Public API
@@ -110,18 +106,40 @@ class TpcdiRunner:
         result = TpcdiResult(scale_factor=self.scale_factor)
 
         self._load_all_data(result)
+        self._count_rows()
+
         if result.errors:
             return result
 
         self.monitor.start()
         try:
-            result.correctness_all_passed, result.correctness_pass_rate, result.correctness_details = (
-                self._run_correctness()
+            audit_results = self.auditor.run_all()
+
+            source_counts: dict[str, int] = {}
+            dw_counts: dict[str, int] = {}
+            for table in TPCDI_TABLES:
+                records = self.auditor.data.get(table, [])
+                if records:
+                    source_counts[table] = len(records)
+                    dw_counts[table] = len(records)
+
+            row_audit = self.auditor.run_row_count_audit(source_counts, dw_counts)
+            audit_results.append(row_audit)
+
+            passed = sum(1 for r in audit_results if r.status == AuditStatus.PASS)
+            skipped = sum(1 for r in audit_results if r.status == AuditStatus.SKIP)
+            total = len(audit_results) - skipped
+            result.correctness_pass_rate = passed / total if total > 0 else 0.0
+            result.correctness_all_passed = (
+                total > 0 and
+                all(r.status == AuditStatus.PASS for r in audit_results if r.status != AuditStatus.SKIP)
             )
+            result.correctness_details = [r.to_dict() for r in audit_results]
         finally:
             self.monitor.stop()
 
         self._gather_resource(result)
+        self.timer.set_row_count(self._row_total)
 
         perf_summary = self.timer.summary()
         result.diu_per_hour = perf_summary["diu_per_hour"]
@@ -143,16 +161,13 @@ class TpcdiRunner:
         return self.REPORT_PATH
 
     # ------------------------------------------------------------------
-    # Timing context managers
+    # Timing context managers (for pipeline integration)
     # ------------------------------------------------------------------
     def phase1(self):
         return self.timer.phase1()
 
     def phase2(self, days: int = 1):
         return self.timer.phase2(days=days)
-
-    def set_row_count(self, rows: int) -> None:
-        self.timer.set_row_count(rows)
 
     # ------------------------------------------------------------------
     # Internals
@@ -166,30 +181,8 @@ class TpcdiRunner:
                 result.errors.append(f"[{table}] {exc}")
         self.auditor.data = data
 
-    def _run_correctness(self) -> tuple[bool, float, list[dict[str, Any]]]:
-        audit_results = self.auditor.run_all()
-
-        data = self.auditor.data
-        source_counts: dict[str, int] = {}
-        dw_counts: dict[str, int] = {}
-        for table in TPCDI_TABLES:
-            records = data.get(table, [])
-            if records:
-                dw_counts[table] = len(records)
-                source_counts[table] = len(records)
-
-        row_audit = self.auditor.run_row_count_audit(source_counts, dw_counts)
-        audit_results.append(row_audit)
-
-        all_passed = all(r.passed for r in audit_results if r.status != AuditResult.__annotations__.get("status", None))  # noqa
-        from benchmark.tpcdi.correctness import AuditStatus
-        passed = sum(1 for r in audit_results if r.status == AuditStatus.PASS)
-        skipped = sum(1 for r in audit_results if r.status == AuditStatus.SKIP)
-        total = len(audit_results) - skipped
-        pass_rate = passed / total if total > 0 else 0.0
-
-        details = [r.to_dict() for r in audit_results]
-        return all(r.status == AuditStatus.PASS for r in audit_results if r.status != AuditStatus.SKIP), pass_rate, details
+    def _count_rows(self) -> None:
+        self._row_total = sum(len(v) for v in self.auditor.data.values())
 
     def _gather_resource(self, result: TpcdiResult) -> None:
         s = self.monitor.summary()
