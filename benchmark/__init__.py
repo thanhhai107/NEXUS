@@ -1,23 +1,25 @@
 """
-NEXUS Benchmark Framework — TPC-DI pipeline metrics and platform testing.
+NEXUS TPC-DI Benchmark Framework.
 
-Primary path:
-    benchmark/tpcdi/          — TPC-DI benchmark metrics (DIU/hr, correctness, resource)
+Evaluates data pipeline performance against the TPC-DI standard across three
+metric dimensions:
 
-Platform testing (R&D only):
-    benchmark/platform_testing/ — Error injection + capability evaluation
+  1. Performance   — DIU/hr (Daily Ingestion Units per hour), Phase 2 timing
+  2. Correctness   — SCD integrity, referential FK, business rules, dedup
+  3. Resource      — CPU, memory, I/O consumption and price-per-DIU/hr
 
-Architecture:
-    benchmark/
-    ├── tpcdi/                  — TPC-DI DIU/hr, correctness audits, resource monitoring
-    ├── platform_testing/
-    │   ├── injection/          — Error Injection Framework (6 categories, 35+ types)
-    │   ├── evaluation/         — Capability metric calculators (8 dimensions, F1 scores)
-    │   └── scenarios/          — YAML scenario configs (Level 1-4)
-    ├── ground_truth/           — Metadata extraction from clean data
-    ├── cli/                    — CLI runner
-    ├── reports/                — Generated scorecards and reports
-    └── utils/                  — Shared hashing, IO, validation
+Usage::
+
+    from benchmark.tpcdi.runner import TpcdiRunner
+
+    runner = TpcdiRunner(scale_factor=1, hourly_infra_cost_usd=2.50)
+    with runner.phase1():
+        run_historical_load()
+    with runner.phase2():
+        run_incremental_load()
+    result = runner.run()
+    #   result.is_valid  == True  → all correctness audits passed
+    #   result.diu_per_hour       → competitive metric
 """
 
 __version__ = "1.0.0"

@@ -8,7 +8,7 @@ from typing import Any, Iterable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_REPOSITORY_URL = os.getenv("NEXUS_REPOSITORY_URL", "https://github.com/Akapi895/data-bigdata")
-DEFAULT_SOURCE_DIR = PROJECT_ROOT / "assets" / "source_discovery"
+DEFAULT_SOURCE_DIR = PROJECT_ROOT / "runtime" / "source_discovery"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "runtime" / "source_discovery"
 ALL_SCHEMAS_FILE = "all_schemas.json"
 ENDPOINT_REPORT_FILE = "endpoint_verification_report.json"
@@ -22,7 +22,7 @@ def load_discovery_catalog(source_dir: Path = DEFAULT_SOURCE_DIR) -> dict[str, A
     if not catalog_path.exists():
         raise FileNotFoundError(
             f"Source discovery catalog not found at {catalog_path}. "
-            "Expected assets/source_discovery/all_schemas.json or pass --source-dir."
+            "Expected runtime/source_discovery/all_schemas.json or pass --source-dir."
         )
     return _read_json(catalog_path)
 
@@ -167,7 +167,7 @@ def integrate_schema_into_domain(
             "schema_path": schema_rel_path_text,
             "source_discovery": {
                 "repository": SOURCE_REPOSITORY_URL,
-                "source_file": f"assets/source_discovery/{ALL_SCHEMAS_FILE}",
+                "source_file": f"runtime/source_discovery/{ALL_SCHEMAS_FILE}",
                 "schema_names": [schema_name],
             },
             "freshness_hours": dataset_entry.get("freshness_hours") or 24,

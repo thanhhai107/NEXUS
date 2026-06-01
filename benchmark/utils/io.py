@@ -1,22 +1,16 @@
-"""I/O utilities for loading TPC-DI data, saving derived sources, and managing configs."""
+"""I/O utilities for loading TPC-DI benchmark data."""
 
 from __future__ import annotations
 
 import csv
-import json
-import os
 from pathlib import Path
 from typing import Any
-
-import yaml
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TPCDI_RUNTIME_DIR = PROJECT_ROOT / "runtime" / "datasets" / "tpcdi"
 BENCHMARK_DIR = PROJECT_ROOT / "benchmark"
-SCENARIOS_DIR = BENCHMARK_DIR / "platform_testing" / "scenarios"
 REPORTS_DIR = BENCHMARK_DIR / "reports"
-DERIVED_DATA_DIR = BENCHMARK_DIR / "derived_data"
 
 
 def _detect_delimiter(filepath: Path) -> str:
@@ -81,74 +75,3 @@ def load_tpcdi_data(table: str, base_dir: Path | None = None) -> list[dict[str, 
                                 typed_row[k] = v
                 records.append(typed_row)
     return records
-
-
-def save_derived_source(
-    records: list[dict[str, Any]],
-    table: str,
-    scenario_id: str,
-    format: str = "csv",
-    output_dir: Path | None = None,
-) -> Path:
-    output_dir = output_dir or DERIVED_DATA_DIR
-    dir_path = output_dir / scenario_id / format
-    dir_path.mkdir(parents=True, exist_ok=True)
-
-    if format == "csv":
-        filepath = dir_path / f"{table}.csv"
-        if not records:
-            filepath.write_text("", encoding="utf-8")
-            return filepath
-        fieldnames = list(records[0].keys())
-        with filepath.open("w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(records)
-    elif format == "jsonl":
-        filepath = dir_path / f"{table}.jsonl"
-        with filepath.open("w", encoding="utf-8") as f:
-            for record in records:
-                f.write(json.dumps(record, default=str) + "\n")
-    elif format == "parquet":
-        filepath = dir_path / f"{table}.parquet"
-        records_as_csv = dir_path / f"_tmp_{table}.csv"
-        save_derived_source(records, f"_tmp_{table}", scenario_id, "csv", output_dir)
-        try:
-            import pandas as pd
-            df = pd.read_csv(records_as_csv)
-            df.to_parquet(filepath, index=False)
-        except ImportError:
-            filepath = records_as_csv.rename(dir_path / f"{table}.csv")
-            return filepath
-        finally:
-            records_as_csv.unlink(missing_ok=True)
-    else:
-        raise ValueError(f"Unsupported format: {format}")
-
-    return filepath
-
-
-def load_scenario_config(scenario_id: str) -> dict[str, Any]:
-    config_path = SCENARIOS_DIR / f"{scenario_id}.yml"
-    if not config_path.exists():
-        raise FileNotFoundError(f"Scenario config not found: {config_path}")
-    with config_path.open("r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
-
-
-def save_scorecard(scenario_id: str, scorecard: dict[str, Any]) -> Path:
-    dir_path = REPORTS_DIR / scenario_id
-    dir_path.mkdir(parents=True, exist_ok=True)
-    filepath = dir_path / "scorecard.json"
-    with filepath.open("w", encoding="utf-8") as f:
-        json.dump(scorecard, f, indent=2, default=str)
-    return filepath
-
-
-def save_injection_log(scenario_id: str, logs: list[dict[str, Any]]) -> Path:
-    dir_path = REPORTS_DIR / scenario_id
-    dir_path.mkdir(parents=True, exist_ok=True)
-    filepath = dir_path / "injection_log.json"
-    with filepath.open("w", encoding="utf-8") as f:
-        json.dump(logs, f, indent=2, default=str)
-    return filepath
