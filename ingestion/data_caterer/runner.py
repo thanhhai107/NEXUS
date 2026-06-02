@@ -27,7 +27,7 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PLANS_DIR = PROJECT_ROOT / "ingestion" / "data_caterer" / "plans"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "runtime" / "datasets"
-DOCKER_IMAGE = "pflooky/data-caterer:0.5.0"
+DOCKER_IMAGE = "datacatering/data-caterer:0.5.0"
 
 def _ensure_dir(path: Path) -> Path:
     try:
@@ -143,34 +143,23 @@ def load_global_config() -> dict[str, Any]:
 
 
 def _build_docker_command(config: DataCatererConfig) -> list[str]:
-    plan_mount = str(config.plan_dir)
-    output_mount = str(config.output_dir)
-    output_mount_parent = str(config.output_dir.parent)
+    script_path = "/opt/nexus/scripts/generate_tpc_spark.py"
 
     cmd = [
-        "docker", "run", "--rm",
-        "-v", f"{plan_mount}:/opt/app/plans:ro",
-        "-v", f"{output_mount_parent}:/opt/app/data",
-        "-e", f"PLAN_NAME={config.plan_name}",
-        "-e", f"SCALE_FACTOR={config.scale_factor}",
-        "-e", f"ERROR_PROFILE={config.error_profile}",
-        "-e", f"OUTPUT_FORMATS={','.join(config.output_formats)}",
-        "-e", f"OUTPUT_DIR=/opt/app/data/{config.output_dir.name}",
-        "-e", f"RUN_ID={config.run_id}",
-        "-e", f"SPARK_MASTER={config.spark_master}",
+        "docker", "exec", "nexus-spark",
+        "spark-submit",
+        "--master", config.spark_master,
+        script_path,
+        "--scale", str(config.scale_factor),
+        "--output", f"/opt/nexus/{str(config.output_dir.relative_to(PROJECT_ROOT))}",
+        "--error-profile", config.error_profile,
     ]
 
-    if config.mode == "streaming":
-        cmd.extend([
-            "-e", f"KAFKA_BOOTSTRAP={config.kafka_bootstrap}",
-            "-e", f"KAFKA_TOPIC_PREFIX={config.kafka_topic_prefix}",
-        ])
-    elif config.mode == "api":
-        cmd.extend([
-            "-p", f"{config.api_port}:8080",
-        ])
+    if config.plan_name != "tpcdi_tasks":
+        plan_path = PLANS_DIR / f"{config.plan_name}.yml"
+        if plan_path.exists():
+            cmd.extend(["--plan", f"/opt/nexus/{str(plan_path.relative_to(PROJECT_ROOT))}"])
 
-    cmd.append(config.docker_image)
     return cmd
 
 
@@ -200,11 +189,11 @@ def run_plan(
     dry_run: bool = False,
     timeout_seconds: int = 3600,
 ) -> dict[str, Any]:
-    """Execute a Data Caterer data generation plan.
+    """Execute a Data Caterer data generation plan via Spark.
 
     Args:
         config: DataCatererConfig with plan settings
-        use_docker: Use Docker to run data-caterer
+        use_docker: Use docker exec to spark-submit
         dry_run: Print command but don't execute
         timeout_seconds: Max runtime in seconds
 
@@ -213,10 +202,7 @@ def run_plan(
     """
     config.output_dir = _ensure_dir(config.output_dir)
 
-    if use_docker:
-        cmd = _build_docker_command(config)
-    else:
-        cmd = _build_direct_command(config)
+    cmd = _build_docker_command(config)
 
     if dry_run:
         return {
@@ -258,7 +244,7 @@ def run_plan(
     except FileNotFoundError:
         return {
             "status": "error",
-            "error": "Docker not found. Install Docker or set use_docker=False with Spark installed.",
+            "error": "Docker not found. Ensure Docker is running.",
             "config": config.to_dict(),
         }
 
@@ -297,6 +283,7 @@ def generate_tpcdi(
         output_dir=DEFAULT_OUTPUT_DIR / "tpcdi",
         mode="batch",
         run_id=run_id,
+        spark_master="spark://spark:7077",
     )
     return run_plan(config, dry_run=dry_run, timeout_seconds=7200)
 
