@@ -1,5 +1,11 @@
 # Ingestion Module Architecture
 
+> **Current scope:** This module was designed for multi-source ingestion from
+> live APIs (London transport, environment). On the current tree, the **active
+> ingestion method is Data Caterer** (`ingestion/data_caterer/`) for TPC-DI
+> benchmark data generation. The London source adapters described below are
+> **reference architecture** — the adapter files are not deployed.
+
 ## Overview
 
 The `ingestion` module provides data ingestion capabilities for NEXUS with two main paradigms:
@@ -189,6 +195,10 @@ from ingestion.base import (
 
 ### London Data Sources (via downloaders)
 
+> ⚠️ **Legacy — not deployed on current tree.** Source adapters for London
+> data sources and the `london_downloader.py` entry point are reference
+> implementations only.
+
 ```python
 # Using the London downloader CLI
 python ingestion/downloaders/london_downloader.py --source openmeteo --mode full_demo
@@ -206,18 +216,13 @@ download_openmeteo(run, context)
 
 1. **base/ is shared**: Core infrastructure (HTTP client, retry logic, checkpointing) lives in `base/` and is used by both `batch/` and `streaming/`
 
-2. **sources/ are London-specific**: Source adapters in `downloaders/sources/` are specific to London data sources
+2. **data_caterer/ is the active generator**: TPC-DI benchmark data is generated via `ingestion/data_caterer/` using Data Caterer or Spark.
 
 3. **canonical/ is the contract**: All ingestion paths write to the same raw envelope format defined in `canonical/`
 
-4. **streaming/ uses real Kafka**: The streaming module integrates with real Apache Kafka via kafka-python
+4. **sources/ and downloaders/ (legacy)**: London-specific source adapters were built for the environment/transport domain model. They are reference architecture — not deployed on the current tree.
 
-5. **downloaders/ is the entry point**: The London downloader provides a CLI for downloading London-specific data sources
-
-6. **Parquet, API Stream, GTFS Realtime added**: Three additional ingestion methods round out the framework: 
-   - batch_parquet for columnar data (PyArrow/Pandas)
-   - stream_api for REST API polling without Kafka dependency
-   - stream_gtfs_realtime for transit feed ingestion (protobuf parsing with fallback)
+5. **streaming/ (inactive on current tree)**: Kafka streaming infrastructure is available for real-time use cases but is not part of the active TPC-DI benchmark flow.
 
 ## Environment Variables
 

@@ -10,6 +10,11 @@ The project is intentionally runnable from a single Ubuntu working tree with
 `.venv`, while Docker Compose can start the heavier Airflow, Kafka, Spark, Trino,
 Superset, OpenMetadata, and Marquez services when needed.
 
+> **Current scope:** NEXUS is actively configured for the **TPC-DI benchmark**
+> (`domains/tpc/`). The environment/transport domains described in earlier docs
+> are reference architecture and are not deployed on the current tree. Data is
+> generated synthetically via Data Caterer rather than ingested from live APIs.
+
 ## Current Capabilities
 
 - Domain catalogs, JSON Schemas, quality rules, and semantic contracts under
@@ -42,8 +47,7 @@ orchestration/airflow/  Airflow DAGs
 processing/             Spark Bronze, Silver, Gold jobs
 serving/                FastAPI, Trino, Superset configs
 transform/dbt/          dbt project, seeds, Gold models
-assets/samples/         Small local CSV fixtures
-assets/source_discovery/Generated source inventory
+benchmark/              TPC-DI correctness, performance, and resource audits
 tests/                  Unit and workflow tests
 runtime/                Generated local outputs; do not commit
 ```
@@ -79,33 +83,19 @@ The expected tested environment includes:
 
 ## Local Smoke Test
 
-These commands exercise the main local system without starting Docker services:
+These commands exercise the main local system without Docker services. Most
+commands read from config and need no data files. Commands that require a CSV
+source (`bronze-validate`, `quality check`, `match-entities`) need generated
+TPC-DI data first (see [`nexus generate tpcdi`](#generate-tpc-di-benchmark-data)):
 
 ```bash
 source .venv/bin/activate
 
-python -m cli.nexus registry list --domain environment
-python -m cli.nexus contract show --dataset openaq_measurements
-python -m cli.nexus semantic show --dataset openaq_measurements
+python -m cli.nexus registry list
+python -m cli.nexus contract show --dataset tpcdi_dim_customer
+python -m cli.nexus semantic show --dataset tpcdi_dim_customer
 
-python -m cli.nexus quality gx-suite --dataset openaq_measurements
-python -m cli.nexus quality bronze-validate \
-  --dataset openaq_measurements \
-  --source assets/samples/openaq_measurements.csv \
-  --no-exit-on-fail
-
-python -m cli.nexus quality check \
-  --dataset openaq_measurements \
-  --source assets/samples/openaq_measurements.csv \
-  --required-columns location_id location parameter value unit datetime \
-  --primary-keys location_id parameter datetime \
-  --freshness-column datetime \
-  --max-age-hours 10000 \
-  --no-exit-on-fail
-
-python -m cli.nexus semantic match-entities \
-  --dataset openaq_measurements \
-  --source assets/samples/openaq_measurements.csv
+python -m cli.nexus quality gx-suite --dataset tpcdi_dim_customer
 
 python -m pytest -q
 ```
@@ -152,7 +142,7 @@ Data contracts are assembled from:
 Show a contract:
 
 ```bash
-python -m cli.nexus contract show --dataset openaq_measurements
+python -m cli.nexus contract show --dataset tpcdi_dim_customer
 ```
 
 Each contract exposes required columns, primary keys, freshness policy, schema
@@ -182,19 +172,19 @@ Schema drift detection covers:
 - Rename candidates from configured aliases or name similarity.
 - Type changes, with safe-cast vs quarantine action.
 
-Run a contract-driven Bronze validation:
+Run a contract-driven Bronze validation (requires generated TPC-DI data):
 
 ```bash
 python -m cli.nexus quality bronze-validate \
-  --dataset openaq_measurements \
-  --source assets/samples/openaq_measurements.csv \
+  --dataset tpcdi_dim_customer \
+  --source runtime/datasets/tpcdi/tpcdi_dim_customer.csv \
   --no-exit-on-fail
 ```
 
 Generate a Great Expectations suite payload:
 
 ```bash
-python -m cli.nexus quality gx-suite --dataset openaq_measurements
+python -m cli.nexus quality gx-suite --dataset tpcdi_dim_customer
 ```
 
 OpenMetadata DQ payloads are logged locally by default. To POST them to a
@@ -210,26 +200,24 @@ export OPENMETADATA_AUTH_TOKEN="<token>"  # optional
 Semantic config lives in:
 
 - `config/semantic_defaults.yml`
-- `domains/environment/semantic_rules.yml`
-- `domains/transport/semantic_rules.yml`
+- `domains/<domain>/semantic_rules.yml`
 - `transform/dbt/seeds/unit_mapping.csv`
 - `transform/dbt/models/gold/schema.yml`
 
-Inspect and export semantic metadata:
+Inspect and export semantic metadata (active domain: `tpc`):
 
 ```bash
-python -m cli.nexus semantic list --domain environment
-python -m cli.nexus semantic show --dataset openaq_measurements
-python -m cli.nexus semantic export --kind openmetadata --domain environment
-python -m cli.nexus semantic export --kind glossary --domain transport
+python -m cli.nexus semantic list --domain tpc
+python -m cli.nexus semantic show --dataset tpcdi_dim_customer
+python -m cli.nexus semantic export --kind glossary --domain tpc
 ```
 
-Create canonical entity IDs and crosswalk output:
+Create canonical entity IDs and crosswalk output (requires generated data):
 
 ```bash
 python -m cli.nexus semantic match-entities \
-  --dataset openaq_measurements \
-  --source assets/samples/openaq_measurements.csv
+  --dataset tpcdi_prospect \
+  --source runtime/datasets/tpcdi/tpcdi_prospect.csv
 ```
 
 Entity matching supports exact, rule-based, fuzzy, and probabilistic local
@@ -262,26 +250,24 @@ dbt parse --profiles-dir .
 
 Running dbt models requires a reachable Trino/Iceberg profile.
 
-## Ingestion And Downloads
+## Generate TPC-DI Benchmark Data
 
-Download source groups are configured in `config/download_defaults.yml`.
-
-Common commands:
-
-```bash
-python scripts/download_data.py --source-group core_historical --mode small_demo
-python scripts/download_data.py --source tfl_line_status --source tfl_arrivals --mode small_demo
-python scripts/download_data.py --poll --source-group realtime_polling --duration-days 0.1 --interval-minutes 1
-```
-
-Streaming examples:
+TPC-DI data is generated via Data Caterer (Docker-based Spark) with 6 error
+injection profiles (none → extreme) to test the quality pipeline:
 
 ```bash
-python ingestion/streaming/producer.py --source transport --events 5
-python -m cli.nexus quality stream --source transport --sample-events 25 --no-exit-on-fail
+# Generate SF=1 with moderate errors (CSV + Parquet)
+python -m cli.nexus generate tpcdi --scale-factor 1 --error-profile moderate
+
+# Dry-run to preview the command without executing
+python -m cli.nexus generate tpcdi --dry-run
+
+# List available Data Caterer plans
+python -m cli.nexus generate list-plans
 ```
 
-Operational failures go to the DLQ. Invalid data records go to quarantine.
+Generated data lands in `runtime/datasets/tpcdi/`. Operational failures go to
+the DLQ. Invalid data records go to quarantine.
 
 ## Runtime Outputs
 
@@ -376,7 +362,7 @@ The governance agent can run without external services using deterministic
 rules:
 
 ```bash
-python -m cli.nexus agent review --dataset openaq_measurements --batch-id manual
+python -m cli.nexus agent review --dataset tpcdi_dim_customer --batch-id manual
 ```
 
 Set AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
@@ -386,27 +372,9 @@ stays local and deterministic.
 
 ## Source Discovery
 
-Inspect generated source inventory:
-
-```bash
-python -m cli.nexus source-discovery summary
-python -m cli.nexus source-discovery schemas
-python -m cli.nexus source-discovery coverage
-```
-
-Sync selected schemas into generated runtime metadata:
-
-```bash
-python -m cli.nexus source-discovery sync \
-  --schema OpenAQ_OpenAQ_Location \
-  --schema TfL_Unified_API_Tfl.Api.Presentation.Entities.LineStatus
-```
-
-Regenerate local CSV samples after schema or discovery changes:
-
-```bash
-python scripts/regenerate_sample_datasets.py
-```
+> **Note:** Source discovery was designed for the environment/transport domain
+> model. It is not active on the current tree (TPC-DI). The CLI subcommands
+> remain available for when real-world sources are re-enabled.
 
 ## Troubleshooting
 
@@ -439,16 +407,15 @@ Run before handing off changes:
 
 ```bash
 source .venv/bin/activate
-python -m compileall -q cli common governance ingestion processing tests
+python -m compileall -q cli common governance ingestion processing tests benchmark
 python -m pytest -q
-python -m cli.nexus quality gx-suite --dataset openaq_measurements >/tmp/nexus_gx_suite.json
-python -m cli.nexus quality bronze-validate --dataset openaq_measurements --source assets/samples/openaq_measurements.csv --no-exit-on-fail
+python -m cli.nexus quality gx-suite --dataset tpcdi_dim_customer >/tmp/nexus_gx_suite.json
 ```
 
 Current expected result:
 
 ```text
-94 passed
+117 passed
 ```
 
 Warnings in `tests/test_heterogeneity_adaptability.py` about tests returning

@@ -1,5 +1,11 @@
 # Data Quality Painpoints — README triển khai cho Multi-source Ingestion
 
+> **Scope note:** This document describes the data quality architecture for
+> multi-source ingestion. On the current tree NEXUS is configured for the
+> **TPC-DI benchmark** (`domains/tpc/`). The patterns described here apply to
+> the TPC-DI pipeline; example references to environment/transport datasets
+> are legacy design examples.
+
 Tài liệu này phân tích đầy đủ các painpoint trong nhóm **Data Quality Issues** và mô tả cách detect, resolve, lưu audit/quarantine, cũng như tech stack nên dùng để agent code có thể áp dụng vào hệ thống.
 
 Stack mặc định của dự án:

@@ -1,10 +1,14 @@
 # Semantic Issues Checklist cho NEXUS
 
-Tài liệu này áp dụng lớp semantic governance cho các nguồn Environment và Transport trong NEXUS. Các cấu hình triển khai nằm ở:
+> **Scope note:** This document was authored for the environment/transport
+> domain model. On the current tree the active domain is **TPC-DI** (`domains/tpc/`).
+> The semantic governance patterns described here apply to TPC-DI tables with
+> the active config at `domains/tpc/semantic_rules.yml`.
+
+Tài liệu này áp dụng lớp semantic governance cho các nguồn trong NEXUS. Các cấu hình triển khai nằm ở:
 
 - `config/semantic_defaults.yml`: chuẩn mặc định cho OpenMetadata, glossary, unit, time, CRS, grain và entity resolution.
-- `domains/environment/semantic_rules.yml`: semantic contract theo dataset environment.
-- `domains/transport/semantic_rules.yml`: semantic contract theo dataset transport.
+- `domains/<domain>/semantic_rules.yml`: semantic contract theo từng domain.
 - `transform/dbt/seeds/unit_mapping.csv`: bảng mapping đơn vị đo dùng bởi dbt seed và Great Expectations.
 - `transform/dbt/models/gold/schema.yml`: khai báo semantic grain, time standard và unit standardization cho Gold models.
 - `python -m cli.nexus semantic export`: sinh output OpenMetadata hoặc Business Glossary từ semantic contracts.
@@ -39,21 +43,10 @@ Tài liệu này áp dụng lớp semantic governance cho các nguồn Environme
 
 ```powershell
 $env:NEXUS_RUNTIME_DIR = "runtime"
-python -m cli.nexus semantic show --dataset openaq_measurements
-python -m cli.nexus semantic export --kind openmetadata --domain environment
-python -m cli.nexus semantic export --kind glossary --domain transport
-python -m cli.nexus semantic match-entities `
-  --dataset openaq_measurements `
-  --source assets/samples/openaq_measurements.csv
-python -m cli.nexus contract show --dataset openaq_measurements
-python -m cli.nexus quality check `
-  --dataset openaq_measurements `
-  --source assets/samples/openaq_measurements.csv `
-  --required-columns location_id location parameter value unit datetime `
-  --primary-keys location_id parameter datetime `
-  --freshness-column datetime `
-  --max-age-hours 10000 `
-  --no-exit-on-fail
+python -m cli.nexus semantic show --dataset tpcdi_dim_customer
+python -m cli.nexus semantic export --kind openmetadata --domain tpc
+python -m cli.nexus semantic export --kind glossary --domain tpc
+python -m cli.nexus contract show --dataset tpcdi_dim_customer
 ```
 
-Great Expectations sẽ kiểm tra unit source có thuộc mapping hợp lệ, tạo giá trị canonical tạm thời như `value_canonical`, và kiểm tra range canonical theo semantic rules.
+Các lệnh trên sử dụng dataset TPC-DI đang active (`domains/tpc/`).

@@ -1,5 +1,11 @@
 # Multi-source Ingestion Pipeline
 
+> **Scope note:** This document describes the schema drift handling design for
+> multi-source ingestion. On the current tree NEXUS is configured for the
+> **TPC-DI benchmark** (`domains/tpc/`). The schema drift detection framework
+> described here applies to TPC-DI tables. Iceberg table references and
+> repository structure examples are reference architecture.
+
 ## 1. Tổng quan
 
 Dự án này xây dựng một pipeline ingestion dữ liệu từ nhiều nguồn khác nhau như API, CSV, database, CDC và streaming source. Mục tiêu chính là đưa dữ liệu từ các nguồn không đồng nhất vào hệ thống lakehouse một cách an toàn, có kiểm soát và có khả năng mở rộng.
