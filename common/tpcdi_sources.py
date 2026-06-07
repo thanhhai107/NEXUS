@@ -33,6 +33,13 @@ def _get_tpcdi_config(path: str | Path | None = None) -> dict[str, Any]:
 
 
 def source_root(path: str | Path | None = None) -> Path:
+    import os
+
+    env_root = os.environ.get("TPCDI_SOURCE_ROOT")
+    if env_root:
+        p = Path(env_root)
+        return p if p.is_absolute() else PROJECT_ROOT / p
+
     cfg = _get_tpcdi_config(path)
     root = cfg.get("source_root", "runtime/tpcdi/sf3")
     return PROJECT_ROOT / root
