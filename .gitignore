@@ -41,6 +41,7 @@ runtime/schemas/history/*
 !runtime/schemas/history/.gitkeep
 runtime/source_discovery/*
 !runtime/source_discovery/.gitkeep
+benchmark/reports/*
 
 # dbt and analytics outputs
 target/

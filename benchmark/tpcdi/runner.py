@@ -19,6 +19,9 @@ from benchmark.utils.io import load_tpcdi_data, TPCDI_RUNTIME_DIR, REPORTS_DIR
 
 from benchmark.ground_truth.extractor import TPCDI_TABLES
 
+# M1 sources
+M1_SOURCES = ["status_type", "trade_type", "tax_rate", "industry", "date", "time"]
+
 
 @dataclass
 class TpcdiResult:
@@ -86,7 +89,7 @@ class TpcdiRunner:
 
     def __init__(
         self,
-        scale_factor: int = 1,
+        scale_factor: int = 3,
         base_data_dir: Optional[Path] = None,
         hourly_infra_cost_usd: Optional[float] = None,
     ):
@@ -153,9 +156,94 @@ class TpcdiRunner:
 
         return result
 
+    # ------------------------------------------------------------------
+    # Milestone 1 — validate → bronze → silver → gold → audit
+    # ------------------------------------------------------------------
+    M1_SOURCES = ["status_type", "trade_type", "tax_rate", "industry", "date", "time"]
+
+    def run_milestone1(self, clean_outputs: bool = True) -> TpcdiResult:
+        """Run full M1 pipeline: validate → Bronze → Silver → Gold → audit.
+
+        Parameters
+        ----------
+        clean_outputs:
+            Remove existing Bronze/Silver/Gold output before running.
+        """
+        import time
+        from governance.quality.bronze_validator import validate_bronze_tpcdi_file
+        from processing.bronze.tpcdi_raw_to_bronze import run as bronze_run
+        from processing.silver.tpcdi_bronze_to_silver import run as silver_run
+        from processing.gold.tpcdi_silver_to_gold import run as gold_run
+
+        if clean_outputs:
+            self._clean_m1_outputs()
+
+        result = TpcdiResult(scale_factor=self.scale_factor)
+
+        self.monitor.start()
+        started = time.perf_counter()
+
+        try:
+            for source_name in self.M1_SOURCES:
+                # 1. Validate source
+                v = validate_bronze_tpcdi_file(source_name=source_name, batch_id="batch1")
+                if v["status"] != "passed":
+                    result.errors.append(f"[{source_name}] validation failed: {v['details']}")
+                    continue
+
+                # 2. Bronze load
+                br = bronze_run(source_name=source_name)
+                if br.get("error"):
+                    result.errors.append(f"[{source_name}] bronze error: {br['error']}")
+                    continue
+
+                # 3. Silver transform
+                sr = silver_run(source_name=source_name)
+                if sr.get("error"):
+                    result.errors.append(f"[{source_name}] silver error: {sr['error']}")
+                    continue
+
+                # 4. Gold load
+                gr = gold_run(source_name=source_name)
+                if gr.get("error"):
+                    result.errors.append(f"[{source_name}] gold error: {gr['error']}")
+                    continue
+        finally:
+            self.monitor.stop()
+
+        result.phase1_seconds = round(time.perf_counter() - started, 3)
+        self._gather_resource(result)
+
+        # 5. Correctness audits
+        audit_results = self.auditor.run_milestone1()
+
+        passed = sum(1 for r in audit_results if r.status == AuditStatus.PASS)
+        skipped = sum(1 for r in audit_results if r.status == AuditStatus.SKIP)
+        total = len(audit_results) - skipped
+        result.correctness_pass_rate = passed / total if total > 0 else 0.0
+        result.correctness_all_passed = (
+            total > 0
+            and all(r.status == AuditStatus.PASS for r in audit_results if r.status != AuditStatus.SKIP)
+        )
+        result.correctness_details = [r.to_dict() for r in audit_results]
+        result.is_valid = result.correctness_all_passed and not result.errors
+
+        return result
+
+    def _clean_m1_outputs(self) -> None:
+        """Remove M1 Bronze/Silver/Gold output from previous runs."""
+        import shutil
+        project_root = Path(__file__).resolve().parents[2]
+        for layer in ["bronze", "silver", "gold"]:
+            base = project_root / "runtime" / "lake" / layer / "tpcdi"
+            for source in self.M1_SOURCES:
+                path = base / source
+                if path.exists():
+                    shutil.rmtree(path)
+
     def save_report(self, result: Optional[TpcdiResult] = None) -> Path:
         if result is None:
-            result = self.run()
+            result = self.run_milestone1()
         self.REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
         self.REPORT_PATH.write_text(json.dumps(result.to_dict(), indent=2, default=str))
         return self.REPORT_PATH
