@@ -146,15 +146,15 @@ tpcdi:
         - "country"
         - "phone"
         - "income"
-        - "number_household"
+        - "number_cars"
+        - "number_children"
+        - "marital_status"
+        - "age"
         - "credit_rating"
-        - "credit_score"
-        - "credit_card_usage"
-        - "num_credit_cards"
-        - "num_savings_accounts"
-        - "num_checks"
-        - "num_cards"
-        - "home_owner"
+        - "own_or_rent_flag"
+        - "employer"
+        - "number_credit_cards"
+        - "net_worth"
 
     # ── Customer Mgmt XML (batch1 only) ─────────────────────────────
     customer_mgmt:
