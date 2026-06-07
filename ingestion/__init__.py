@@ -1,10 +1,10 @@
 ﻿"""
-NEXUS Ingestion Framework — TPC-DS SF=1 only.
+NEXUS Ingestion Framework — TPC-DI (DIGen-based).
 
 Architecture:
 ├── base/        - Shared infrastructure (HTTP client, core classes, contracts)
 ├── batch/       - Batch processing (REST API, CSV, CSV download, Parquet)
-└── data_caterer/ - TPC-DS data generation via Data Caterer
+└── data_caterer/ - (deprecated) legacy Data Caterer integration
 """
 
 from ingestion.base.core import DownloadContext, SourceFailure, SourceRun

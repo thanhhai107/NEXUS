@@ -7,8 +7,8 @@ Usage:
     from processing.common.watermark import WatermarkTracker
 
     tracker = WatermarkTracker()
-    last_processed = tracker.get_last_processed_watermark("tpcds_store_sales")
-    tracker.save_watermark("tpcds_store_sales", datetime.now())
+    last_processed = tracker.get_last_processed_watermark("tpcdi_dim_trade")
+    tracker.save_watermark("tpcdi_dim_trade", datetime.now())
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ class IcebergWatermarkStore(WatermarkStore):
         """Query Iceberg table for last processed watermark.
 
         Args:
-            source: Source key (e.g., 'tpcds_store_sales')
+            source: Source key (e.g., 'tpcdi_dim_trade')
             event_time_col: Column name containing event time
 
         Returns:

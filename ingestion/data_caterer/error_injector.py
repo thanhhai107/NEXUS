@@ -1,7 +1,21 @@
-# Error injection utilities for Data Caterer generated data.
-# Provides configurable error injection profiles and field-level
-# corruption functions for testing data quality pipelines.
+"""
+DEPRECATED.
+
+This injector operates on parsed ``list[dict]`` records and is NOT used by
+the current DIGen-based TPC-DI pipeline.
+
+Use source-layer error injection (``ingestion/tpcdi/error_injection/``)
+for injecting errors into CSV/TXT/XML source files before ingestion.
+"""
+
 from __future__ import annotations
+
+import warnings
+warnings.warn(
+    "error_injector is deprecated. Use source-layer injection via ingestion/tpcdi/error_injection/.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 import copy
 import random

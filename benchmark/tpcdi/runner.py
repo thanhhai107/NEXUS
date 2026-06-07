@@ -166,6 +166,8 @@ class TpcdiRunner:
     # ------------------------------------------------------------------
     M2_SOURCES = ["hr", "prospect", "daily_market", "trade", "cash_transaction", "holding_history", "watch_history"]
 
+    M3_NON_VALIDATABLE = {"customer_mgmt", "finwire"}  # XML/fixed-width — not csv-validatable
+
     def _run_pipeline(self, source_names: list[str], result: TpcdiResult,
                        steps: tuple[str, ...] = ("validate", "bronze", "silver", "gold")) -> float:
         """Run specified pipeline steps for each source. Returns elapsed seconds."""
@@ -178,7 +180,7 @@ class TpcdiRunner:
         started = time.perf_counter()
 
         for source_name in source_names:
-            if "validate" in steps:
+            if "validate" in steps and source_name not in self.M3_NON_VALIDATABLE:
                 v = validate_bronze_tpcdi_file(source_name=source_name, batch_id="batch1")
                 if v["status"] != "passed":
                     result.errors.append(f"[{source_name}] validation failed: {v['details']}")
@@ -218,6 +220,7 @@ class TpcdiRunner:
 
     M2A_SOURCES = ["hr", "prospect", "daily_market"]
     M2B_SOURCES = ["trade", "cash_transaction", "holding_history", "watch_history"]
+    M3_SOURCES = ["customer_mgmt", "finwire", "customer_update", "account_update"]
 
     def run_milestone2a(self, clean_outputs: bool = True) -> TpcdiResult:
         """M2a: M1 full + M2a full (Silver+Gold) + M1+M2a audits."""
@@ -270,6 +273,53 @@ class TpcdiRunner:
         self._set_audit_result(result, audit_results)
         return result
 
+    def run_milestone4(self, clean_outputs: bool = True) -> TpcdiResult:
+        """M4: M1 + M2a + M2b + M3 full + SCD2 transforms + M1-4 audits."""
+        self.monitor.start()
+        result = TpcdiResult(scale_factor=self.scale_factor)
+        if clean_outputs:
+            self._clean_m1_outputs()
+        from processing.silver.tpcdi_transform import run_hr_split, run_scd2, run_trade_merge
+
+        # M3 has mixed batch_ids — split into batch1 and batch2 groups
+        m3_batch1 = ["customer_mgmt", "finwire"]
+        m3_batch2 = ["customer_update", "account_update"]
+
+        t1 = self._run_pipeline(self.M1_SOURCES, result)
+        t2 = self._run_pipeline(self.M2A_SOURCES, result)
+        t3 = self._run_pipeline(self.M2B_SOURCES, result)
+        t4 = self._run_pipeline(m3_batch1, result)  # batch1 → customer_mgmt, finwire
+        # customer_update and account_update exist in batch2 only
+        from processing.bronze.tpcdi_raw_to_bronze import run as bronze_run
+        for src in m3_batch2:
+            br = bronze_run(source_name=src, batch_id="batch2")
+            if br.get("error"):
+                result.errors.append(f"[{src}] bronze error: {br['error']}")
+        result.phase1_seconds = round(t1 + t2 + t3 + t4, 3)
+
+        # Transforms
+        hr_result = run_hr_split()
+        if hr_result.get("error"):
+            result.errors.append(f"[hr_split] {hr_result['error']}")
+        scd2_result = run_scd2("customer_update", "batch2")
+        if scd2_result.get("error"):
+            result.errors.append(f"[scd2] {scd2_result['error']}")
+        trade_result = run_trade_merge()
+        if trade_result.get("error"):
+            result.errors.append(f"[trade_merge] {trade_result['error']}")
+
+        self.monitor.stop()
+        self._gather_resource(result)
+
+        audit_results = (
+            self.auditor.run_milestone1()
+            + self.auditor.run_milestone2a()
+            + self.auditor.run_milestone3()
+            + self.auditor.run_milestone4()
+        )
+        self._set_audit_result(result, audit_results)
+        return result
+
     def _set_audit_result(self, result: TpcdiResult, audit_results: list) -> None:
         passed = sum(1 for r in audit_results if r.status == AuditStatus.PASS)
         skipped = sum(1 for r in audit_results if r.status == AuditStatus.SKIP)
@@ -286,7 +336,7 @@ class TpcdiRunner:
         """Remove Bronze/Silver/Gold output for all milestone sources."""
         import shutil
         project_root = Path(__file__).resolve().parents[2]
-        all_sources = self.M1_SOURCES + self.M2A_SOURCES + self.M2B_SOURCES
+        all_sources = self.M1_SOURCES + self.M2A_SOURCES + self.M2B_SOURCES + self.M3_SOURCES
         for layer in ["bronze", "silver", "gold"]:
             base = project_root / "runtime" / "lake" / layer / "tpcdi"
             for source in all_sources:

@@ -1,4 +1,4 @@
-"""Source coverage module — TPC-DS SF=1 only."""
+"""Source coverage module — TPC-DI coverage tracking."""
 
 from __future__ import annotations
 

@@ -686,6 +686,101 @@ class TpcdiCorrectnessAuditor:
         self.results = [self.run_row_count_audit_m2c(), self.run_pk_duplicate_audit_m2c()]
         return self.results
 
+    # ==================================================================
+    # M4 — Trade-Holding Consistency Audit
+    # ==================================================================
+    def run_trade_holding_audit(self) -> AuditResult:
+        import json; from pathlib import Path
+        gold_root = Path(__file__).resolve().parents[2] / "runtime" / "lake" / "gold" / "tpcdi"
+        violations: list[dict[str, Any]] = []
+
+        trade_file = gold_root / "trade" / "data.jsonl"
+        holding_file = gold_root / "holding_history" / "data.jsonl"
+
+        if not trade_file.exists() or not holding_file.exists():
+            return AuditResult("trade_holding", AuditStatus.SKIP, "Trade or Holding gold data not found")
+
+        holding_trade_ids: set[str] = set()
+        with holding_file.open() as f:
+            for line in f:
+                if not line.strip(): continue
+                rec = json.loads(line).get("payload", {})
+                tid = str(rec.get("hh_t_id", "") or "").strip()
+                if tid:
+                    holding_trade_ids.add(tid)
+
+        checked = 0
+        with trade_file.open() as f:
+            for line in f:
+                if not line.strip(): continue
+                rec = json.loads(line).get("payload", {})
+                status = str(rec.get("status", "") or "").strip()
+                tid = str(rec.get("trade_id", "") or "").strip()
+                if not tid: continue
+                checked += 1
+                if "CMPT" in status and tid not in holding_trade_ids:
+                    violations.append({"trade_id": tid, "issue": "completed_trade_missing_holding"})
+                if "CNCL" in status and tid in holding_trade_ids:
+                    violations.append({"trade_id": tid, "issue": "cancelled_trade_has_holding"})
+
+        status = AuditStatus.PASS if not violations else AuditStatus.FAIL
+        return AuditResult(
+            audit_name="trade_holding", status=status,
+            detail=f"{checked} trades checked" if not violations else f"{len(violations)} trade-holding issues",
+            violations=violations, expected=0, actual=len(violations),
+        )
+
+    # ==================================================================
+    # M4 — Prospect-Customer Match Audit
+    # ==================================================================
+    def run_prospect_customer_audit(self) -> AuditResult:
+        import json; from pathlib import Path
+        gold_root = Path(__file__).resolve().parents[2] / "runtime" / "lake" / "gold" / "tpcdi"
+        violations: list[dict[str, Any]] = []
+
+        prospect_file = gold_root / "prospect" / "data.jsonl"
+        customer_file = gold_root / "customer_mgmt" / "data.jsonl"
+
+        if not prospect_file.exists():
+            return AuditResult("prospect_customer", AuditStatus.SKIP, "Prospect gold data not found")
+
+        customer_names: set[tuple[str, str]] = set()
+        if customer_file.exists():
+            with customer_file.open() as f:
+                for line in f:
+                    if not line.strip(): continue
+                    rec = json.loads(line).get("payload", {})
+                    fn = str(rec.get("c_f_name", "") or "").strip().lower()
+                    ln = str(rec.get("c_l_name", "") or "").strip().lower()
+                    if fn and ln:
+                        customer_names.add((fn, ln))
+
+        checked = 0
+        matched = 0
+        with prospect_file.open() as f:
+            for line in f:
+                if not line.strip(): continue
+                rec = json.loads(line).get("payload", {})
+                fn = str(rec.get("first_name", "") or "").strip().lower()
+                ln = str(rec.get("last_name", "") or "").strip().lower()
+                checked += 1
+                if fn and ln and (fn, ln) in customer_names:
+                    matched += 1
+
+        if matched > 0:
+            violations.append({"issue": "prospect_customer_overlap", "matched": matched, "checked": checked})
+
+        status = AuditStatus.PASS if not violations else AuditStatus.FAIL
+        return AuditResult(
+            audit_name="prospect_customer", status=status,
+            detail=f"{checked} prospects checked, {matched} matched customers" if not violations else f"{matched} matches found",
+            violations=violations, expected=0, actual=matched,
+        )
+
+    def run_milestone4(self) -> list[AuditResult]:
+        self.results = [self.run_trade_holding_audit(), self.run_prospect_customer_audit()]
+        return self.results
+
     def run_milestone2a(self) -> list[AuditResult]:
         self.results = [self.run_row_count_audit_m2a(), self.run_pk_duplicate_audit_m2a()]
         return self.results

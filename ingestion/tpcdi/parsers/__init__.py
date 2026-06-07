@@ -15,6 +15,12 @@ from ingestion.tpcdi.parsers.csv_pipe import (
     parse_holding_history,
     parse_watch_history,
 )
+from ingestion.tpcdi.parsers.complex import (
+    parse_customer_mgmt,
+    parse_finwire,
+    parse_customer_update,
+    parse_account_update,
+)
 
 __all__ = [
     "parse_reference",
@@ -27,4 +33,8 @@ __all__ = [
     "parse_cash_transaction",
     "parse_holding_history",
     "parse_watch_history",
+    "parse_customer_mgmt",
+    "parse_finwire",
+    "parse_customer_update",
+    "parse_account_update",
 ]

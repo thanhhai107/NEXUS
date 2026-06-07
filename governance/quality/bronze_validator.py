@@ -145,6 +145,9 @@ def validate_bronze_tpcdi_file(
         parse_trade, parse_cash_transaction, parse_holding_history,
         parse_watch_history,
     )
+    from ingestion.tpcdi.parsers.complex import (
+        parse_customer_update, parse_account_update,
+    )
 
     GROUP2_PARSERS = {
         "hr": parse_hr,
@@ -154,6 +157,11 @@ def validate_bronze_tpcdi_file(
         "cash_transaction": parse_cash_transaction,
         "holding_history": parse_holding_history,
         "watch_history": parse_watch_history,
+    }
+
+    GROUP3_DELIMITED_PARSERS = {
+        "customer_update": parse_customer_update,
+        "account_update": parse_account_update,
     }
 
     cfg = get_source_config(source_name)
@@ -175,6 +183,8 @@ def validate_bronze_tpcdi_file(
         iter_fn = parse_time_dim(source_name, batch_id)
     elif source_name in GROUP2_PARSERS:
         iter_fn = GROUP2_PARSERS[source_name](source_name, batch_id)
+    elif source_name in GROUP3_DELIMITED_PARSERS:
+        iter_fn = GROUP3_DELIMITED_PARSERS[source_name](source_name, batch_id)
     else:
         raise ValueError(f"validate_bronze_tpcdi_file: unsupported source '{source_name}'")
 
@@ -274,6 +284,7 @@ def validate_bronze_tpcdi_batch(
         "status_type", "trade_type", "tax_rate", "industry", "date", "time",
         "hr", "prospect", "daily_market",
         "trade", "cash_transaction", "holding_history", "watch_history",
+        "customer_update", "account_update",
     }
 
     for src in list_sources_for_batch(batch_id):

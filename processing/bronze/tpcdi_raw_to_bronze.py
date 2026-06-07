@@ -32,6 +32,10 @@ def run(
         parse_trade, parse_cash_transaction, parse_holding_history,
         parse_watch_history,
     )
+    from ingestion.tpcdi.parsers.complex import (
+        parse_customer_mgmt, parse_finwire,
+        parse_customer_update, parse_account_update,
+    )
 
     GROUP2_PARSERS = {
         "hr": parse_hr,
@@ -43,6 +47,13 @@ def run(
         "watch_history": parse_watch_history,
     }
 
+    GROUP3_PARSERS = {
+        "customer_mgmt": parse_customer_mgmt,
+        "finwire": parse_finwire,
+        "customer_update": parse_customer_update,
+        "account_update": parse_account_update,
+    }
+
     if source_name in _ALLOWED_REFERENCE_SOURCES:
         iter_fn = parse_reference(source_name, batch_id)
     elif source_name == "date":
@@ -51,6 +62,8 @@ def run(
         iter_fn = parse_time_dim(source_name, batch_id)
     elif source_name in GROUP2_PARSERS:
         iter_fn = GROUP2_PARSERS[source_name](source_name, batch_id)
+    elif source_name in GROUP3_PARSERS:
+        iter_fn = GROUP3_PARSERS[source_name](source_name, batch_id)
     else:
         raise ValueError(f"Unsupported source: {source_name}")
 
