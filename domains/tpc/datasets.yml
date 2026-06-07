@@ -6,12 +6,16 @@ datasets:
   # ── Core Dimensions ────────────────────────────────────────────────────────
   tpcdi_dim_date:
     domain: tpc
-    description: TPC-DI Date dimension (2,557 rows, 2015-2021).
+    description: 'TPC-DI Date dimension (18 fields, SF=3: 25,933 rows).'
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: date
+        batches: [batch1]
     schema_path: domains/tpc/schemas/tpcdi_dim_date.schema.json
     freshness_hours: 8760
     primary_keys:
@@ -30,16 +34,20 @@ datasets:
       raw_path: s3a://nexus-lakehouse/bronze/tpcdi/dim_date/
       bronze_table: nexus.bronze.tpcdi_dim_date
       silver_table: nexus.silver.tpcdi_dim_date
-      gold_table: nexus.gold.tpcdi_dim_date_summary
+      gold_table: nexus.gold.tpcdi_dim_date
 
   tpcdi_dim_time:
     domain: tpc
-    description: TPC-DI Time dimension (86,400 rows — one per second).
+    description: TPC-DI Time dimension (10 fields, 86,400 rows — one per second).
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: time
+        batches: [batch1]
     schema_path: domains/tpc/schemas/tpcdi_dim_time.schema.json
     freshness_hours: 8760
     primary_keys:
@@ -58,7 +66,7 @@ datasets:
       raw_path: s3a://nexus-lakehouse/bronze/tpcdi/dim_time/
       bronze_table: nexus.bronze.tpcdi_dim_time
       silver_table: nexus.silver.tpcdi_dim_time
-      gold_table: nexus.gold.tpcdi_dim_time_summary
+      gold_table: nexus.gold.tpcdi_dim_time
 
   tpcdi_dim_account:
     domain: tpc
@@ -66,8 +74,14 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: customer_mgmt
+        batches: [batch1]
+      - source_name: account_update
+        batches: [batch2, batch3]
     schema_path: domains/tpc/schemas/tpcdi_dim_account.schema.json
     freshness_hours: 24
     primary_keys:
@@ -94,8 +108,12 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: hr
+        batches: [batch1]
     schema_path: domains/tpc/schemas/tpcdi_dim_broker.schema.json
     freshness_hours: 8760
     primary_keys:
@@ -122,8 +140,14 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: customer_mgmt
+        batches: [batch1]
+      - source_name: customer_update
+        batches: [batch2, batch3]
     schema_path: domains/tpc/schemas/tpcdi_dim_customer.schema.json
     freshness_hours: 24
     primary_keys:
@@ -150,8 +174,12 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: finwire
+        batches: [batch1]
     schema_path: domains/tpc/schemas/tpcdi_dim_security.schema.json
     freshness_hours: 24
     primary_keys:
@@ -178,8 +206,12 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: finwire
+        batches: [batch1]
     schema_path: domains/tpc/schemas/tpcdi_dim_company.schema.json
     freshness_hours: 8760
     primary_keys:
@@ -206,8 +238,14 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: trade
+        batches: [batch1, batch2, batch3]
+      - source_name: trade_history
+        batches: [batch1]
     schema_path: domains/tpc/schemas/tpcdi_dim_trade.schema.json
     freshness_hours: 1
     primary_keys:
@@ -235,8 +273,12 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: cash_transaction
+        batches: [batch1, batch2, batch3]
     schema_path: domains/tpc/schemas/tpcdi_fact_cash_balances.schema.json
     freshness_hours: 24
     primary_keys:
@@ -265,8 +307,12 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: holding_history
+        batches: [batch1, batch2, batch3]
     schema_path: domains/tpc/schemas/tpcdi_fact_holdings.schema.json
     freshness_hours: 24
     primary_keys:
@@ -296,8 +342,14 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: finwire
+        batches: [batch1]
+      - source_name: daily_market
+        batches: [batch1, batch2, batch3]
     schema_path: domains/tpc/schemas/tpcdi_fact_market_history.schema.json
     freshness_hours: 24
     primary_keys:
@@ -325,8 +377,12 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: watch_history
+        batches: [batch1, batch2, batch3]
     schema_path: domains/tpc/schemas/tpcdi_fact_watches.schema.json
     freshness_hours: 24
     primary_keys:
@@ -355,8 +411,12 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: industry
+        batches: [batch1]
     schema_path: domains/tpc/schemas/tpcdi_industry.schema.json
     freshness_hours: 8760
     primary_keys:
@@ -383,8 +443,12 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: status_type
+        batches: [batch1]
     schema_path: domains/tpc/schemas/tpcdi_status_type.schema.json
     freshness_hours: 8760
     primary_keys:
@@ -411,8 +475,12 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: tax_rate
+        batches: [batch1]
     schema_path: domains/tpc/schemas/tpcdi_tax_rate.schema.json
     freshness_hours: 8760
     primary_keys:
@@ -439,8 +507,12 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: trade_type
+        batches: [batch1]
     schema_path: domains/tpc/schemas/tpcdi_trade_type.schema.json
     freshness_hours: 8760
     primary_keys:
@@ -467,8 +539,12 @@ datasets:
     nexus_demo:
       status: primary
       default_download: true
-    source_type: data_caterer
-    data_caterer_plan: tpcdi_plan
+    source_type: tpcdi_digen
+    source_config: domains/tpc/tpcdi_sources.yml
+    source_root: runtime/tpcdi/sf3
+    source_mappings:
+      - source_name: prospect
+        batches: [batch1, batch2, batch3]
     schema_path: domains/tpc/schemas/tpcdi_prospect.schema.json
     freshness_hours: 8760
     primary_keys:
