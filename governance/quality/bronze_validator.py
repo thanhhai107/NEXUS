@@ -206,14 +206,17 @@ def validate_bronze_tpcdi_file(
             if source_file not in files_checked:
                 files_checked.append(source_file)
 
-            # Field count mismatch
-            if rec.get("_parse_error") == "field_count_mismatch":
+            # Field count mismatch (stored as _parse_errors list by parsers)
+            parse_errors = rec.get("_parse_errors")
+            if not parse_errors:
+                parse_errors = [rec.get("_parse_error")] if rec.get("_parse_error") else []
+
+            if any("field_count_mismatch" in str(e) for e in parse_errors):
                 total_field_errors += 1
                 malformed.append(rec)
                 continue
 
-            # Type coercion errors
-            parse_errors = rec.get("_parse_errors")
+            # Type coercion errors (remaining parse_errors after field_count check)
             if parse_errors:
                 total_type_errors += 1
                 rec["_batch_id"] = batch_id

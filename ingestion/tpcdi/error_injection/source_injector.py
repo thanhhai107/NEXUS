@@ -9,12 +9,17 @@ Usage::
     from ingestion.tpcdi.error_injection.source_injector import TpcdiSourceInjector
 
     injector = TpcdiSourceInjector()
-    scenario_root = injector.create_scenario("missing_field", target="trade", batch="batch1", line_numbers=[100, 200])
-    print(scenario_root)
+    scenario_root = injector.create_scenario(
+        "missing_field_trade_001",
+        target_source="trade", batch_id="batch1",
+        mutation_type="missing_field",
+        line_numbers=[100, 200],
+    )
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import random
@@ -22,7 +27,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from common.tpcdi_sources import source_root, load_tpcdi_sources_config, resolve_batch_path
+from common.tpcdi_sources import source_root, resolve_batch_path, get_source_config, list_source_files
 
 SCENARIO_BASE = Path("runtime/tpcdi/scenarios")
 
@@ -46,55 +51,30 @@ class TpcdiSourceInjector:
     ) -> Path:
         """Create a scenario directory with injected errors.
 
-        Parameters
-        ----------
-        scenario_id:
-            Unique name for this scenario (e.g. ``malformed_trade_001``).
-        target_source:
-            Source name from tpcdi_sources.yml (e.g. ``trade``, ``daily_market``).
-        batch_id:
-            batch1, batch2, or batch3.
-        line_numbers:
-            1-indexed line numbers to mutate (excluding header lines).
-            If None, picks ``random.sample`` from available lines.
-        mutation_type:
-            One of: ``missing_field``, ``extra_field``, ``type_error``, ``duplicate_pk``.
-        field_index:
-            0-indexed field position for mutations that target a specific field.
-            If None and mutation is field-level, picks a random index.
-
         Returns
         -------
-        Path to the scenario source_root (``runtime/tpcdi/scenarios/{scenario_id}/``).
+        Path to the scenario root (``runtime/tpcdi/scenarios/{scenario_id}/``).
         """
-        from common.tpcdi_sources import get_source_config
-
-        src_cfg = get_source_config(target_source)
         clean_root = source_root()
         scenario_root = PROJECT_ROOT / SCENARIO_BASE / scenario_id
-        batch_dir = scenario_root / resolve_batch_path(batch_id).relative_to(source_root())
+        source_dir = scenario_root / "source"
+        batch_dir = source_dir / resolve_batch_path(batch_id).relative_to(clean_root)
 
-        # Copy batch directory
-        clean_batch = resolve_batch_path(batch_id)
-        if clean_batch.exists():
-            shutil.copytree(clean_batch, batch_dir, dirs_exist_ok=True)
+        # Copy full clean source root (all batches + reports)
+        if source_dir.exists():
+            shutil.rmtree(source_dir)
+        shutil.copytree(clean_root, source_dir)
 
-        # Copy root-level reports
-        for f in clean_root.glob("*.txt"):
-            shutil.copy2(f, scenario_root)
-        for f in clean_root.glob("*_audit.csv"):
-            shutil.copy2(f, scenario_root)
-        for f in clean_root.glob("Generator_audit.csv"):
-            shutil.copy2(f, scenario_root)
-
-        # Find the target file
+        # Find target files
+        src_cfg = get_source_config(target_source)
         target_files = list_source_files(target_source, batch_id)
         mutations: list[dict[str, Any]] = []
+        mut_counter = 0
+        columns = src_cfg.get("columns", [])
 
         for filepath in target_files:
             relative = filepath.relative_to(clean_root)
-            scenario_file = scenario_root / relative
-
+            scenario_file = source_dir / relative
             if not scenario_file.exists():
                 continue
 
@@ -108,30 +88,57 @@ class TpcdiSourceInjector:
                 count = min(3, total_lines)
                 lnums = sorted(self.rng.sample(range(1, total_lines + 1), count))
 
-            for ln in lnums:
-                idx = ln - 1
-                original = lines[idx].rstrip("\n\r")
-                mutated, meta = self._mutate_line(
-                    original, mutation_type, delimiter, field_index, ln
+            for phys_ln in lnums:
+                mut_counter += 1
+                idx = phys_ln - 1
+                original_line = lines[idx].rstrip("\n\r")
+
+                if mutation_type == "duplicate_pk":
+                    # Insert a separate duplicate line after the original
+                    lines.insert(idx + 1, original_line + "\n")
+                logical_rn = phys_ln  # simplified; real blank-skip handled later
+
+                record_hash_before = hashlib.sha256(original_line.encode()).hexdigest()[:16]
+
+                mutated_line, meta = self._mutate_line(
+                    original_line, mutation_type, delimiter, field_index, phys_ln, columns
                 )
-                lines[idx] = mutated + "\n"
+                lines[idx] = mutated_line + "\n"
+
+                if meta.get("skipped"):
+                    continue  # don't add skipped mutations to manifest
+
+                record_hash_after = hashlib.sha256(mutated_line.encode()).hexdigest()[:16]
+                meta.update({
+                    "mutation_id": f"mut-{mut_counter:06d}",
+                    "source_name": target_source,
+                    "batch_id": batch_id,
+                    "relative_file": str(relative),
+                    "physical_line_number": phys_ln,
+                    "logical_record_number": logical_rn,
+                    "record_hash_before": record_hash_before,
+                    "record_hash_after": record_hash_after,
+                    "mutation_type": mutation_type,
+                })
                 mutations.append(meta)
 
             scenario_file.write_text("".join(lines), encoding="utf-8")
 
-        # Write manifest
         manifest = {
             "scenario_id": scenario_id,
+            "run_id": "",
+            "seed": self.seed,
             "base_source_root": str(clean_root),
+            "scenario_root": str(scenario_root),
+            "scenario_source_root": str(source_dir),
+            "recovered_source_root": str(scenario_root / "recovered_source"),
             "target_source": target_source,
             "batch": batch_id,
-            "seed": self.seed,
             "mutation_type": mutation_type,
             "mutations": mutations,
         }
         manifest_path = scenario_root / "injection_manifest.json"
         manifest_path.write_text(json.dumps(manifest, indent=2))
-
         return scenario_root
 
     def _mutate_line(
@@ -141,12 +148,17 @@ class TpcdiSourceInjector:
         delimiter: str,
         field_index: int | None,
         line_number: int,
+        columns: list[str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         fields = line.split(delimiter)
         meta: dict[str, Any] = {
-            "line_number": line_number,
-            "type": mutation_type,
-            "original": line,
+            "target_field": None,
+            "original_value": None,
+            "mutated_value": None,
+            "expected_detection": None,
+            "expected_stage": None,
+            "recoverable": None,
+            "recovery_hint": None,
         }
 
         if mutation_type == "missing_field":
@@ -154,35 +166,58 @@ class TpcdiSourceInjector:
                 return line, {**meta, "skipped": "only_one_field"}
             fi = field_index if field_index is not None and field_index < len(fields) else self.rng.randint(0, len(fields) - 1)
             removed = fields.pop(fi)
-            meta["field_index"] = fi
-            meta["removed_value"] = removed
-            meta["expected_detection"] = "field_count_mismatch"
+            meta.update({
+                "target_field": columns[fi] if columns and fi < len(columns) else f"col_{fi}",
+                "original_value": removed,
+                "mutated_value": "(removed)",
+                "expected_detection": "field_count_mismatch",
+                "expected_stage": "bronze_validation",
+                "recoverable": True,
+                "recovery_hint": "infer_missing_field",
+            })
 
         elif mutation_type == "extra_field":
             fi = field_index if field_index is not None and field_index <= len(fields) else self.rng.randint(0, len(fields))
             extra = f"EXTRA{self.rng.randint(100, 999)}"
             fields.insert(fi, extra)
-            meta["field_index"] = fi
-            meta["extra_value"] = extra
-            meta["expected_detection"] = "field_count_mismatch"
+            meta.update({
+                "target_field": columns[fi] if columns and fi < len(columns) else f"col_{fi}",
+                "original_value": None,
+                "mutated_value": extra,
+                "expected_detection": "field_count_mismatch",
+                "expected_stage": "bronze_validation",
+                "recoverable": True,
+                "recovery_hint": "drop_extra_field",
+            })
 
         elif mutation_type == "type_error":
-            numeric_candidates = [i for i, f in enumerate(fields) if f.strip().lstrip("-").isdigit()]
+            numeric_candidates = [i for i, f in enumerate(fields) if f.strip().lstrip("-").replace(".", "").isdigit()]
             if not numeric_candidates:
                 return line, {**meta, "skipped": "no_numeric_field"}
             fi = field_index if field_index is not None and field_index in numeric_candidates else self.rng.choice(numeric_candidates)
             original = fields[fi]
             fields[fi] = "NOT_A_NUMBER"
-            meta["field_index"] = fi
-            meta["original_value"] = original
-            meta["replacement"] = "NOT_A_NUMBER"
-            meta["expected_detection"] = "type_coercion_error"
+            meta.update({
+                "target_field": columns[fi] if columns and fi < len(columns) else f"col_{fi}",
+                "original_value": original,
+                "mutated_value": "NOT_A_NUMBER",
+                "expected_detection": "type_coercion_error",
+                "expected_stage": "bronze_validation",
+                "recoverable": True,
+                "recovery_hint": "safe_cast",
+            })
 
         elif mutation_type == "duplicate_pk":
-            # Duplicate the entire line
-            fields_copy = list(fields)
-            meta["expected_detection"] = "duplicate_primary_key"
-            return line + delimiter.join(fields_copy) + "\n", meta
+            meta.update({
+                "target_field": "all",
+                "original_value": line,
+                "mutated_value": "(duplicated line)",
+                "expected_detection": "duplicate_primary_key",
+                "expected_stage": "gold_audit",
+                "recoverable": True,
+                "recovery_hint": "dedup",
+            })
+            return line, meta  # line unchanged; duplicate is already inserted in create_scenario()
 
         else:
             raise ValueError(f"Unknown mutation_type: {mutation_type}")
@@ -191,6 +226,5 @@ class TpcdiSourceInjector:
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-from common.tpcdi_sources import list_source_files
 
 __all__ = ["TpcdiSourceInjector"]
