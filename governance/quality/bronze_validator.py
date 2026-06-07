@@ -117,4 +117,158 @@ def validate_bronze_file(
     }
 
 
-__all__ = ["validate_bronze_file"]
+def validate_bronze_tpcdi_file(
+    *,
+    source_name: str,
+    batch_id: str = "batch1",
+    chunk_size: int = 10000,
+    no_exit_on_fail: bool = True,
+    dataset: str | None = None,
+) -> dict[str, Any]:
+    """Validate a TPC-DI DIGen source file using streaming chunks.
+
+    Performs per-chunk validation:
+    1. File exists → row count
+    2. Field count vs expected columns
+    3. Type coercion errors (tracked via _parse_errors)
+    4. Null ratio per column
+    5. Quarantine malformed records
+
+    Designed for Group 1 sources (status_type, trade_type, tax_rate,
+    industry, date, time).  No FK/SCD checks yet.
+    """
+    from common.tpcdi_io import iter_tpcdi_chunks, count_tpcdi_records
+    from common.tpcdi_sources import get_source_config, list_source_files, list_sources_for_batch
+    from ingestion.tpcdi.parsers.reference import parse_reference, _ALLOWED_REFERENCE_SOURCES
+    from ingestion.tpcdi.parsers.datetime_dim import parse_date_dim, parse_time_dim
+
+    cfg = get_source_config(source_name)
+    expected_columns = len(cfg.get("columns", []))
+    use_dataset = dataset or source_name
+
+    total_records = 0
+    total_field_errors = 0
+    total_type_errors = 0
+    null_counts: dict[str, int] = {}
+    malformed: list[dict[str, Any]] = []
+    files_checked: list[str] = []
+
+    # Determine which parser to use based on source type
+    if source_name in _ALLOWED_REFERENCE_SOURCES:
+        iter_fn = parse_reference(source_name, batch_id)
+    elif source_name == "date":
+        iter_fn = parse_date_dim(source_name, batch_id)
+    elif source_name == "time":
+        iter_fn = parse_time_dim(source_name, batch_id)
+    else:
+        raise ValueError(f"validate_bronze_tpcdi_file: unsupported source '{source_name}'")
+
+    def _chunk_iter(records, cs: int):
+        chunk: list[dict[str, Any]] = []
+        for record in records:
+            chunk.append(record)
+            if len(chunk) >= cs:
+                yield chunk
+                chunk = []
+        if chunk:
+            yield chunk
+
+    for chunk in _chunk_iter(iter_fn, chunk_size):
+        total_records += len(chunk)
+
+        for rec in chunk:
+            source_file = rec.get("_source_file", "")
+            if source_file not in files_checked:
+                files_checked.append(source_file)
+
+            # Field count mismatch
+            if rec.get("_parse_error") == "field_count_mismatch":
+                total_field_errors += 1
+                malformed.append(rec)
+                continue
+
+            # Type coercion errors
+            parse_errors = rec.get("_parse_errors")
+            if parse_errors:
+                total_type_errors += 1
+                rec["_batch_id"] = batch_id
+                rec["_source_name"] = source_name
+                rec["_dataset"] = use_dataset
+                malformed.append(rec)
+                continue
+
+            # Null tracking per column
+            for k, v in rec.items():
+                if k.startswith("_"):
+                    continue
+                if v is None or (isinstance(v, str) and v.strip() == ""):
+                    null_counts[k] = null_counts.get(k, 0) + 1
+
+    # Quarantine malformed records
+    quarantine_path = None
+    if malformed:
+        quarantine_path = quarantine_records(
+            use_dataset,
+            malformed,
+            reason="bronze_validation_failed",
+            batch_id=batch_id,
+            source_path=",".join(files_checked) if files_checked else source_name,
+            layer="bronze",
+        )
+
+    # Build result
+    null_ratios = {
+        col: round(count / total_records, 4) if total_records > 0 else 0.0
+        for col, count in sorted(null_counts.items())
+    }
+
+    passed = (total_field_errors == 0 and total_type_errors == 0)
+    status = "passed" if passed else "failed"
+
+    details = {
+        "source_name": source_name,
+        "batch_id": batch_id,
+        "files_checked": files_checked,
+        "total_records": total_records,
+        "field_count_errors": total_field_errors,
+        "type_coercion_errors": total_type_errors,
+        "null_ratios": null_ratios,
+        "quarantine_path": str(quarantine_path) if quarantine_path else None,
+    }
+
+    return {
+        "dataset": use_dataset,
+        "source": source_name,
+        "status": status,
+        "details": details,
+        "exit_code": 0 if passed or no_exit_on_fail else 1,
+    }
+
+
+def validate_bronze_tpcdi_batch(
+    *,
+    batch_id: str = "batch1",
+    chunk_size: int = 10000,
+    no_exit_on_fail: bool = True,
+) -> list[dict[str, Any]]:
+    """Validate all tpc-di sources in a batch."""
+    from common.tpcdi_sources import list_sources_for_batch
+
+    results: list[dict[str, Any]] = []
+    allowed = {"status_type", "trade_type", "tax_rate", "industry", "date", "time"}
+
+    for src in list_sources_for_batch(batch_id):
+        if src["name"] not in allowed:
+            continue
+        result = validate_bronze_tpcdi_file(
+            source_name=src["name"],
+            batch_id=batch_id,
+            chunk_size=chunk_size,
+            no_exit_on_fail=no_exit_on_fail,
+        )
+        results.append(result)
+
+    return results
+
+
+__all__ = ["validate_bronze_file", "validate_bronze_tpcdi_file", "validate_bronze_tpcdi_batch"]

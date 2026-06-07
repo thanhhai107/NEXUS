@@ -458,6 +458,36 @@ def generate_quality_suite(args: argparse.Namespace) -> None:
         print(json.dumps(suite, indent=2))
 
 
+def validate_bronze_tpcdi_cli(args: argparse.Namespace) -> None:
+    from governance.quality.bronze_validator import (
+        validate_bronze_tpcdi_file,
+        validate_bronze_tpcdi_batch,
+    )
+
+    if args.all:
+        results = validate_bronze_tpcdi_batch(
+            batch_id=args.batch,
+            chunk_size=args.chunk_size,
+            no_exit_on_fail=args.no_exit_on_fail,
+        )
+    elif args.source_name:
+        result = validate_bronze_tpcdi_file(
+            source_name=args.source_name,
+            batch_id=args.batch,
+            chunk_size=args.chunk_size,
+            no_exit_on_fail=args.no_exit_on_fail,
+        )
+        results = [result]
+    else:
+        print("Error: specify --source-name or --all")
+        raise SystemExit(1)
+
+    print(json.dumps(results, indent=2))
+    exit_code = max(r.get("exit_code", 0) for r in results)
+    if exit_code:
+        raise SystemExit(exit_code)
+
+
 def validate_bronze(args: argparse.Namespace) -> None:
     result = validate_bronze_file(
         dataset=args.dataset,
@@ -738,6 +768,17 @@ def build_parser() -> argparse.ArgumentParser:
     bronze_validate.add_argument("--actor")
     bronze_validate.add_argument("--no-exit-on-fail", action="store_true")
     bronze_validate.set_defaults(func=validate_bronze)
+
+    tpcdi_validate = quality_subcommands.add_parser(
+        "tpcdi-validate",
+        help="Validate a TPC-DI DIGen source file using streaming chunks",
+    )
+    tpcdi_validate.add_argument("--source-name", help="Source name in tpcdi_sources.yml")
+    tpcdi_validate.add_argument("--batch", default="batch1", help="batch1 | batch2 | batch3")
+    tpcdi_validate.add_argument("--all", action="store_true", help="Validate all sources in batch")
+    tpcdi_validate.add_argument("--chunk-size", type=int, default=10000)
+    tpcdi_validate.add_argument("--no-exit-on-fail", action="store_true")
+    tpcdi_validate.set_defaults(func=validate_bronze_tpcdi_cli)
 
     gx_suite = quality_subcommands.add_parser(
         "gx-suite",
