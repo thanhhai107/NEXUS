@@ -27,6 +27,21 @@ def run(
     from common.tpcdi_sources import get_source_config
     from ingestion.tpcdi.parsers.reference import parse_reference, _ALLOWED_REFERENCE_SOURCES
     from ingestion.tpcdi.parsers.datetime_dim import parse_date_dim, parse_time_dim
+    from ingestion.tpcdi.parsers.csv_pipe import (
+        parse_hr, parse_daily_market, parse_prospect,
+        parse_trade, parse_cash_transaction, parse_holding_history,
+        parse_watch_history,
+    )
+
+    GROUP2_PARSERS = {
+        "hr": parse_hr,
+        "daily_market": parse_daily_market,
+        "prospect": parse_prospect,
+        "trade": parse_trade,
+        "cash_transaction": parse_cash_transaction,
+        "holding_history": parse_holding_history,
+        "watch_history": parse_watch_history,
+    }
 
     if source_name in _ALLOWED_REFERENCE_SOURCES:
         iter_fn = parse_reference(source_name, batch_id)
@@ -34,6 +49,8 @@ def run(
         iter_fn = parse_date_dim(source_name, batch_id)
     elif source_name == "time":
         iter_fn = parse_time_dim(source_name, batch_id)
+    elif source_name in GROUP2_PARSERS:
+        iter_fn = GROUP2_PARSERS[source_name](source_name, batch_id)
     else:
         raise ValueError(f"Unsupported source: {source_name}")
 

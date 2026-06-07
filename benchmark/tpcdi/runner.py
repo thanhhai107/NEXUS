@@ -157,66 +157,94 @@ class TpcdiRunner:
         return result
 
     # ------------------------------------------------------------------
-    # Milestone 1 — validate → bronze → silver → gold → audit
+    # Milestone 1 — Group 1 (reference + date/time)
     # ------------------------------------------------------------------
     M1_SOURCES = ["status_type", "trade_type", "tax_rate", "industry", "date", "time"]
 
-    def run_milestone1(self, clean_outputs: bool = True) -> TpcdiResult:
-        """Run full M1 pipeline: validate → Bronze → Silver → Gold → audit.
+    # ------------------------------------------------------------------
+    # Milestone 2 — Group 2a (hr, prospect, daily_market)
+    # ------------------------------------------------------------------
+    M2_SOURCES = ["hr", "prospect", "daily_market", "trade", "cash_transaction", "holding_history", "watch_history"]
 
-        Parameters
-        ----------
-        clean_outputs:
-            Remove existing Bronze/Silver/Gold output before running.
-        """
+    def _run_pipeline(self, source_names: list[str], result: TpcdiResult,
+                       steps: tuple[str, ...] = ("validate", "bronze", "silver", "gold")) -> float:
+        """Run specified pipeline steps for each source. Returns elapsed seconds."""
         import time
         from governance.quality.bronze_validator import validate_bronze_tpcdi_file
         from processing.bronze.tpcdi_raw_to_bronze import run as bronze_run
         from processing.silver.tpcdi_bronze_to_silver import run as silver_run
         from processing.gold.tpcdi_silver_to_gold import run as gold_run
 
-        if clean_outputs:
-            self._clean_m1_outputs()
-
-        result = TpcdiResult(scale_factor=self.scale_factor)
-
-        self.monitor.start()
         started = time.perf_counter()
 
-        try:
-            for source_name in self.M1_SOURCES:
-                # 1. Validate source
+        for source_name in source_names:
+            if "validate" in steps:
                 v = validate_bronze_tpcdi_file(source_name=source_name, batch_id="batch1")
                 if v["status"] != "passed":
                     result.errors.append(f"[{source_name}] validation failed: {v['details']}")
                     continue
 
-                # 2. Bronze load
+            if "bronze" in steps:
                 br = bronze_run(source_name=source_name)
                 if br.get("error"):
                     result.errors.append(f"[{source_name}] bronze error: {br['error']}")
                     continue
 
-                # 3. Silver transform
+            if "silver" in steps:
                 sr = silver_run(source_name=source_name)
                 if sr.get("error"):
                     result.errors.append(f"[{source_name}] silver error: {sr['error']}")
                     continue
 
-                # 4. Gold load
+            if "gold" in steps:
                 gr = gold_run(source_name=source_name)
                 if gr.get("error"):
                     result.errors.append(f"[{source_name}] gold error: {gr['error']}")
                     continue
-        finally:
-            self.monitor.stop()
 
-        result.phase1_seconds = round(time.perf_counter() - started, 3)
+        return round(time.perf_counter() - started, 3)
+
+    def run_milestone1(self, clean_outputs: bool = True) -> TpcdiResult:
+        result = TpcdiResult(scale_factor=self.scale_factor)
+        if clean_outputs:
+            self._clean_m1_outputs()
+        self.monitor.start()
+        result.phase1_seconds = self._run_pipeline(self.M1_SOURCES, result)
+        self.monitor.stop()
+        self._gather_resource(result)
+        audit_results = self.auditor.run_milestone1()
+        self._set_audit_result(result, audit_results)
+        return result
+
+    def run_milestone2(self, clean_outputs: bool = True) -> TpcdiResult:
+        """Run M2: M1 full pipeline + Group 2 validate + Bronze.
+
+        M1 Gold must exist for correctness audits, so M1 is always
+        regenerated before Group 2 processing.
+        """
+        self.monitor.start()
+        result = TpcdiResult(scale_factor=self.scale_factor)
+
+        if clean_outputs:
+            self._clean_m1_outputs()
+
+        # 1. M1 full pipeline → regenerates M1 Gold for audits
+        m1_time = self._run_pipeline(self.M1_SOURCES, result)
+        # 2. Group 2 validate + bronze only (no silver/gold yet)
+        g2_time = self._run_pipeline(
+            self.M2_SOURCES, result,
+            steps=("validate", "bronze"),
+        )
+        self.monitor.stop()
+
+        result.phase1_seconds = round(m1_time + g2_time, 3)
         self._gather_resource(result)
 
-        # 5. Correctness audits
         audit_results = self.auditor.run_milestone1()
+        self._set_audit_result(result, audit_results)
+        return result
 
+    def _set_audit_result(self, result: TpcdiResult, audit_results: list) -> None:
         passed = sum(1 for r in audit_results if r.status == AuditStatus.PASS)
         skipped = sum(1 for r in audit_results if r.status == AuditStatus.SKIP)
         total = len(audit_results) - skipped
@@ -228,15 +256,14 @@ class TpcdiRunner:
         result.correctness_details = [r.to_dict() for r in audit_results]
         result.is_valid = result.correctness_all_passed and not result.errors
 
-        return result
-
     def _clean_m1_outputs(self) -> None:
-        """Remove M1 Bronze/Silver/Gold output from previous runs."""
+        """Remove Bronze/Silver/Gold output for M1+M2 sources."""
         import shutil
         project_root = Path(__file__).resolve().parents[2]
+        all_sources = self.M1_SOURCES + self.M2_SOURCES
         for layer in ["bronze", "silver", "gold"]:
             base = project_root / "runtime" / "lake" / layer / "tpcdi"
-            for source in self.M1_SOURCES:
+            for source in all_sources:
                 path = base / source
                 if path.exists():
                     shutil.rmtree(path)
