@@ -390,6 +390,26 @@ class TpcdiCorrectnessAuditor:
         "time": "sk_time",
     }
 
+    M2A_TABLES = {
+        "hr": "employee_id",
+        "prospect": "agency_id",
+    }
+
+    M2B_TABLES = {
+        "daily_market": ["dm_date", "dm_s_symb"],
+    }
+
+    M2C_TABLES = {}  # all fact tables — row_count only, no natural PK at source level
+    M2C_TABLES_SINGLE_PK = {
+        "trade": "trade_id",
+    }
+    M2C_TABLES_ALL = {
+        "trade": "trade_id",
+        "cash_transaction": None,  # fact — row count only
+        "holding_history": None,   # fact — row count only
+        "watch_history": None,     # fact — row count only
+    }
+
     def run_row_count_audit_m1(self) -> AuditResult:
         """Compare M1 Gold record counts against DIGen source record counts.
 
@@ -519,6 +539,156 @@ class TpcdiCorrectnessAuditor:
             expected=0,
             actual=len(violations),
         )
+
+    # ==================================================================
+    # M2a — Row Count Audit (hr, prospect, daily_market)
+    # ==================================================================
+    def run_row_count_audit_m2a(self) -> AuditResult:
+        from common.tpcdi_io import count_tpcdi_records
+        from pathlib import Path
+
+        gold_root = Path(__file__).resolve().parents[2] / "runtime" / "lake" / "gold" / "tpcdi"
+        sources = list(self.M2A_TABLES) + list(self.M2B_TABLES)
+        violations: list[dict[str, Any]] = []
+        checked = expected_total = actual_total = 0
+
+        for source_name in sources:
+            expected_count = count_tpcdi_records(source_name, "batch1")
+            expected_total += expected_count
+            gold_file = gold_root / source_name / "data.jsonl"
+            if not gold_file.exists():
+                violations.append({"table": source_name, "issue": "gold_data_not_found", "expected": expected_count, "actual": 0})
+                continue
+            actual_count = sum(1 for line in gold_file.open() if line.strip())
+            actual_total += actual_count
+            checked += 1
+            if actual_count != expected_count:
+                violations.append({"table": source_name, "issue": "row_count_mismatch", "expected": expected_count, "actual": actual_count, "delta": actual_count - expected_count})
+
+        status = AuditStatus.PASS if not violations else AuditStatus.FAIL
+        return AuditResult(
+            audit_name="row_count_m2a",
+            status=status,
+            detail=f"{checked}/{len(sources)} tables match" if not violations else f"{len(violations)} row count issues",
+            violations=violations, expected=expected_total, actual=actual_total,
+        )
+
+    # ==================================================================
+    # M2a — PK Duplicate Audit (hr, prospect, daily_market)
+    # ==================================================================
+    def run_pk_duplicate_audit_m2a(self) -> AuditResult:
+        import json
+        from pathlib import Path
+
+        gold_root = Path(__file__).resolve().parents[2] / "runtime" / "lake" / "gold" / "tpcdi"
+        violations: list[dict[str, Any]] = []
+        checked = 0
+
+        # Single-field PK tables
+        for table, pk_col in self.M2A_TABLES.items():
+            gold_file = gold_root / table / "data.jsonl"
+            if not gold_file.exists():
+                violations.append({"table": table, "issue": "gold_data_not_found"})
+                continue
+            checked += 1
+            seen: set[str] = set()
+            with gold_file.open() as f:
+                for line in f:
+                    if not line.strip(): continue
+                    pk_raw = json.loads(line).get("payload", {}).get(pk_col)
+                    pk_val = str(pk_raw).strip() if pk_raw is not None else ""
+                    if not pk_val:
+                        violations.append({"table": table, "pk_column": pk_col, "issue": "missing_primary_key"})
+                    elif pk_val in seen:
+                        violations.append({"table": table, "pk_column": pk_col, "pk_value": pk_val, "issue": "duplicate_primary_key"})
+                    else:
+                        seen.add(pk_val)
+
+        # Composite PK tables (daily_market)
+        for table, pk_cols in self.M2B_TABLES.items():
+            gold_file = gold_root / table / "data.jsonl"
+            if not gold_file.exists():
+                violations.append({"table": table, "issue": "gold_data_not_found"})
+                continue
+            checked += 1
+            seen: set[tuple] = set()
+            with gold_file.open() as f:
+                for line in f:
+                    if not line.strip(): continue
+                    payload = json.loads(line).get("payload", {})
+                    key = tuple(str(payload.get(c, "") or "").strip() for c in pk_cols)
+                    if not all(key):
+                        violations.append({"table": table, "pk_columns": pk_cols, "issue": "missing_primary_key"})
+                    elif key in seen:
+                        violations.append({"table": table, "pk_columns": pk_cols, "pk_value": str(key), "issue": "duplicate_primary_key"})
+                    else:
+                        seen.add(key)
+
+        status = AuditStatus.PASS if not violations else AuditStatus.FAIL
+        return AuditResult(
+            audit_name="pk_duplicate_m2a",
+            status=status,
+            detail=f"No issues in {checked} tables" if not violations else f"{len(violations)} PK issues",
+            violations=violations, expected=0, actual=len(violations),
+        )
+
+    # ==================================================================
+    # M2c — Row Count Audit (trade, cash_transaction, holding_history, watch_history)
+    # ==================================================================
+    def run_row_count_audit_m2c(self) -> AuditResult:
+        from common.tpcdi_io import count_tpcdi_records
+        from pathlib import Path
+        gold_root = Path(__file__).resolve().parents[2] / "runtime" / "lake" / "gold" / "tpcdi"
+        sources = list(self.M2C_TABLES_ALL)
+        violations: list[dict[str, Any]] = []
+        checked = expected_total = actual_total = 0
+        for source_name in sources:
+            expected_count = count_tpcdi_records(source_name, "batch1")
+            expected_total += expected_count
+            gold_file = gold_root / source_name / "data.jsonl"
+            if not gold_file.exists():
+                violations.append({"table": source_name, "issue": "gold_data_not_found", "expected": expected_count, "actual": 0}); continue
+            actual_count = sum(1 for line in gold_file.open() if line.strip())
+            actual_total += actual_count; checked += 1
+            if actual_count != expected_count:
+                violations.append({"table": source_name, "issue": "row_count_mismatch", "expected": expected_count, "actual": actual_count, "delta": actual_count - expected_count})
+        status = AuditStatus.PASS if not violations else AuditStatus.FAIL
+        return AuditResult(audit_name="row_count_m2c", status=status, detail=f"{checked}/{len(sources)} tables match" if not violations else f"{len(violations)} row count issues", violations=violations, expected=expected_total, actual=actual_total)
+
+    # ==================================================================
+    # M2c — PK Duplicate Audit (trade only — has natural PK at source level)
+    # ==================================================================
+    def run_pk_duplicate_audit_m2c(self) -> AuditResult:
+        import json; from pathlib import Path
+        gold_root = Path(__file__).resolve().parents[2] / "runtime" / "lake" / "gold" / "tpcdi"
+        violations: list[dict[str, Any]] = []; checked = 0
+        for table, pk_col in self.M2C_TABLES_SINGLE_PK.items():
+            gold_file = gold_root / table / "data.jsonl"
+            if not gold_file.exists():
+                violations.append({"table": table, "issue": "gold_data_not_found"}); continue
+            checked += 1; seen: set[str] = set()
+            with gold_file.open() as f:
+                for line in f:
+                    if not line.strip(): continue
+                    pk_raw = json.loads(line).get("payload", {}).get(pk_col)
+                    pk_val = str(pk_raw).strip() if pk_raw is not None else ""
+                    if not pk_val:
+                        violations.append({"table": table, "pk_column": pk_col, "issue": "missing_primary_key"})
+                    elif pk_val in seen:
+                        violations.append({"table": table, "pk_column": pk_col, "pk_value": pk_val, "issue": "duplicate_primary_key"})
+                    else:
+                        seen.add(pk_val)
+        status = AuditStatus.PASS if not violations else AuditStatus.FAIL
+        detail = f"No issues in {checked} tables" if not violations else f"{len(violations)} PK issues in {checked} tables"
+        return AuditResult(audit_name="pk_duplicate_m2c", status=status, detail=detail, violations=violations, expected=0, actual=len(violations))
+
+    def run_milestone3(self) -> list[AuditResult]:
+        self.results = [self.run_row_count_audit_m2c(), self.run_pk_duplicate_audit_m2c()]
+        return self.results
+
+    def run_milestone2a(self) -> list[AuditResult]:
+        self.results = [self.run_row_count_audit_m2a(), self.run_pk_duplicate_audit_m2a()]
+        return self.results
 
     def run_milestone1(self) -> list[AuditResult]:
         """Run M1 audit suite (row_count + pk_duplicate)."""
