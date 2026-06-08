@@ -48,6 +48,17 @@ class RecoveryReport:
             return 1.0
         return self.repaired / self.total_quarantined
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "scenario_id": self.scenario_id,
+            "run_id": self.run_id,
+            "total_quarantined": self.total_quarantined,
+            "repaired": self.repaired,
+            "repair_candidates": self.repair_candidates,
+            "unrecoverable": self.unrecoverable,
+            "strategy_breakdown": self.strategy_breakdown,
+            "recovery_rate": round(self.recovery_rate, 4),
+        }
 
 class RecoveryEngine:
     """Orchestrate repair of source files for a given scenario."""
