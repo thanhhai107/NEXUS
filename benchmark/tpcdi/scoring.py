@@ -45,6 +45,9 @@ class ScoringReport:
 
     # Recovery (optional, populated in full mode)
     repaired: int = 0
+    repair_candidates: int = 0
+    unrecoverable: int = 0
+    total_quarantined: int = 0
     repair_rate_on_detected: float = 0.0
     end_to_end_recovery_rate: float = 0.0
 
@@ -71,6 +74,9 @@ class ScoringReport:
             },
             "recovery": {
                 "repaired": self.repaired,
+                "repair_candidates": self.repair_candidates,
+                "unrecoverable": self.unrecoverable,
+                "total_quarantined": self.total_quarantined,
                 "repair_rate_on_detected": round(self.repair_rate_on_detected, 4),
                 "end_to_end_recovery_rate": round(self.end_to_end_recovery_rate, 4),
             },
@@ -216,6 +222,97 @@ class TpcdiScoringEngine:
             },
             summary=self._summary,
         )
+
+    def score_full(
+        self,
+        manifest_path: str | Path,
+        *,
+        bronze_validation: dict[str, Any] | None = None,
+        audit_results: list[dict[str, Any]] | None = None,
+        quarantine_root: str | Path | None = None,
+        detected_errors: list[dict[str, Any]] | None = None,
+        recovery_log_path: str | Path | None = None,
+    ) -> ScoringReport:
+        """Score detection + recovery: includes repaired/leakage metrics.
+
+        Reads ``recovery_log.json`` from the scenario directory to extract
+        recovery stats, then merges them into the detection report.
+
+        Parameters
+        ----------
+        manifest_path: Path to injection_manifest.json or scenario root dir.
+        recovery_log_path: Path to recovery_log.json.
+            If None, inferred from manifest_path parent.
+        """
+        # Step 1: Detection scoring
+        report = self.score_detection(
+            manifest_path,
+            bronze_validation=bronze_validation,
+            audit_results=audit_results,
+            quarantine_root=quarantine_root,
+            detected_errors=detected_errors,
+        )
+
+        # Step 2: Load recovery log
+        if recovery_log_path is None:
+            manifest_dir = Path(manifest_path)
+            if manifest_dir.is_dir():
+                recovery_log_path = manifest_dir / "recovery_log.json"
+            else:
+                recovery_log_path = manifest_dir.parent / "recovery_log.json"
+
+        rpath = Path(recovery_log_path)
+        if not rpath.exists():
+            report.summary += " | recovery_log not found"
+            return report
+
+        try:
+            recovery_log = json.loads(rpath.read_text())
+        except (json.JSONDecodeError, OSError):
+            report.summary += " | recovery_log unreadable"
+            return report
+
+        stats = recovery_log.get("stats", {})
+        repaired = stats.get("repaired", 0)
+        repair_candidates = stats.get("repair_candidates", 0)
+        unrecoverable = stats.get("unrecoverable", 0)
+        total_quarantined = stats.get("total_quarantined", 0)
+
+        # Safe division — only repaired (auto-applied) counts as recovered
+        total_injected = report.total_injected
+        tp = report.true_positives
+
+        repair_rate_on_detected = repaired / tp if tp > 0 else 0.0
+        end_to_end_recovery_rate = repaired / total_injected if total_injected > 0 else 1.0
+
+        report.repaired = repaired
+        report.repair_candidates = repair_candidates
+        report.unrecoverable = unrecoverable
+        report.total_quarantined = total_quarantined
+        report.repair_rate_on_detected = repair_rate_on_detected
+        report.end_to_end_recovery_rate = end_to_end_recovery_rate
+        report.details["recovery"] = {
+            "repaired": repaired,
+            "repair_candidates": repair_candidates,
+            "unrecoverable": unrecoverable,
+            "total_quarantined": total_quarantined,
+            "repair_rate_on_detected": round(repair_rate_on_detected, 4),
+            "end_to_end_recovery_rate": round(end_to_end_recovery_rate, 4),
+        }
+
+        # Update summary — only repaired counts
+        report.summary = (
+            f"Detected {report.true_positives}/{total_injected} "
+            f"({report.detection_rate:.0%}), "
+            f"precision {report.precision:.0%}, "
+            f"recovered {repaired}/{total_injected} "
+            f"({end_to_end_recovery_rate:.0%}), "
+            f"candidates {repair_candidates}, "
+            f"leaked {report.false_negatives}/{total_injected} "
+            f"({report.leakage_rate:.0%})"
+        )
+
+        return report
 
     def write_report(self, report: ScoringReport, scenario_root: str | Path) -> Path:
         """Write scoring_report.json to scenario directory."""
