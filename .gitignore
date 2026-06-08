@@ -67,3 +67,14 @@ Thumbs.db
 .idea/
 .vscode/
 .kilo/
+
+# TPC-DI runtime artifacts
+runtime/tpcdi/scenarios/
+runtime/lake/bronze/tpcdi/
+runtime/lake/silver/tpcdi/
+runtime/lake/gold/tpcdi/
+runtime/quarantine/
+benchmark/reports/tpcdi_benchmark.json
+
+# generated synthetic data
+scripts/generate_synthetic_tpcdi_warehouse.py

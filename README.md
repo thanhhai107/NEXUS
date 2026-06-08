@@ -401,6 +401,53 @@ python -c "import jsonschema; print(jsonschema.__version__)"
 
 Expected version is `4.23.0` or newer.
 
+## TPC-DI Benchmark Pipeline
+
+NEXUS includes a complete TPC-DI benchmark pipeline using DIGen-generated data (SF=3 at `runtime/tpcdi/sf3/`).
+
+### Quick start
+
+```bash
+# Clean baseline
+python -c "from benchmark.tpcdi.runner import TpcdiRunner; r=TpcdiRunner(scale_factor=3).run_milestone4(clean_outputs=True); print('is_valid=%s errors=%s' % (r.is_valid, r.errors))"
+
+# E2E scenario: inject → detect → recover → score
+python -c "from benchmark.tpcdi.scenario_runner import TpcdiScenarioRunner; r=TpcdiScenarioRunner(scale_factor=3).run_scenario('demo','extra_field','trade',line_numbers=[100,200,300]); print(r['scoring_report']['summary'])"
+```
+
+### Pipeline architecture
+
+| Layer | Module | Function |
+|---|---|---|
+| Error injection | `ingestion/tpcdi/error_injection/source_injector.py` | `TpcdiSourceInjector.create_scenario()` |
+| Source config | `domains/tpc/tpcdi_sources.yml` | DIGen source file definitions |
+| I/O | `common/tpcdi_io.py` | Streaming iterators (`iter_tpcdi_records`, `iter_tpcdi_chunks`) |
+| Bronze validation | `governance/quality/bronze_validator.py` | `validate_bronze_tpcdi_file()` |
+| Processing | `processing/{bronze,silver,gold}/tpcdi_*.py` | TPC-DI-specific Bronze → Silver → Gold |
+| Correctness audits | `benchmark/tpcdi/correctness.py` | 8 audits: row_count, pk_duplicate, trade_holding, prospect_customer |
+| Recovery | `governance/recovery/engine.py` | `RecoveryEngine.run()` — repair source files |
+| Scoring | `benchmark/tpcdi/scoring.py` | TP/FP/FN, detection_rate, recovery_rate, leakage_rate |
+| E2E runner | `benchmark/tpcdi/scenario_runner.py` | `TpcdiScenarioRunner.run_scenario()` |
+
+### Supported error scenarios
+
+| Scenario | Detection | Recovery rate |
+|---|---|---|
+| `extra_field` | Bronze validation | 100% |
+| `type_error` | Bronze validation | 100% |
+| `duplicate_pk` | Gold audit | 100% |
+
+### Artifacts (`runtime/tpcdi/scenarios/{id}/`)
+
+- `injection_manifest.json` — ground truth mutations
+- `detected_errors.json` — pipeline detection results
+- `recovery_log.json` — repair actions
+- `scoring_report.json` — TP/FP/FN + metrics
+
+### Documentation
+
+See `docs/tpcdi_flow.md` for detailed usage.
+
 ## Development Checks
 
 Run before handing off changes:
