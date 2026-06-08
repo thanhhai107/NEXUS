@@ -1,6 +1,7 @@
 """LLM-based Semantic Annotator.
 
-Uses Amazon Bedrock to generate semantic annotations for fields.
+Uses Amazon Bedrock (default) or OpenAI-compatible API
+to generate semantic annotations for fields.
 """
 
 from __future__ import annotations
@@ -9,11 +10,11 @@ import json
 import os
 from typing import Any
 
-import boto3
+from governance.llm.client import chat, check_health as llm_check_health
 
 
 class BedrockAnnotator:
-    """Annotates fields using Amazon Bedrock."""
+    """Annotates fields using an LLM."""
 
     def __init__(
         self,
@@ -24,7 +25,6 @@ class BedrockAnnotator:
         self.model = os.getenv("NEXUS_AGENT_MODEL", model)
         self.region = os.getenv("AWS_DEFAULT_REGION", region)
         self.timeout = timeout
-        self.client = None
 
     def annotate(
         self,
@@ -34,8 +34,7 @@ class BedrockAnnotator:
         samples: list[dict] | None = None,
         domain: str = "unknown",
     ) -> dict[str, dict[str, Any]]:
-        """Annotate fields using LLM via Bedrock."""
-        # Build prompt
+        """Annotate fields using LLM."""
         field_list = ", ".join(fields.keys())
 
         prompt = f"""You are a data engineer annotating fields from a {domain} dataset.
@@ -59,55 +58,23 @@ Return JSON with field names as keys.
 """
 
         try:
-            if self.client is None:
-                self.client = boto3.client(
-                    "bedrock-runtime",
-                    region_name=self.region,
-                )
-
-            response = self.client.converse(
-                modelId=self.model,
-                system=[{"text": "Return only valid JSON. No markdown."}],
-                messages=[{"role": "user", "content": [{"text": prompt}]}],
-                inferenceConfig={
-                    "temperature": 0.3,
-                    "maxTokens": 2048,
-                },
+            text = chat(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                system="Return only valid JSON. No markdown.",
+                temperature=0.3,
+                max_tokens=2048,
             )
 
-            text = response["output"]["message"]["content"][0]["text"]
-
-            # Try to parse JSON from response
-            try:
-                start = text.find("{")
-                end = text.rfind("}") + 1
-                if start >= 0 and end > start:
-                    return json.loads(text[start:end])
-            except json.JSONDecodeError:
-                pass
+            start = text.find("{")
+            end = text.rfind("}") + 1
+            if start >= 0 and end > start:
+                return json.loads(text[start:end])
         except Exception as e:
             print(f"LLM annotation failed: {e}")
 
         return {}
 
     def check_health(self) -> dict[str, Any]:
-        """Check if Bedrock is accessible."""
-        try:
-            bedrock = boto3.client("bedrock", region_name=self.region)
-            response = bedrock.list_foundation_models(
-                byProvider="Amazon",
-                byOutputModality="TEXT",
-            )
-            model_summaries = response.get("modelSummaries", [])
-            model_ids = [m["modelId"] for m in model_summaries]
-            model_available = any(self.model in mid for mid in model_ids)
-            return {
-                "available": True,
-                "models": model_ids[:20],
-                "model_available": model_available,
-            }
-        except Exception as e:
-            return {
-                "available": False,
-                "error": str(e),
-            }
+        """Check if the configured LLM is accessible."""
+        return llm_check_health()

@@ -5,8 +5,6 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-import boto3
-
 from common.semantic import load_semantic_contract
 from governance.agents.decision_schema import AgentDecision
 from governance.agents.prompts import build_prompt
@@ -19,6 +17,7 @@ from governance.agents.tools import (
     load_quarantine_summary,
     write_agent_decision,
 )
+from governance.llm.client import chat
 from governance.quality.checks import detect_anomalies
 
 
@@ -58,27 +57,17 @@ def _collect_evidence(dataset_name: str, batch_id: str) -> dict[str, Any]:
 
 
 def _llm_decision(evidence: dict[str, Any]) -> AgentDecision | None:
-    region = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
     model = os.getenv("NEXUS_AGENT_MODEL", "amazon.nova-pro-v1:0")
-
-    try:
-        client = boto3.client("bedrock-runtime", region_name=region)
-    except Exception as exc:
-        import sys
-        print(f"Warning: Bedrock client creation failed: {exc}", file=sys.stderr)
-        return None
-
     system_prompt = "Return only valid JSON. Do not include markdown."
     user_prompt = build_prompt(evidence)
 
     try:
-        response = client.converse(
-            modelId=model,
-            system=[{"text": system_prompt}],
-            messages=[{"role": "user", "content": [{"text": user_prompt}]}],
-            inferenceConfig={"temperature": 0},
+        content = chat(
+            model=model,
+            messages=[{"role": "user", "content": user_prompt}],
+            system=system_prompt,
+            temperature=0,
         )
-        content = response["output"]["message"]["content"][0]["text"]
         parsed = json.loads(content)
         parsed["dataset_name"] = evidence["dataset_name"]
         parsed["batch_id"] = evidence["batch_id"]
