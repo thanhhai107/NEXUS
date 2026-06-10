@@ -11,12 +11,12 @@ def test_record_lineage_writes_openlineage_event(tmp_path) -> None:
     lineage_log = tmp_path / "lineage.jsonl"
 
     record_lineage(
-        "demo_job",
-        ["raw.demo"],
-        ["silver.demo"],
+        "tpcdi_trade_job",
+        ["bronze.tpcdi_trade"],
+        ["silver.tpcdi_trade"],
         batch_id="batch-1",
         run_id="run-1",
-        source_path="samples/demo.csv",
+        source_path="runtime/tpcdi/sf3/Batch1/Trade.txt",
         actor="tester",
         lineage_log=lineage_log,
     )
@@ -24,8 +24,8 @@ def test_record_lineage_writes_openlineage_event(tmp_path) -> None:
     event = json.loads(lineage_log.read_text(encoding="utf-8"))
     assert event["eventType"] == "COMPLETE"
     assert event["run"]["runId"] == "run-1"
-    assert event["inputs"][0]["name"] == "raw.demo"
-    assert event["outputs"][0]["name"] == "silver.demo"
+    assert event["inputs"][0]["name"] == "bronze.tpcdi_trade"
+    assert event["outputs"][0]["name"] == "silver.tpcdi_trade"
     assert event["batch_id"] == "batch-1"
     assert event["actor"] == "tester"
 
@@ -50,9 +50,9 @@ def test_record_lineage_emits_openlineage_event_when_configured(tmp_path, monkey
     monkeypatch.setattr("requests.post", fake_post)
 
     record_lineage(
-        "demo_job",
-        ["raw.demo"],
-        ["silver.demo"],
+        "tpcdi_trade_job",
+        ["bronze.tpcdi_trade"],
+        ["silver.tpcdi_trade"],
         batch_id="batch-1",
         run_id="run-1",
         lineage_log=lineage_log,
@@ -61,7 +61,7 @@ def test_record_lineage_emits_openlineage_event_when_configured(tmp_path, monkey
     assert captured["url"] == "http://lineage:5000/api/v1/lineage"
     assert captured["timeout"] == 1.5
     assert captured["json"]["job"]["namespace"] == "test-namespace"
-    assert captured["json"]["inputs"][0]["name"] == "raw.demo"
+    assert captured["json"]["inputs"][0]["name"] == "bronze.tpcdi_trade"
     assert "job_name" not in captured["json"]
 
 
@@ -77,8 +77,8 @@ def test_record_lineage_strict_mode_raises_on_openlineage_error(tmp_path, monkey
 
     with pytest.raises(RuntimeError, match="Failed to emit OpenLineage event"):
         record_lineage(
-            "demo_job",
-            ["raw.demo"],
-            ["silver.demo"],
+            "tpcdi_trade_job",
+            ["bronze.tpcdi_trade"],
+            ["silver.tpcdi_trade"],
             lineage_log=lineage_log,
         )

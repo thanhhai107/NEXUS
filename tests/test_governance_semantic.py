@@ -27,7 +27,7 @@ class TestSemanticCache:
         }
         
         version = self.cache.set(
-            source_id="test_source",
+            source_id="trade",
             annotations=annotations,
             schema_hash="abc123",
             annotated_by="llm",
@@ -35,7 +35,7 @@ class TestSemanticCache:
         
         assert version.startswith("v")
         
-        cached = self.cache.get("test_source")
+        cached = self.cache.get("trade")
         assert cached is not None
         assert cached.annotations["id"]["role"] == "identifier"
 
@@ -59,11 +59,11 @@ class TestSemanticCache:
         """Test approving annotations."""
         annotations = {"field1": {"role": "test"}}
         
-        self.cache.set("test_source", annotations, "hash1")
-        assert not self.cache.is_approved("test_source")
+        self.cache.set("trade", annotations, "hash1")
+        assert not self.cache.is_approved("trade")
         
-        self.cache.approve("test_source", approved_by="human")
-        assert self.cache.is_approved("test_source")
+        self.cache.approve("trade", approved_by="human")
+        assert self.cache.is_approved("trade")
 
     def test_get_status(self):
         """Test getting cache status."""

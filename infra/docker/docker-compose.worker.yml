@@ -186,7 +186,6 @@ services:
       HOSTNAME: worker-remote
     command: celery worker
     volumes:
-      - ../../orchestration/airflow/dags:/opt/airflow/dags
       - ../../common:/opt/airflow/common
       - ../../config:/opt/airflow/config
       - ../../domains:/opt/airflow/domains

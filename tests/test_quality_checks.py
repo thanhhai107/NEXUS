@@ -33,7 +33,7 @@ def test_quality_result() -> None:
     records = [{"id": "1", "name": "A", "updated_at": now}]
 
     result = run_quality_checks(
-        dataset="demo",
+        dataset="tpcdi_dim_trade",
         records=records,
         required_columns=["id", "name", "updated_at"],
         primary_keys=["id"],
@@ -41,7 +41,7 @@ def test_quality_result() -> None:
         max_age_hours=1,
     )
 
-    assert result.dataset == "demo"
+    assert result.dataset == "tpcdi_dim_trade"
     assert result.schema_valid is True
     assert result.readiness_score == 1.0
     assert result.gx_validation["enabled"] is True
@@ -53,7 +53,7 @@ def test_great_expectations_validation_can_be_disabled(monkeypatch) -> None:
     now = datetime.now(timezone.utc).isoformat()
 
     result = run_quality_checks(
-        dataset="demo",
+        dataset="tpcdi_dim_trade",
         records=[{"id": "1", "name": "A", "updated_at": now}],
         required_columns=["id", "name", "updated_at"],
         primary_keys=["id"],
@@ -70,7 +70,7 @@ def test_great_expectations_reports_failed_expectations(monkeypatch) -> None:
     now = datetime.now(timezone.utc).isoformat()
 
     result = run_quality_checks(
-        dataset="demo",
+        dataset="tpcdi_dim_trade",
         records=[
             {"id": "1", "name": "A", "updated_at": now},
             {"id": "1", "name": "B", "updated_at": now},
@@ -103,7 +103,7 @@ def test_json_schema_is_enforced_after_type_coercion() -> None:
     )
 
     result = run_quality_checks(
-        dataset="demo",
+        dataset="tpcdi_dim_trade",
         records=coerced.records,
         required_columns=["id", "severity"],
         primary_keys=["id"],
@@ -119,7 +119,7 @@ def test_json_schema_is_enforced_after_type_coercion() -> None:
 def test_json_schema_validation_failure_blocks_status() -> None:
     now = datetime.now(timezone.utc).isoformat()
     result = run_quality_checks(
-        dataset="demo",
+        dataset="tpcdi_dim_trade",
         records=[{"id": "1", "severity": "high", "updated_at": now}],
         required_columns=["id", "severity"],
         primary_keys=["id"],
@@ -147,7 +147,7 @@ def test_json_schema_validation_failure_blocks_status() -> None:
 
 def test_all_thresholds_are_enforced() -> None:
     result = run_quality_checks(
-        dataset="demo",
+        dataset="tpcdi_dim_trade",
         records=[
             {"id": "1", "name": "", "updated_at": "2020-01-01T00:00:00+00:00"},
             {"id": "1", "name": "Ada", "updated_at": "2020-01-01T00:00:00+00:00"},

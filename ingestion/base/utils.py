@@ -15,49 +15,12 @@ DEFAULT_ENV_PATH = PROJECT_ROOT / ".env"
 from common.config import BRONZE_DIR
 
 
-BOROUGH_CENTROIDS: list[dict[str, Any]] = [
-    {"name": "Barking and Dagenham", "latitude": 51.5607, "longitude": 0.1557},
-    {"name": "Barnet", "latitude": 51.6252, "longitude": -0.1517},
-    {"name": "Bexley", "latitude": 51.4549, "longitude": 0.1505},
-    {"name": "Brent", "latitude": 51.5588, "longitude": -0.2817},
-    {"name": "Bromley", "latitude": 51.4039, "longitude": 0.0198},
-    {"name": "Camden", "latitude": 51.5290, "longitude": -0.1255},
-    {"name": "City of London", "latitude": 51.5155, "longitude": -0.0922},
-    {"name": "Croydon", "latitude": 51.3714, "longitude": -0.0977},
-    {"name": "Ealing", "latitude": 51.5130, "longitude": -0.3089},
-    {"name": "Enfield", "latitude": 51.6538, "longitude": -0.0799},
-    {"name": "Greenwich", "latitude": 51.4892, "longitude": 0.0648},
-    {"name": "Hackney", "latitude": 51.5450, "longitude": -0.0553},
-    {"name": "Hammersmith and Fulham", "latitude": 51.4927, "longitude": -0.2339},
-    {"name": "Haringey", "latitude": 51.5906, "longitude": -0.1110},
-    {"name": "Harrow", "latitude": 51.5898, "longitude": -0.3346},
-    {"name": "Havering", "latitude": 51.5812, "longitude": 0.1837},
-    {"name": "Hillingdon", "latitude": 51.5441, "longitude": -0.4760},
-    {"name": "Hounslow", "latitude": 51.4746, "longitude": -0.3680},
-    {"name": "Islington", "latitude": 51.5416, "longitude": -0.1022},
-    {"name": "Kensington and Chelsea", "latitude": 51.5020, "longitude": -0.1947},
-    {"name": "Kingston upon Thames", "latitude": 51.4085, "longitude": -0.3064},
-    {"name": "Lambeth", "latitude": 51.4607, "longitude": -0.1163},
-    {"name": "Lewisham", "latitude": 51.4452, "longitude": -0.0209},
-    {"name": "Merton", "latitude": 51.4014, "longitude": -0.1958},
-    {"name": "Newham", "latitude": 51.5077, "longitude": 0.0469},
-    {"name": "Redbridge", "latitude": 51.5590, "longitude": 0.0741},
-    {"name": "Richmond upon Thames", "latitude": 51.4479, "longitude": -0.3260},
-    {"name": "Southwark", "latitude": 51.5035, "longitude": -0.0804},
-    {"name": "Sutton", "latitude": 51.3618, "longitude": -0.1945},
-    {"name": "Tower Hamlets", "latitude": 51.5203, "longitude": -0.0293},
-    {"name": "Waltham Forest", "latitude": 51.5908, "longitude": -0.0134},
-    {"name": "Wandsworth", "latitude": 51.4567, "longitude": -0.1910},
-    {"name": "Westminster", "latitude": 51.4973, "longitude": -0.1372},
-]
-
-
 def source_options(context: Any, source: str) -> dict[str, Any]:
     """Get source-specific options from global config plus mode overrides.
     
     Args:
         context: DownloadContext instance
-        source: Source name (e.g., 'tpcds_customer', 'tpcds_inventory')
+        source: Source name (e.g., 'tpcdi_dim_customer', 'tpcdi_dim_trade')
     
     Returns:
         Dictionary of source options with mode-level overrides applied.
@@ -76,35 +39,6 @@ def source_options(context: Any, source: str) -> dict[str, Any]:
 
     return {**config_options, **mode_options}
 
-
-def selected_boroughs(
-    config_or_context: Any,
-    limit_key: str | None = None,
-) -> list[dict[str, Any]]:
-    """Get selected boroughs based on mode config.
-    
-    Args:
-        config_or_context: Either a config dict or DownloadContext with .mode
-        limit_key: Optional key to get borough_limit from config (default: "borough_limit")
-    
-    Returns:
-        List of borough centroid dicts
-    """
-    # Support both config dict and DownloadContext
-    if hasattr(config_or_context, "mode"):
-        config = config_or_context.mode
-    else:
-        config = config_or_context
-    
-    key = limit_key or "borough_limit"
-    mode = config.get(key, "london")
-    if mode == "london":
-        return BOROUGH_CENTROIDS
-    if isinstance(mode, int):
-        return BOROUGH_CENTROIDS[:mode]
-    if isinstance(mode, list):
-        return [b for b in BOROUGH_CENTROIDS if b["name"] in mode]
-    return BOROUGH_CENTROIDS
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")

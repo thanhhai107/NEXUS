@@ -21,7 +21,7 @@ default_semantic:
       mapping_required: true
     unit:
       mapping_seed: transform/dbt/seeds/unit_mapping.csv
-      canonicalization_layer: dbt staging_or_gold
+      canonicalization_layer: silver_or_gold
       validation_engine: Great Expectations
     time:
       storage_timezone: UTC

@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from benchmark.tpcdi.scenario_runner import TpcdiScenarioRunner
+from common.tpcdi_sources import source_root
 
 
 SCENARIO_BASE = Path("runtime/tpcdi/scenarios")
@@ -18,6 +19,12 @@ SCENARIOS = [
     # duplicate_pk runs full M4 (~4 min) — uncomment for full regression
     # ("duplicate_pk_trade_pytest", "duplicate_pk"),
 ]
+
+
+def require_tpcdi_source_root() -> None:
+    root = source_root()
+    if not root.exists():
+        pytest.skip(f"TPC-DI DIGen source root is missing: {root}")
 
 
 @pytest.fixture(scope="module")
@@ -38,6 +45,7 @@ class TestTpcdiScenarios:
 
     @pytest.mark.parametrize("scenario_id, mutation_type", SCENARIOS)
     def test_scenario_full(self, runner, scenario_id, mutation_type):
+        require_tpcdi_source_root()
         result = runner.run_scenario(
             scenario_id=scenario_id,
             mutation_type=mutation_type,
@@ -78,6 +86,7 @@ class TestTpcdiScenarios:
     def test_clean_m4_baseline(self):
         """Verify clean baseline still passes after scenario runs."""
         from benchmark.tpcdi.runner import TpcdiRunner
+        require_tpcdi_source_root()
         os.environ.pop("TPCDI_SOURCE_ROOT", None)
         result = TpcdiRunner(scale_factor=3).run_milestone4(clean_outputs=True)
         assert result.is_valid, f"Clean M4 should be valid, got errors: {result.errors}"

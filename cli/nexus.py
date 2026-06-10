@@ -17,27 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv(PROJECT_ROOT / ".env", override=True)
 
-from common.config import load_dataset_catalog, load_quality_config, DATASETS_DIR
-from common.source_discovery import (
-    DEFAULT_OUTPUT_DIR as SOURCE_DISCOVERY_DEFAULT_OUTPUT_DIR,
-)
-from common.source_discovery import (
-    DEFAULT_SOURCE_DIR as SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
-)
-from common.source_discovery import integrate_schema_into_domain
-from common.source_discovery import (
-    schema_names as source_discovery_schema_names,
-)
-from common.source_discovery import (
-    source_summary as source_discovery_summary,
-)
-from common.source_discovery import (
-    sync_discovery as sync_source_discovery,
-)
-from common.source_coverage import (
-    COVERAGE_MAP_FILE as SOURCE_DISCOVERY_COVERAGE_MAP_FILE,
-    write_ingestion_coverage_map,
-)
+from common.config import load_dataset_catalog, load_quality_config
 from common.source_registry import get_source, list_sources
 from common.data_contract import load_data_contract, list_data_contracts
 from common.semantic import (
@@ -515,45 +495,6 @@ def record_lineage_event(args: argparse.Namespace) -> None:
     print(f"Lineage written to {output_path}")
 
 
-def summarize_source_discovery(args: argparse.Namespace) -> None:
-    summary = source_discovery_summary(args.source_dir)
-    print(json.dumps(summary, indent=2))
-
-
-def list_source_discovery_schemas(args: argparse.Namespace) -> None:
-    names = source_discovery_schema_names(args.source_dir)
-    print(json.dumps({"schema_count": len(names), "schemas": names}, indent=2))
-
-
-def sync_source_discovery_metadata(args: argparse.Namespace) -> None:
-    result = sync_source_discovery(
-        source_dir=args.source_dir,
-        output_dir=args.output_dir,
-        selected_schemas=args.schema,
-    )
-    print(json.dumps(result, indent=2))
-
-
-def build_source_discovery_coverage(args: argparse.Namespace) -> None:
-    result = write_ingestion_coverage_map(
-        output_path=args.output_path,
-        source_dir=args.source_dir,
-        domains_dir=args.domains_dir,
-        config_dir=args.config_dir,
-    )
-    print(json.dumps(result, indent=2))
-
-
-def integrate_source_discovery_schema(args: argparse.Namespace) -> None:
-    result = integrate_schema_into_domain(
-        schema_name=args.schema,
-        domain=args.domain,
-        dataset=args.dataset,
-        source_dir=args.source_dir,
-    )
-    print(json.dumps(result, indent=2))
-
-
 def list_registry(args: argparse.Namespace) -> None:
     payload = [entry.to_dict() for entry in list_sources()]
     if args.domain:
@@ -807,90 +748,6 @@ def build_parser() -> argparse.ArgumentParser:
     lineage_record.add_argument("--actor")
     lineage_record.set_defaults(func=record_lineage_event)
 
-    source_discovery = subcommands.add_parser(
-        "source-discovery",
-        help="Inspect and sync generated source discovery metadata",
-    )
-    source_discovery_subcommands = source_discovery.add_subparsers(
-        dest="source_discovery_command",
-        required=True,
-    )
-    source_discovery_summary_command = source_discovery_subcommands.add_parser(
-        "summary",
-        help="Show discovered source summary",
-    )
-    source_discovery_summary_command.add_argument(
-        "--source-dir",
-        type=Path,
-        default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
-    )
-    source_discovery_summary_command.set_defaults(func=summarize_source_discovery)
-
-    source_discovery_schemas = source_discovery_subcommands.add_parser("schemas", help="List discovered schema names")
-    source_discovery_schemas.add_argument(
-        "--source-dir",
-        type=Path,
-        default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
-    )
-    source_discovery_schemas.set_defaults(func=list_source_discovery_schemas)
-
-    source_discovery_sync_command = source_discovery_subcommands.add_parser(
-        "sync",
-        help="Write generated source metadata and JSON Schemas into runtime/source_discovery",
-    )
-    source_discovery_sync_command.add_argument(
-        "--source-dir",
-        type=Path,
-        default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
-    )
-    source_discovery_sync_command.add_argument("--output-dir", type=Path, default=SOURCE_DISCOVERY_DEFAULT_OUTPUT_DIR)
-    source_discovery_sync_command.add_argument(
-        "--schema",
-        action="append",
-        help="Schema name to export. Repeat for multiple schemas. Defaults to all schemas.",
-    )
-    source_discovery_sync_command.set_defaults(func=sync_source_discovery_metadata)
-
-    source_discovery_coverage_command = source_discovery_subcommands.add_parser(
-        "coverage",
-        help="Build the ingestion coverage map for all discovered sources and schemas",
-    )
-    source_discovery_coverage_command.add_argument(
-        "--source-dir",
-        type=Path,
-        default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
-    )
-    source_discovery_coverage_command.add_argument(
-        "--domains-dir",
-        type=Path,
-        default=PROJECT_ROOT / "domains",
-    )
-    source_discovery_coverage_command.add_argument(
-        "--config-dir",
-        type=Path,
-        default=PROJECT_ROOT / "config",
-    )
-    source_discovery_coverage_command.add_argument(
-        "--output-path",
-        type=Path,
-        default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR / SOURCE_DISCOVERY_COVERAGE_MAP_FILE,
-    )
-    source_discovery_coverage_command.set_defaults(func=build_source_discovery_coverage)
-
-    source_discovery_integrate_command = source_discovery_subcommands.add_parser(
-        "integrate",
-        help="Integrate one discovered schema into domains/<domain>/datasets.yml and schemas/",
-    )
-    source_discovery_integrate_command.add_argument("--schema", required=True, help="Discovery schema name")
-    source_discovery_integrate_command.add_argument("--domain", required=True, help="Domain folder name")
-    source_discovery_integrate_command.add_argument("--dataset", required=True, help="Dataset key in catalog")
-    source_discovery_integrate_command.add_argument(
-        "--source-dir",
-        type=Path,
-        default=SOURCE_DISCOVERY_DEFAULT_SOURCE_DIR,
-    )
-    source_discovery_integrate_command.set_defaults(func=integrate_source_discovery_schema)
-
     registry = subcommands.add_parser("registry", help="Source registry commands")
     registry_subcommands = registry.add_subparsers(dest="registry_command", required=True)
     registry_list = registry_subcommands.add_parser("list", help="List registered sources")
@@ -966,7 +823,7 @@ def build_parser() -> argparse.ArgumentParser:
     worker_list_parser.add_argument("--max-age", type=int, default=300, help="Max heartbeat age in seconds")
     worker_list_parser.set_defaults(func=worker_heartbeats)
 
-    generate = subcommands.add_parser("generate", help="Generate TPC-DS benchmark data via Data Caterer")
+    generate = subcommands.add_parser("generate", help="Generate TPC-DI benchmark data via Data Caterer")
     generate_subcommands = generate.add_subparsers(dest="generate_command", required=True)
 
     gen_tpc = generate_subcommands.add_parser("tpcdi", help="Generate TPC-DI data (SF=1)")

@@ -33,11 +33,11 @@ class TestSchemaInference:
         
         schema = self.inference.infer_from_records(
             records,
-            source_id="test_source",
+            source_id="trade",
             source_key="test_key",
         )
         
-        assert schema.source_id == "test_source"
+        assert schema.source_id == "trade"
         assert schema.record_count == 3
         assert "id" in schema.fields
         assert "name" in schema.fields
@@ -55,7 +55,7 @@ class TestSchemaInference:
         
         schema = self.inference.infer_from_records(
             records,
-            source_id="test_source",
+            source_id="trade",
             source_key="test_key",
         )
         
@@ -71,7 +71,7 @@ class TestSchemaInference:
         
         schema = self.inference.infer_from_records(
             records,
-            source_id="test_source",
+            source_id="trade",
             source_key="test_key",
         )
         
@@ -87,7 +87,7 @@ class TestSchemaInference:
         
         schema = self.inference.infer_from_records(
             records,
-            source_id="test_source",
+            source_id="trade",
             source_key="test_key",
         )
         
@@ -106,13 +106,13 @@ class TestSchemaInference:
         
         schema = self.inference.infer_from_records(
             records,
-            source_id="test_source",
+            source_id="trade",
             source_key="test_key",
         )
         
         summary = schema.to_summary()
         
-        assert summary["source_id"] == "test_source"
+        assert summary["source_id"] == "trade"
         assert summary["field_count"] == 2
         assert "fields" in summary
 
@@ -124,7 +124,7 @@ class TestSchemaInference:
         
         schema = self.inference.infer_from_records(
             records,
-            source_id="test_source",
+            source_id="trade",
             source_key="test_key",
         )
         

@@ -66,7 +66,7 @@ class TestDLQEntry:
         """Test converting entry to dict."""
         entry = DLQEntry(
             category="test",
-            source="openaq",
+            source="tpcdi_trade",
             error="Connection timeout",
             payload={"url": "http://example.com"},
             captured_at="2026-05-30T10:00:00Z",
@@ -76,7 +76,7 @@ class TestDLQEntry:
         data = entry.to_dict()
         
         assert data["category"] == "test"
-        assert data["source"] == "openaq"
+        assert data["source"] == "tpcdi_trade"
         assert data["error"] == "Connection timeout"
         assert data["attempts"] == 2
         assert data["status"] == "pending"
@@ -85,7 +85,7 @@ class TestDLQEntry:
         """Test creating entry from dict."""
         data = {
             "category": "test",
-            "source": "tfl",
+            "source": "tpcdi_status_type",
             "error": "API error",
             "payload": {"id": 1},
             "captured_at": "2026-05-30T10:00:00Z",
@@ -96,7 +96,7 @@ class TestDLQEntry:
         entry = DLQEntry.from_dict(data)
         
         assert entry.category == "test"
-        assert entry.source == "tfl"
+        assert entry.source == "tpcdi_status_type"
         assert entry.attempts == 3
         assert entry.status == "failed"
 
@@ -113,9 +113,9 @@ class TestEnhancedDLQ:
         """Test recording an entry to DLQ."""
         path = self.dlq.record(
             category="test",
-            source="openaq",
+            source="tpcdi_trade",
             error="Connection failed",
-            payload={"url": "http://api.openaq.org"},
+            payload={"url": "http://api.tpcdi_trade.org"},
         )
         
         assert path.exists()
@@ -124,13 +124,13 @@ class TestEnhancedDLQ:
         """Test listing pending entries."""
         self.dlq.record(
             category="test",
-            source="openaq",
+            source="tpcdi_trade",
             error="Error 1",
             payload={"id": 1},
         )
         self.dlq.record(
             category="test",
-            source="tfl",
+            source="tpcdi_status_type",
             error="Error 2",
             payload={"id": 2},
         )
@@ -139,20 +139,20 @@ class TestEnhancedDLQ:
         
         assert len(pending) == 2
         sources = [e.source for e in pending]
-        assert "openaq" in sources
-        assert "tfl" in sources
+        assert "tpcdi_trade" in sources
+        assert "tpcdi_status_type" in sources
 
     def test_list_pending_with_category_filter(self):
         """Test listing pending with category filter."""
         self.dlq.record(
             category="api_error",
-            source="openaq",
+            source="tpcdi_trade",
             error="Error",
             payload={},
         )
         self.dlq.record(
             category="parse_error",
-            source="tfl",
+            source="tpcdi_status_type",
             error="Error",
             payload={},
         )
@@ -160,13 +160,13 @@ class TestEnhancedDLQ:
         pending = self.dlq.list_pending("api_error")
         
         assert len(pending) == 1
-        assert pending[0].source == "openaq"
+        assert pending[0].source == "tpcdi_trade"
 
     def test_retry_entry_success(self):
         """Test retrying a successful entry."""
         entry = self.dlq.record(
             category="test",
-            source="openaq",
+            source="tpcdi_trade",
             error="Temporary error",
             payload={"id": 1},
         )
@@ -186,7 +186,7 @@ class TestEnhancedDLQ:
         """Test retry failure schedules next retry."""
         entry = self.dlq.record(
             category="test",
-            source="openaq",
+            source="tpcdi_trade",
             error="Temporary error",
             payload={"id": 1},
         )
@@ -208,7 +208,7 @@ class TestEnhancedDLQ:
         
         entry = self.dlq.record(
             category="test",
-            source="openaq",
+            source="tpcdi_trade",
             error="Persistent error",
             payload={"id": 1},
         )
@@ -232,13 +232,13 @@ class TestEnhancedDLQ:
         """Test getting DLQ statistics."""
         self.dlq.record(
             category="test",
-            source="openaq",
+            source="tpcdi_trade",
             error="Error",
             payload={},
         )
         self.dlq.record(
             category="test",
-            source="tfl",
+            source="tpcdi_status_type",
             error="Error",
             payload={},
         )
@@ -247,14 +247,14 @@ class TestEnhancedDLQ:
         
         assert stats["total"] == 2
         assert stats["pending"] == 2
-        assert "openaq" in stats["by_source"]
-        assert "tfl" in stats["by_source"]
+        assert "tpcdi_trade" in stats["by_source"]
+        assert "tpcdi_status_type" in stats["by_source"]
 
     def test_replay_with_backoff(self):
         """Test replaying DLQ with backoff."""
         self.dlq.record(
             category="test",
-            source="openaq",
+            source="tpcdi_trade",
             error="Error",
             payload={"id": 1},
         )
@@ -282,7 +282,7 @@ class TestConvenienceFunctions:
         """Test record_dlq_with_retry function."""
         path = record_dlq_with_retry(
             category="test",
-            source="openaq",
+            source="tpcdi_trade",
             error="Test error",
             payload={"id": 1},
         )

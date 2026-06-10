@@ -2,7 +2,7 @@ version: 2
 
 seeds:
   - name: unit_mapping
-    description: Canonical unit conversion mapping for environment and transport semantic standardization.
+    description: Canonical unit conversion mapping for TPC-DI semantic standardization.
     columns:
       - name: dimension_type
         description: Measurement dimension such as temperature speed distance or concentration.

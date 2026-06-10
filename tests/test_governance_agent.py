@@ -14,7 +14,7 @@ def make_evidence(
     schema_breaking: bool = False,
 ) -> dict:
     return {
-        "dataset_name": "demo",
+        "dataset_name": "tpcdi_dim_trade",
         "batch_id": "batch-1",
         "quality_report": {
             "status": status,

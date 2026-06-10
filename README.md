@@ -1,26 +1,26 @@
 # NEXUS
 
-NEXUS is a local-first lakehouse scaffold for open data. It ingests batch files,
-downloaded API data, and streaming snapshots; validates records with data
-contracts, JSON Schema, Great Expectations, schema-drift policy, and semantic
-rules; then routes data through Bronze, Silver, Gold, Quarantine, audit, lineage,
-and optional serving/metadata services.
+NEXUS is a local-first TPC-DI lakehouse benchmark scaffold. It reads DIGen-style
+source files, validates records with parser checks, data contracts, JSON Schema,
+Great Expectations, schema-drift policy, and semantic rules; then routes data
+through Bronze, Silver, Gold, Quarantine, audit, lineage, recovery, and optional
+serving/metadata services.
 
 The project is intentionally runnable from a single Ubuntu working tree with
-`.venv`, while Docker Compose can start the heavier Airflow, Kafka, Spark, Trino,
-Superset, OpenMetadata, and Marquez services when needed.
+`.venv`, while Docker Compose can start heavier Kafka, Spark, Trino, Superset,
+OpenMetadata, and Marquez services when needed.
 
 > **Current scope:** NEXUS is actively configured for the **TPC-DI benchmark**
-> (`domains/tpc/`). The environment/transport domains described in earlier docs
-> are reference architecture and are not deployed on the current tree. Data is
-> generated synthetically via Data Caterer rather than ingested from live APIs.
+> (`domains/tpc/`). Non-TPC benchmark domains have been removed from the current
+> tree. Data is generated synthetically via Data Caterer rather than ingested
+> from live APIs.
 
 ## Current Capabilities
 
 - Domain catalogs, JSON Schemas, quality rules, and semantic contracts under
   `domains/`.
 - Source registry and data contract CLI for every configured dataset.
-- Batch/API/download/streaming ingestion modules with raw envelope support.
+- Batch ingestion modules with raw envelope support.
 - Great Expectations Core validation, JSON Schema validation, schema coercion,
   readiness scoring, quality metrics, audit logs, and quarantine routing.
 - Schema drift detection for missing fields, unknown fields, dropped downstream
@@ -30,7 +30,7 @@ Superset, OpenMetadata, and Marquez services when needed.
   OpenMetadata-compatible DQ payloads.
 - Semantic governance for glossary terms, aliases, units, timestamps, CRS, grain,
   metric definitions, and entity matching.
-- Spark Bronze/Silver/Gold scripts plus dbt Gold model scaffolding.
+- Spark/Python Bronze, Silver, and Gold scripts for TPC-DI benchmark runs.
 - Optional OpenMetadata/OpenLineage/Marquez integration.
 
 ## Repository Map
@@ -38,15 +38,13 @@ Superset, OpenMetadata, and Marquez services when needed.
 ```text
 cli/                    Operational CLI entrypoint
 common/                 Config, registry, contracts, semantic helpers
-config/                 Defaults for download, quality, governance, semantic, Spark
 docs/                   Design notes and implementation checklists
 domains/                Dataset catalogs, schemas, quality rules, semantic rules
 governance/             Quality, schema drift, quarantine, audit, lineage, metadata
-ingestion/              Batch, download, streaming, source adapters
-orchestration/airflow/  Airflow DAGs
+ingestion/              Batch, canonical, Data Caterer, and TPC-DI source adapters
 processing/             Spark Bronze, Silver, Gold jobs
 serving/                FastAPI, Trino, Superset configs
-transform/dbt/          dbt project, seeds, Gold models
+transform/dbt/seeds/    Semantic unit mapping seed
 benchmark/              TPC-DI correctness, performance, and resource audits
 tests/                  Unit and workflow tests
 runtime/                Generated local outputs; do not commit
@@ -79,7 +77,6 @@ The expected tested environment includes:
 - `great_expectations==1.16.1`
 - `jsonschema==4.23.0`
 - `pyspark==3.5.1`
-- `dbt-trino==1.8.1`
 
 ## Local Smoke Test
 
@@ -121,7 +118,6 @@ Top-level commands:
 | `quality check` | Validate a local CSV against explicit quality arguments. |
 | `quality bronze-validate` | Validate a file using the configured data contract. |
 | `quality gx-suite` | Generate a Great Expectations suite payload from a contract. |
-| `quality stream` | Validate sampled streaming events. |
 | `semantic` | Inspect contracts, export OpenMetadata/glossary payloads, match entities. |
 | `batch run` | Run config-driven batch ingestion and quality gate. |
 | `lineage record` | Write OpenLineage-compatible lineage events. |
@@ -202,7 +198,6 @@ Semantic config lives in:
 - `config/semantic_defaults.yml`
 - `domains/<domain>/semantic_rules.yml`
 - `transform/dbt/seeds/unit_mapping.csv`
-- `transform/dbt/models/gold/schema.yml`
 
 Inspect and export semantic metadata (active domain: `tpc`):
 
@@ -236,19 +231,8 @@ python processing/gold/silver_to_gold.py --help
 
 Bronze keeps raw envelope payloads and metadata. Silver flattens payloads,
 trims strings, adds contract-based missing-field flags, and writes idempotently
-using semantic dedup keys. Gold is primarily dbt-driven under
-`transform/dbt/models/gold/`, with `processing/gold/silver_to_gold.py` kept for
-generic backfills.
-
-dbt assets:
-
-```bash
-cd transform/dbt
-dbt --version
-dbt parse --profiles-dir .
-```
-
-Running dbt models requires a reachable Trino/Iceberg profile.
+using semantic dedup keys. Gold is handled by the TPC-DI Python jobs and the
+generic `processing/gold/silver_to_gold.py` backfill helper.
 
 ## Generate TPC-DI Benchmark Data
 
@@ -275,7 +259,7 @@ the DLQ. Invalid data records go to quarantine.
 
 ```text
 runtime/raw/                 Local raw JSONL from batch CLI
-runtime/lake/bronze/         Download/streaming Bronze landing
+runtime/lake/bronze/         Bronze landing for TPC-DI and batch outputs
 runtime/lake/silver/         Silver outputs
 runtime/lake/gold/           Gold outputs
 runtime/quarantine/          Invalid records for triage
@@ -348,9 +332,9 @@ export OPENLINEAGE_ENDPOINT="/api/v1/lineage"
 export OPENLINEAGE_NAMESPACE="nexus"
 
 python -m cli.nexus lineage record \
-  --job-name demo \
-  --inputs raw.demo \
-  --outputs silver.demo
+  --job-name tpcdi_trade_scenario \
+  --inputs bronze.tpcdi_trade \
+  --outputs silver.tpcdi_trade
 ```
 
 Spark jobs use `infra/spark/spark-submit-wrapper.sh` to inject OpenLineage
@@ -369,12 +353,6 @@ Set AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
 `AWS_DEFAULT_REGION`) and grant Bedrock model access to the IAM user/role
 only if you want optional LLM-backed review. Without credentials, the agent
 stays local and deterministic.
-
-## Source Discovery
-
-> **Note:** Source discovery was designed for the environment/transport domain
-> model. It is not active on the current tree (TPC-DI). The CLI subcommands
-> remain available for when real-world sources are re-enabled.
 
 ## Troubleshooting
 
@@ -412,7 +390,7 @@ NEXUS includes a complete TPC-DI benchmark pipeline using DIGen-generated data (
 python -c "from benchmark.tpcdi.runner import TpcdiRunner; r=TpcdiRunner(scale_factor=3).run_milestone4(clean_outputs=True); print('is_valid=%s errors=%s' % (r.is_valid, r.errors))"
 
 # E2E scenario: inject → detect → recover → score
-python -c "from benchmark.tpcdi.scenario_runner import TpcdiScenarioRunner; r=TpcdiScenarioRunner(scale_factor=3).run_scenario('demo','extra_field','trade',line_numbers=[100,200,300]); print(r['scoring_report']['summary'])"
+python -c "from benchmark.tpcdi.scenario_runner import TpcdiScenarioRunner; r=TpcdiScenarioRunner(scale_factor=3).run_scenario('tpcdi_trade_scenario','extra_field','trade',line_numbers=[100,200,300]); print(r['scoring_report']['summary'])"
 ```
 
 ### Pipeline architecture

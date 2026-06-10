@@ -73,7 +73,7 @@ def test_format_parsing():
     return len(formats_tested) >= 3
 
 
-def test_source_registry():
+def trade_registry():
     """Test 2: Source Registry - Multiple source types"""
     print("\n" + "="*60)
     print("TEST 2: Source Registry")
@@ -113,8 +113,8 @@ def test_bronze_envelope():
     print("="*60)
     
     context = EnvelopeContext(
-        dataset_id="test_dataset",
-        source_id="test_source",
+        dataset_id="tpcdi_dim_trade",
+        source_id="trade",
         ingestion_type="batch_api",
         run_id="20260528T010000Z",
         chunk_id="test_chunk_1",
@@ -154,7 +154,7 @@ def test_quality_checks():
     ]
     
     result = run_quality_checks(
-        dataset="test_dataset",
+        dataset="tpcdi_dim_trade",
         records=records,
         required_columns=["id", "name", "updated_at"],
         primary_keys=["id"],
@@ -245,7 +245,7 @@ def test_checkpoint_resume():
         )
         
         run = SourceRun(
-            source_id="test_source",
+            source_id="trade",
             context=context,
             source_key="test_key",
         )
@@ -259,7 +259,7 @@ def test_checkpoint_resume():
         
         # Reload from checkpoint
         run2 = SourceRun(
-            source_id="test_source",
+            source_id="trade",
             context=context,
             source_key="test_key",
         )
@@ -311,7 +311,7 @@ def main():
     results = []
     
     results.append(("Format Parsing", test_format_parsing()))
-    results.append(("Source Registry", test_source_registry()))
+    results.append(("Source Registry", trade_registry()))
     results.append(("Bronze Envelope", test_bronze_envelope()))
     results.append(("Quality Checks", test_quality_checks()))
     results.append(("Freshness Tracking", test_freshness_tracking()))

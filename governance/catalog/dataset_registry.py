@@ -58,7 +58,7 @@ class DatasetRegistry:
         
         Args:
             dataset_id: Unique dataset identifier
-            domain: Domain (e.g., 'transport', 'environment')
+            domain: Domain (e.g., 'tpc')
             description: Dataset description
             **kwargs: Additional metadata fields
         

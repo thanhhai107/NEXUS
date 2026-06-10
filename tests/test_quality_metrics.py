@@ -7,7 +7,7 @@ def test_quality_metric_history_roundtrip(tmp_path) -> None:
     metrics_log = tmp_path / "quality.jsonl"
 
     write_quality_metric(
-        dataset="demo",
+        dataset="tpcdi_dim_trade",
         batch_id="batch-1",
         status="passed",
         quality={
@@ -23,7 +23,7 @@ def test_quality_metric_history_roundtrip(tmp_path) -> None:
         metrics_log=metrics_log,
     )
 
-    history = load_quality_history("demo", metrics_log=metrics_log)
+    history = load_quality_history("tpcdi_dim_trade", metrics_log=metrics_log)
     assert len(history) == 1
     assert history[0]["batch_id"] == "batch-1"
     assert history[0]["auto_fix"]["changed_record_count"] == 1

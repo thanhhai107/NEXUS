@@ -62,10 +62,10 @@ class SemanticAnnotationPipeline:
         )
         
         result = pipeline.process(
-            source_id="tpcds_store_sales",
-            source_key="tpcds_store_sales",
+            source_id="tpcdi_dim_trade",
+            source_key="tpcdi_dim_trade",
             inferred_schema=schema,
-            docs_url="https://api.tfl.gov.uk/"
+            docs_url=None
         )
         
         if result.needs_human_review:

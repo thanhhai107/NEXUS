@@ -98,7 +98,7 @@ class TestDataPartitioning:
     def test_hash_partition(self):
         """Test hash partitioning for consistency."""
         # Same key should always go to same partition
-        key = "station_london_001"
+        key = "tpcdi_trade_001"
         
         p1 = hash_partition(key, num_partitions=4)
         p2 = hash_partition(key, num_partitions=4)

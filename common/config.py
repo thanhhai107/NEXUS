@@ -350,7 +350,7 @@ def get_bronze_path(
     """Get bronze path for a dataset run.
     
     Args:
-        dataset: Dataset name (e.g., 'tpcds_store_sales', 'tpcds_customer')
+        dataset: Dataset name (e.g., 'tpcdi_dim_trade', 'tpcdi_dim_customer')
         run_id: Run ID (e.g., '20260527T033320Z')
         subdir: Subdirectory ('raw', 'staging', 'metadata', 'published')
     
