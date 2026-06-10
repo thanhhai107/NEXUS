@@ -15,7 +15,7 @@ from governance.schema.inference import InferredSchema
 
 
 DEFAULT_CACHE_DIR = "runtime/governance/semantic"
-DEFAULT_LLM_MODEL = "amazon.nova-pro-v1:0"
+DEFAULT_LLM_MODEL = "gpt-4o-mini"
 DEFAULT_MIN_NEW_FIELDS = 3
 DEFAULT_REANNOTATE_THRESHOLD = 10
 
@@ -58,7 +58,7 @@ class SemanticAnnotationPipeline:
     Usage:
         pipeline = SemanticAnnotationPipeline(
             cache_dir="governance/semantic",
-            llm_model="amazon.nova-pro-v1:0"
+            llm_model="gpt-4o-mini"
         )
         
         result = pipeline.process(
@@ -76,7 +76,6 @@ class SemanticAnnotationPipeline:
         self,
         cache_dir: Path | str = DEFAULT_CACHE_DIR,
         llm_model: str = DEFAULT_LLM_MODEL,
-        llm_region: str = "us-east-1",
         min_new_fields: int = DEFAULT_MIN_NEW_FIELDS,
         reannotate_threshold: int = DEFAULT_REANNOTATE_THRESHOLD,
         llm_timeout: int = 180,
@@ -85,14 +84,13 @@ class SemanticAnnotationPipeline:
         from governance.semantic.cache import SemanticCache
         from governance.semantic.diff_detector import SchemaDiffDetector
         from governance.semantic.template_annotator import TemplateAnnotator
-        from governance.semantic.llm_annotator import BedrockAnnotator
+        from governance.semantic.llm_annotator import LLMAnnotator
         from governance.semantic.fetch_docs import fetch_api_docs
         
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
         self.llm_model = llm_model
-        self.llm_region = llm_region
         self.min_new_fields = min_new_fields
         self.reannotate_threshold = reannotate_threshold
         self.llm_timeout = llm_timeout
@@ -100,9 +98,8 @@ class SemanticAnnotationPipeline:
         self.diff_detector = SchemaDiffDetector(cache_dir)
         self.template_annotator = TemplateAnnotator()
         self.cache = SemanticCache(cache_dir)
-        self.llm_annotator = BedrockAnnotator(
+        self.llm_annotator = LLMAnnotator(
             model=llm_model,
-            region=llm_region,
             timeout=llm_timeout,
         )
         self.fetch_docs = fetch_api_docs

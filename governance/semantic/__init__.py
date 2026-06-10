@@ -4,7 +4,7 @@ from governance.semantic.pipeline import SemanticAnnotationPipeline, AnnotationR
 from governance.semantic.cache import SemanticCache, CachedAnnotations
 from governance.semantic.diff_detector import SchemaDiffDetector, DiffResult
 from governance.semantic.template_annotator import TemplateAnnotator
-from governance.semantic.llm_annotator import BedrockAnnotator
+from governance.semantic.llm_annotator import LLMAnnotator
 
 __all__ = [
     "SemanticAnnotationPipeline",
@@ -14,5 +14,5 @@ __all__ = [
     "SchemaDiffDetector",
     "DiffResult",
     "TemplateAnnotator",
-    "BedrockAnnotator",
+    "LLMAnnotator",
 ]

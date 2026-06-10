@@ -349,8 +349,7 @@ rules:
 python -m cli.nexus agent review --dataset tpcdi_dim_customer --batch-id manual
 ```
 
-Set AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
-`AWS_DEFAULT_REGION`) and grant Bedrock model access to the IAM user/role
+Set `OPENAI_API_KEY` and optionally `OPENAI_BASE_URL`/`NEXUS_AGENT_MODEL`
 only if you want optional LLM-backed review. Without credentials, the agent
 stays local and deterministic.
 

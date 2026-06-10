@@ -117,8 +117,9 @@ x-airflow-environment: &airflow-environment
   OPENLINEAGE_ENDPOINT: ${OPENLINEAGE_ENDPOINT:-/api/v1/lineage}
   OPENLINEAGE_NAMESPACE: ${OPENLINEAGE_NAMESPACE:-nexus}
   OPENLINEAGE_TIMEOUT_SECONDS: ${OPENLINEAGE_TIMEOUT_SECONDS:-5}
-  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
-  NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-amazon.nova-pro-v1:0}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+  NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gpt-4o-mini}
 
 x-host-access: &host-access
   extra_hosts:

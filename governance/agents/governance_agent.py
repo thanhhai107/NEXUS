@@ -57,7 +57,7 @@ def _collect_evidence(dataset_name: str, batch_id: str) -> dict[str, Any]:
 
 
 def _llm_decision(evidence: dict[str, Any]) -> AgentDecision | None:
-    model = os.getenv("NEXUS_AGENT_MODEL", "amazon.nova-pro-v1:0")
+    model = os.getenv("NEXUS_AGENT_MODEL", "gpt-4o-mini")
     system_prompt = "Return only valid JSON. Do not include markdown."
     user_prompt = build_prompt(evidence)
 

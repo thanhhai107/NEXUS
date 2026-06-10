@@ -1,8 +1,4 @@
-"""LLM-based Semantic Annotator.
-
-Uses Amazon Bedrock (default) or OpenAI-compatible API
-to generate semantic annotations for fields.
-"""
+"""LLM-based semantic annotator using an OpenAI-compatible API."""
 
 from __future__ import annotations
 
@@ -13,17 +9,15 @@ from typing import Any
 from governance.llm.client import chat, check_health as llm_check_health
 
 
-class BedrockAnnotator:
+class LLMAnnotator:
     """Annotates fields using an LLM."""
 
     def __init__(
         self,
-        model: str = "amazon.nova-pro-v1:0",
-        region: str = "us-east-1",
+        model: str = "gpt-4o-mini",
         timeout: int = 180,
     ):
         self.model = os.getenv("NEXUS_AGENT_MODEL", model)
-        self.region = os.getenv("AWS_DEFAULT_REGION", region)
         self.timeout = timeout
 
     def annotate(

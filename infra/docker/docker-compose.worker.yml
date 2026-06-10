@@ -181,8 +181,9 @@ services:
       NEXUS_RUNTIME_DIR: ${NEXUS_RUNTIME_DIR:-/data}
       OPENLINEAGE_URL: ${OPENLINEAGE_URL:-}
       OPENLINEAGE_NAMESPACE: ${OPENLINEAGE_NAMESPACE:-nexus}
-      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
-      NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-amazon.nova-pro-v1:0}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      NEXUS_AGENT_MODEL: ${NEXUS_AGENT_MODEL:-gpt-4o-mini}
       HOSTNAME: worker-remote
     command: celery worker
     volumes:

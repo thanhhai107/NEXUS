@@ -20,8 +20,7 @@ default:
 
 # Semantic annotation settings
 semantic:
-  llm_model: amazon.nova-pro-v1:0
-  bedrock_region: us-east-1
+  llm_model: gpt-4o-mini
   llm_timeout_seconds: 180
   trigger:
     min_new_fields: 3
