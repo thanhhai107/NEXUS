@@ -1,4 +1,4 @@
-"""Ground Truth Extractor for TPC-DI SF=1.
+"""Ground Truth Extractor for TPC-DI benchmark data.
 
 Extracts authoritative metadata from clean generated TPC-DI data:
   - Schemas (field names, types, nullability)
@@ -86,7 +86,7 @@ TPCDI_FOREIGN_KEYS = {
 
 
 class GroundTruthExtractor:
-    """Extract ground-truth metadata from clean TPC-DI SF=1 data."""
+    """Extract ground-truth metadata from clean TPC-DI benchmark data."""
 
     def __init__(self, base_data_dir: Path | None = None):
         self.base_data_dir = base_data_dir

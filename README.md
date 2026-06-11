@@ -173,7 +173,7 @@ Run a contract-driven Bronze validation (requires generated TPC-DI data):
 ```bash
 python -m cli.nexus quality bronze-validate \
   --dataset tpcdi_dim_customer \
-  --source runtime/datasets/tpcdi/tpcdi_dim_customer.csv \
+  --source runtime/datasets/tpcdi_sf3/tpcdi_dim_customer.csv \
   --no-exit-on-fail
 ```
 
@@ -212,7 +212,7 @@ Create canonical entity IDs and crosswalk output (requires generated data):
 ```bash
 python -m cli.nexus semantic match-entities \
   --dataset tpcdi_prospect \
-  --source runtime/datasets/tpcdi/tpcdi_prospect.csv
+  --source runtime/datasets/tpcdi_sf3/tpcdi_prospect.csv
 ```
 
 Entity matching supports exact, rule-based, fuzzy, and probabilistic local
@@ -240,8 +240,8 @@ TPC-DI data is generated via Data Caterer (Docker-based Spark) with 6 error
 injection profiles (none → extreme) to test the quality pipeline:
 
 ```bash
-# Generate SF=1 with moderate errors (CSV + Parquet)
-python -m cli.nexus generate tpcdi --scale-factor 1 --error-profile moderate
+# Generate one of the supported benchmark scales: SF=3, SF=10, or SF=50
+python -m cli.nexus generate tpcdi --scale-factor 3 --error-profile moderate
 
 # Dry-run to preview the command without executing
 python -m cli.nexus generate tpcdi --dry-run
@@ -250,8 +250,10 @@ python -m cli.nexus generate tpcdi --dry-run
 python -m cli.nexus generate list-plans
 ```
 
-Generated data lands in `runtime/datasets/tpcdi/`. Operational failures go to
-the DLQ. Invalid data records go to quarantine.
+Generated data lands in scale-specific directories such as
+`runtime/datasets/tpcdi_sf3/`, `runtime/datasets/tpcdi_sf10/`, or
+`runtime/datasets/tpcdi_sf50/`. Operational failures go to the DLQ. Invalid
+data records go to quarantine.
 
 ## Runtime Outputs
 
@@ -380,7 +382,8 @@ Expected version is `4.23.0` or newer.
 
 ## TPC-DI Benchmark Pipeline
 
-NEXUS includes a complete TPC-DI benchmark pipeline using DIGen-generated data (SF=3 at `runtime/tpcdi/sf3/`).
+NEXUS includes a complete TPC-DI benchmark pipeline using DIGen-generated data
+at `runtime/tpcdi/sf3/`, `runtime/tpcdi/sf10/`, or `runtime/tpcdi/sf50/`.
 
 ### Quick start
 

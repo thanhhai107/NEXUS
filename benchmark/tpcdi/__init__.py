@@ -9,7 +9,7 @@ Implements the three canonical TPC-DI metric groups:
 Usage::
 
     from benchmark.tpcdi.runner import TpcdiRunner
-    runner = TpcdiRunner(scale_factor=1)
+    runner = TpcdiRunner(scale_factor=3)
     result = runner.run()
     runner.save_report()
 """

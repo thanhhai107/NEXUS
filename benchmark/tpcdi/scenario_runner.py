@@ -25,6 +25,7 @@ from typing import Any
 
 from benchmark.tpcdi.runner import TpcdiRunner
 from benchmark.tpcdi.scoring import TpcdiScoringEngine
+from common.tpcdi_sources import resolve_scale_factor
 from governance.quality.bronze_validator import validate_bronze_tpcdi_file
 from governance.recovery.engine import RecoveryEngine
 from ingestion.tpcdi.error_injection.error_collector import collect_detected_errors, write_detected_errors
@@ -41,7 +42,7 @@ class TpcdiScenarioRunner:
     """Orchestrate inject → detect → recover → score for one scenario."""
 
     def __init__(self, scale_factor: int = 3):
-        self.scale_factor = scale_factor
+        self.scale_factor = resolve_scale_factor(scale_factor)
         self.scorer = TpcdiScoringEngine()
         self.recovery = RecoveryEngine()
 
@@ -67,7 +68,9 @@ class TpcdiScenarioRunner:
         extra_kwargs:
             Additional keyword arguments forwarded to the injector create_scenario().
         """
+        original_scale = os.environ.get("TPCDI_SCALE_FACTOR")
         original_source_root = os.environ.get("TPCDI_SOURCE_ROOT")
+        os.environ["TPCDI_SCALE_FACTOR"] = str(self.scale_factor)
         os.environ.pop("TPCDI_SOURCE_ROOT", None)
 
         is_dup = mutation_type == "duplicate_pk"
@@ -211,6 +214,10 @@ class TpcdiScenarioRunner:
                 os.environ["TPCDI_SOURCE_ROOT"] = original_source_root
             elif "TPCDI_SOURCE_ROOT" in os.environ:
                 os.environ.pop("TPCDI_SOURCE_ROOT", None)
+            if original_scale is not None:
+                os.environ["TPCDI_SCALE_FACTOR"] = original_scale
+            else:
+                os.environ.pop("TPCDI_SCALE_FACTOR", None)
 
     def _create_scenario(
         self,

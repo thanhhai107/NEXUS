@@ -6,6 +6,8 @@ Deprecated: Use ``common.tpcdi_io`` for streaming access to DIGen sources.
 from __future__ import annotations
 
 import warnings
+import os
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +20,7 @@ from common.tpcdi_io import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TPCDI_RUNTIME_DIR = PROJECT_ROOT / "runtime" / "datasets" / "tpcdi"
+TPCDI_RUNTIME_DIR = PROJECT_ROOT / "runtime" / "tpcdi" / "sf3"
 BENCHMARK_DIR = PROJECT_ROOT / "benchmark"
 REPORTS_DIR = BENCHMARK_DIR / "reports"
 
@@ -57,4 +59,20 @@ def load_tpcdi_data(table: str, base_dir: Path | None = None) -> list[dict[str, 
         stacklevel=2,
     )
     source_name = SOURCE_MAP.get(table, table)
-    return list(iter_tpcdi_records(source_name, "batch1"))
+    if base_dir is None:
+        return list(iter_tpcdi_records(source_name, "batch1"))
+    with _temporary_source_root(base_dir):
+        return list(iter_tpcdi_records(source_name, "batch1"))
+
+
+@contextmanager
+def _temporary_source_root(base_dir: Path):
+    previous = os.environ.get("TPCDI_SOURCE_ROOT")
+    os.environ["TPCDI_SOURCE_ROOT"] = str(base_dir)
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("TPCDI_SOURCE_ROOT", None)
+        else:
+            os.environ["TPCDI_SOURCE_ROOT"] = previous

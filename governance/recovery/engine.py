@@ -395,7 +395,7 @@ class RecoveryEngine:
         os.environ["TPCDI_SOURCE_ROOT"] = str(recovered_source_root)
         try:
             from benchmark.tpcdi.runner import TpcdiRunner
-            runner = TpcdiRunner(scale_factor=3)
+            runner = TpcdiRunner(scale_factor=int(os.environ.get("TPCDI_SCALE_FACTOR", "3")))
             result = runner.run_milestone4(clean_outputs=True)
             report._pipeline_result = result.to_dict()
         finally:

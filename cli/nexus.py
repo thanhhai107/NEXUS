@@ -444,23 +444,31 @@ def validate_bronze_tpcdi_cli(args: argparse.Namespace) -> None:
         validate_bronze_tpcdi_batch,
     )
 
-    if args.all:
-        results = validate_bronze_tpcdi_batch(
-            batch_id=args.batch,
-            chunk_size=args.chunk_size,
-            no_exit_on_fail=args.no_exit_on_fail,
-        )
-    elif args.source_name:
-        result = validate_bronze_tpcdi_file(
-            source_name=args.source_name,
-            batch_id=args.batch,
-            chunk_size=args.chunk_size,
-            no_exit_on_fail=args.no_exit_on_fail,
-        )
-        results = [result]
-    else:
-        print("Error: specify --source-name or --all")
-        raise SystemExit(1)
+    previous_scale = os.environ.get("TPCDI_SCALE_FACTOR")
+    os.environ["TPCDI_SCALE_FACTOR"] = str(args.scale_factor)
+    try:
+        if args.all:
+            results = validate_bronze_tpcdi_batch(
+                batch_id=args.batch,
+                chunk_size=args.chunk_size,
+                no_exit_on_fail=args.no_exit_on_fail,
+            )
+        elif args.source_name:
+            result = validate_bronze_tpcdi_file(
+                source_name=args.source_name,
+                batch_id=args.batch,
+                chunk_size=args.chunk_size,
+                no_exit_on_fail=args.no_exit_on_fail,
+            )
+            results = [result]
+        else:
+            print("Error: specify --source-name or --all")
+            raise SystemExit(1)
+    finally:
+        if previous_scale is None:
+            os.environ.pop("TPCDI_SCALE_FACTOR", None)
+        else:
+            os.environ["TPCDI_SCALE_FACTOR"] = previous_scale
 
     print(json.dumps(results, indent=2))
     exit_code = max(r.get("exit_code", 0) for r in results)
@@ -646,7 +654,7 @@ def worker_heartbeats(_args: argparse.Namespace) -> None:
 
 
 def generate_tpc_data(args: argparse.Namespace) -> None:
-    """Generate TPC-DI benchmark data via Data Caterer (SF=1)."""
+    """Generate TPC-DI benchmark data via Data Caterer."""
     scale = args.scale_factor
     error = args.error_profile
     run_id = args.run_id or f"tpcdi-sf{scale}-{error}"
@@ -716,6 +724,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     tpcdi_validate.add_argument("--source-name", help="Source name in tpcdi_sources.yml")
     tpcdi_validate.add_argument("--batch", default="batch1", help="batch1 | batch2 | batch3")
+    tpcdi_validate.add_argument("--scale-factor", type=int, default=3, choices=[3, 10, 50], help="Benchmark scale factor: 3, 10, or 50 (default SF=3)")
     tpcdi_validate.add_argument("--all", action="store_true", help="Validate all sources in batch")
     tpcdi_validate.add_argument("--chunk-size", type=int, default=10000)
     tpcdi_validate.add_argument("--no-exit-on-fail", action="store_true")
@@ -826,8 +835,8 @@ def build_parser() -> argparse.ArgumentParser:
     generate = subcommands.add_parser("generate", help="Generate TPC-DI benchmark data via Data Caterer")
     generate_subcommands = generate.add_subparsers(dest="generate_command", required=True)
 
-    gen_tpc = generate_subcommands.add_parser("tpcdi", help="Generate TPC-DI data (SF=1)")
-    gen_tpc.add_argument("--scale-factor", type=int, default=1, help="Scale factor (default SF=1)")
+    gen_tpc = generate_subcommands.add_parser("tpcdi", help="Generate TPC-DI data")
+    gen_tpc.add_argument("--scale-factor", type=int, default=3, choices=[3, 10, 50], help="Benchmark scale factor: 3, 10, or 50 (default SF=3)")
     gen_tpc.add_argument(
         "--error-profile", default="moderate",
         choices=list(ERROR_PRESETS.keys()),

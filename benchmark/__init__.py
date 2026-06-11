@@ -12,7 +12,7 @@ Usage::
 
     from benchmark.tpcdi.runner import TpcdiRunner
 
-    runner = TpcdiRunner(scale_factor=1, hourly_infra_cost_usd=2.50)
+    runner = TpcdiRunner(scale_factor=3, hourly_infra_cost_usd=2.50)
     with runner.phase1():
         run_historical_load()
     with runner.phase2():

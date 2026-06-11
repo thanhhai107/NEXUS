@@ -1,5 +1,6 @@
-"""
-⚠️  WARNING: Not TPC-DI compliant. For synthetic demo only.
+"""Generate synthetic TPC-DI-like CSV data using Spark.
+
+WARNING: Not TPC-DI compliant. For synthetic demo only.
 
 This script generates warehouse-like tables using uniform random data.
 It does NOT conform to TPC-DI specification because:
@@ -8,10 +9,8 @@ It does NOT conform to TPC-DI specification because:
 - Batch 1/2/3 structure is NOT present
 - Data distributions are uniform random, not realistic
 
-Use DIGen source files (runtime/tpcdi/sf3/) for TPC-DI benchmark.
-"""
-
-"""Generate TPC-DI CSV data using Spark for high performance.
+Use DIGen source files under runtime/tpcdi/sf3/, runtime/tpcdi/sf10/, or
+runtime/tpcdi/sf50/ for TPC-DI benchmark.
 
 Run: docker exec nexus-spark spark-submit /opt/nexus/scripts/generate_tpc_spark.py --scale 10 --output /opt/nexus/runtime/datasets/tpcdi_sf10 --error-profile moderate
 """
@@ -245,7 +244,7 @@ def _gen_column(name: str, ftype: str, offset: int) -> Any:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scale", type=int, default=1)
+    parser.add_argument("--scale", type=int, default=3, choices=[3, 10, 50])
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("--datasets", type=str, default="")
     parser.add_argument("--error-profile", type=str, default="none",

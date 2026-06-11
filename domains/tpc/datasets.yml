@@ -12,7 +12,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: date
         batches: [batch1]
@@ -44,7 +44,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: time
         batches: [batch1]
@@ -76,7 +76,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: customer_mgmt
         batches: [batch1]
@@ -110,7 +110,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: hr
         batches: [batch1]
@@ -142,7 +142,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: customer_mgmt
         batches: [batch1]
@@ -176,7 +176,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: finwire
         batches: [batch1]
@@ -208,7 +208,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: finwire
         batches: [batch1]
@@ -240,7 +240,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: trade
         batches: [batch1, batch2, batch3]
@@ -275,7 +275,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: cash_transaction
         batches: [batch1, batch2, batch3]
@@ -309,7 +309,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: holding_history
         batches: [batch1, batch2, batch3]
@@ -344,7 +344,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: finwire
         batches: [batch1]
@@ -379,7 +379,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: watch_history
         batches: [batch1, batch2, batch3]
@@ -413,7 +413,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: industry
         batches: [batch1]
@@ -445,7 +445,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: status_type
         batches: [batch1]
@@ -477,7 +477,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: tax_rate
         batches: [batch1]
@@ -509,7 +509,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: trade_type
         batches: [batch1]
@@ -541,7 +541,7 @@ datasets:
       default_download: true
     source_type: tpcdi_digen
     source_config: domains/tpc/tpcdi_sources.yml
-    source_root: runtime/tpcdi/sf3
+    source_root_template: runtime/tpcdi/sf{scale_factor}
     source_mappings:
       - source_name: prospect
         batches: [batch1, batch2, batch3]

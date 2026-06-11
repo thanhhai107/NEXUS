@@ -28,15 +28,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PLANS_DIR = PROJECT_ROOT / "ingestion" / "data_caterer" / "plans"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "runtime" / "datasets"
 DOCKER_IMAGE = "datacatering/data-caterer:0.5.0"
+SUPPORTED_BENCHMARK_SCALE_FACTORS = {3, 10, 50}
 
 def _ensure_dir(path: Path) -> Path:
     try:
         path.mkdir(parents=True, exist_ok=True)
     except PermissionError:
-        import tempfile
-        alt = Path(tempfile.gettempdir()) / "nexus-datasets"
-        alt.mkdir(parents=True, exist_ok=True)
-        return alt
+        raise PermissionError(f"Cannot create dataset output directory inside repository: {path}")
     return path
 
 # Error injection presets
@@ -97,7 +95,7 @@ class DataCatererConfig:
     plan_dir: Path = field(default=PLANS_DIR)
     output_dir: Path = field(default=DEFAULT_OUTPUT_DIR)
     output_formats: list[str] = field(default_factory=lambda: ["csv", "parquet"])
-    scale_factor: int = 1
+    scale_factor: int = 3
     error_profile: str = "moderate"
     mode: str = "batch"
     kafka_bootstrap: str = "localhost:29092"
@@ -200,8 +198,6 @@ def run_plan(
     Returns:
         Dict with status, output_paths, record_counts, errors
     """
-    config.output_dir = _ensure_dir(config.output_dir)
-
     cmd = _build_docker_command(config)
 
     if dry_run:
@@ -210,6 +206,9 @@ def run_plan(
             "command": " ".join(cmd),
             "config": config.to_dict(),
         }
+
+    config.output_dir = _ensure_dir(config.output_dir)
+    cmd = _build_docker_command(config)
 
     start_time = time.time()
     try:
@@ -266,13 +265,16 @@ def _count_records(file_list: list[str]) -> dict[str, int]:
 
 
 def generate_tpcdi(
-    scale_factor: int = 1,
+    scale_factor: int = 3,
     error_profile: str = "moderate",
     output_formats: list[str] | None = None,
     run_id: str = "",
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Generate TPC-DI benchmark data (SF=1 by default)."""
+    """Generate TPC-DI benchmark data (SF=3 by default)."""
+    if scale_factor not in SUPPORTED_BENCHMARK_SCALE_FACTORS:
+        supported = ", ".join(str(value) for value in sorted(SUPPORTED_BENCHMARK_SCALE_FACTORS))
+        raise ValueError(f"Unsupported benchmark scale factor {scale_factor}; use one of: {supported}.")
     if output_formats is None:
         output_formats = ["csv", "parquet"]
     config = DataCatererConfig(
@@ -280,7 +282,7 @@ def generate_tpcdi(
         scale_factor=scale_factor,
         error_profile=error_profile,
         output_formats=output_formats,
-        output_dir=DEFAULT_OUTPUT_DIR / "tpcdi",
+        output_dir=DEFAULT_OUTPUT_DIR / f"tpcdi_sf{scale_factor}",
         mode="batch",
         run_id=run_id,
         spark_master="local[*]",

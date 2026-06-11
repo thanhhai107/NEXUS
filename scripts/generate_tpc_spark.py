@@ -232,7 +232,7 @@ def _gen_column(name: str, ftype: str, offset: int) -> Any:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scale", type=int, default=1)
+    parser.add_argument("--scale", type=int, default=3, choices=[3, 10, 50])
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("--datasets", type=str, default="")
     parser.add_argument("--error-profile", type=str, default="none",

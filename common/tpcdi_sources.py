@@ -19,6 +19,24 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "domains" / "tpc" / "tpcdi_sources.yml"
+SUPPORTED_BENCHMARK_SCALE_FACTORS = {3, 10, 50}
+
+
+def resolve_scale_factor(scale_factor: int | str | None = None) -> int:
+    """Resolve and validate the active TPC-DI benchmark scale factor."""
+    import os
+
+    raw = scale_factor if scale_factor is not None else os.environ.get("TPCDI_SCALE_FACTOR")
+    if raw is None:
+        raw = _get_tpcdi_config().get("scale_factor", 3)
+    try:
+        resolved = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid TPC-DI scale factor: {raw!r}") from exc
+    if resolved not in SUPPORTED_BENCHMARK_SCALE_FACTORS:
+        supported = ", ".join(str(value) for value in sorted(SUPPORTED_BENCHMARK_SCALE_FACTORS))
+        raise ValueError(f"Unsupported TPC-DI scale factor {resolved}; use one of: {supported}.")
+    return resolved
 
 
 def load_tpcdi_sources_config(path: str | Path | None = None) -> dict[str, Any]:
@@ -32,7 +50,7 @@ def _get_tpcdi_config(path: str | Path | None = None) -> dict[str, Any]:
     return cfg.get("tpcdi", cfg)
 
 
-def source_root(path: str | Path | None = None) -> Path:
+def source_root(path: str | Path | None = None, scale_factor: int | str | None = None) -> Path:
     import os
 
     env_root = os.environ.get("TPCDI_SOURCE_ROOT")
@@ -41,7 +59,11 @@ def source_root(path: str | Path | None = None) -> Path:
         return p if p.is_absolute() else PROJECT_ROOT / p
 
     cfg = _get_tpcdi_config(path)
-    root = cfg.get("source_root", "runtime/tpcdi/sf3")
+    scale = resolve_scale_factor(scale_factor)
+    if scale == int(cfg.get("scale_factor", 3)):
+        root = cfg.get("source_root", f"runtime/tpcdi/sf{scale}")
+    else:
+        root = f"runtime/tpcdi/sf{scale}"
     return PROJECT_ROOT / root
 
 

@@ -8,6 +8,7 @@ metric; resource consumption is reported alongside.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -15,7 +16,8 @@ from typing import Any, Optional
 from benchmark.tpcdi.performance import TpcdiPerformanceTimer, get_diu
 from benchmark.tpcdi.correctness import TpcdiCorrectnessAuditor, AuditStatus
 from benchmark.tpcdi.resource import ResourceMonitor
-from benchmark.utils.io import load_tpcdi_data, TPCDI_RUNTIME_DIR, REPORTS_DIR
+from benchmark.utils.io import load_tpcdi_data, REPORTS_DIR
+from common.tpcdi_sources import resolve_scale_factor
 
 from benchmark.ground_truth.extractor import TPCDI_TABLES
 
@@ -78,9 +80,10 @@ class TpcdiRunner:
     Parameters
     ----------
     scale_factor:
-        TPC-DI scale factor (default 1).
+        TPC-DI scale factor. Supported benchmark scales are 3, 10, and 50.
     base_data_dir:
-        Directory containing CSV data files. Defaults to ``runtime/datasets/tpcdi/``.
+        Optional override for the DIGen source root. By default the runner uses
+        ``runtime/tpcdi/sf{scale_factor}/``.
     hourly_infra_cost_usd:
         Optional hourly infrastructure cost for computing ``price_per_diu``.
     """
@@ -93,8 +96,9 @@ class TpcdiRunner:
         base_data_dir: Optional[Path] = None,
         hourly_infra_cost_usd: Optional[float] = None,
     ):
-        self.scale_factor = scale_factor
-        self.base_data_dir = base_data_dir or TPCDI_RUNTIME_DIR
+        self.scale_factor = resolve_scale_factor(scale_factor)
+        os.environ["TPCDI_SCALE_FACTOR"] = str(self.scale_factor)
+        self.base_data_dir = base_data_dir
         self.hourly_infra_cost = hourly_infra_cost_usd
 
         self.timer = TpcdiPerformanceTimer(scale_factor=scale_factor)

@@ -1,4 +1,4 @@
-# Data Caterer integration package for NEXUS — TPC-DI SF=1
+# Data Caterer integration package for NEXUS — TPC-DI SF=3/10/50
 from ingestion.data_caterer.runner import (
     DataCatererConfig,
     generate_tpcdi,

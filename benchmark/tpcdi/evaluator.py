@@ -23,6 +23,8 @@ from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from benchmark.tpcdi.scenario_runner import TpcdiScenarioRunner
 
+from common.tpcdi_sources import resolve_scale_factor
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Error Taxonomy — all 35 error types grouped by category
 # ═══════════════════════════════════════════════════════════════════════════
@@ -262,8 +264,9 @@ class BenchmarkReport:
 class BenchmarkEvaluator:
     """Run and score all 35 error scenarios across 7 categories."""
 
-    def __init__(self, require_source: bool = False):
+    def __init__(self, require_source: bool = False, scale_factor: int = 3):
         self.require_source = require_source
+        self.scale_factor = resolve_scale_factor(scale_factor)
         self.results: list[ScenarioResult] = []
 
     def run_full_benchmark(
@@ -280,15 +283,23 @@ class BenchmarkEvaluator:
         """
         self.results = []
         run_mode = "live" if scenario_runner else "simulated"
+        old_scale = os.environ.get("TPCDI_SCALE_FACTOR")
+        os.environ["TPCDI_SCALE_FACTOR"] = str(self.scale_factor)
 
-        for category, scenarios in SCENARIO_CATALOG.items():
-            for scenario_def in scenarios:
-                result = self._run_one_scenario(
-                    category, scenario_def, scenario_runner
-                )
-                self.results.append(result)
+        try:
+            for category, scenarios in SCENARIO_CATALOG.items():
+                for scenario_def in scenarios:
+                    result = self._run_one_scenario(
+                        category, scenario_def, scenario_runner
+                    )
+                    self.results.append(result)
 
-        return self._build_report(run_mode)
+            return self._build_report(run_mode)
+        finally:
+            if old_scale is None:
+                os.environ.pop("TPCDI_SCALE_FACTOR", None)
+            else:
+                os.environ["TPCDI_SCALE_FACTOR"] = old_scale
 
     def _run_one_scenario(
         self,

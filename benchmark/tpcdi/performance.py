@@ -16,20 +16,21 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 DIU_BY_SCALE_FACTOR: dict[int, int] = {
-    1: 3,
     3: 10,
     10: 100,
-    100: 1000,
-    1000: 10000,
+    50: 500,
 }
 
 
 def get_diu(scale_factor: int) -> int:
     """Return the number of Daily Ingestion Units for a given scale factor.
 
-    Falls back to ``scale_factor * 10`` for unlisted scale factors.
+    Supported benchmark scale factors are 3, 10, and 50.
     """
-    return DIU_BY_SCALE_FACTOR.get(scale_factor, scale_factor * 10)
+    if scale_factor not in DIU_BY_SCALE_FACTOR:
+        supported = ", ".join(str(value) for value in sorted(DIU_BY_SCALE_FACTOR))
+        raise ValueError(f"Unsupported TPC-DI scale factor {scale_factor}; use one of: {supported}.")
+    return DIU_BY_SCALE_FACTOR[scale_factor]
 
 
 @dataclass
@@ -38,7 +39,7 @@ class TpcdiPerformanceTimer:
 
     Typical usage (context manager)::
 
-        timer = TpcdiPerformanceTimer(scale_factor=1)
+        timer = TpcdiPerformanceTimer(scale_factor=3)
         with timer.phase1():
             run_historical_load()
         with timer.phase2(days=1):
@@ -47,7 +48,7 @@ class TpcdiPerformanceTimer:
 
     Typical usage (explicit start/stop)::
 
-        timer = TpcdiPerformanceTimer(scale_factor=1)
+        timer = TpcdiPerformanceTimer(scale_factor=3)
         timer.start_phase1()
         run_historical_load()
         timer.stop_phase1()
@@ -57,7 +58,7 @@ class TpcdiPerformanceTimer:
         print(timer.summary())
     """
 
-    scale_factor: int = 1
+    scale_factor: int = 3
     _phase1_start: float = 0.0
     _phase1_end: float | None = None
     _phase2_start: float = 0.0
