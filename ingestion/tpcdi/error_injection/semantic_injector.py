@@ -7,12 +7,17 @@ but produce analytically wrong values.  Detection requires semantic validation
 rules (Phase 3 quality pipeline) or Gold-level ground-truth comparison.
 
 Supported mutation_types:
-  unit_changed                — Multiply all ``amount_fields`` by a conversion factor.
-  timestamp_format_changed    — Reformat ``timestamp_fields`` (YYYY-MM-DD → DD/MM/YYYY).
-  timestamp_granularity_changed — Truncate datetime to date-only (lose time precision).
-  entity_id_ambiguity         — Duplicate an entity with a different technical ID.
-  rename_to_synonym           — Rename a field to a synonym in ``semantic_meta``.
-  pre_aggregate_records       — Group-by key fields and sum amount fields.
+  unit_changed                     — Multiply ``amount_fields`` by a conversion factor.
+  timestamp_format_changed         — Reformat ``timestamp_fields`` (YYYY-MM-DD → DD/MM/YYYY).
+  timestamp_granularity_changed    — Truncate datetime to date-only (lose time precision).
+  entity_id_ambiguity              — Duplicate an entity with a different technical ID.
+  rename_to_synonym                — Rename a field to a synonym in ``semantic_meta``.
+  pre_aggregate_records            — Group-by key fields and sum amount fields.
+  same_name_different_meaning      — Swap values between two identically-named fields
+                                      that carry different business semantics.
+  different_business_definitions   — Apply a formula shift (e.g. net_price → gross_price).
+  different_spatial_ref            — Inject a spatial CRS field or modify coordinate values.
+  cross_source_inconsistency       — Modify values to create conflicts between sources.
 
 Usage::
 
@@ -371,6 +376,373 @@ class SemanticInjector:
                 "expected_stage": "semantic_validation",
                 "recoverable": False,
                 "recovery_hint": "manual_correction",
+            })
+        return mutations
+
+    # ── New mutation types (extended taxonomy) ───────────────────────────
+
+    def _inject_rename_to_synonym(
+        self,
+        src_dir: Path,
+        source_name: str,
+        batch_id: str,
+        *,
+        target_field: str | None = None,
+        synonym: str | None = None,
+        **_: Any,
+    ) -> list[dict[str, Any]]:
+        """Rename a field column and all its occurrences in source files.
+
+        Picks a random field name and replaces it with a known synonym
+        (e.g. ``price`` → ``cost``, ``quantity`` → ``volume``, ``date`` → ``day``).
+        """
+        cfg = get_source_config(source_name)
+        columns = list(cfg.get("columns", []))
+        if not columns:
+            return [{"mutation_type": "rename_to_synonym", "skipped": "no_columns"}]
+
+        synonym_map = {
+            "price": "cost", "quantity": "volume", "amount": "sum",
+            "date": "day", "time": "moment", "id": "uid",
+            "name": "label", "type": "category", "status": "state",
+            "value": "score", "rate": "ratio", "fee": "charge",
+        }
+        if target_field and target_field in columns:
+            original = target_field
+        else:
+            candidates = [c for c in columns if any(k in c.lower() for k in synonym_map)]
+            if not candidates:
+                candidates = columns
+            original = self.rng.choice(candidates)
+
+        syn = synonym or synonym_map.get(original.lower(), original + "_renamed")
+        delimiter = cfg.get("delimiter", "|")
+        col_idx = columns.index(original)
+
+        mutations: list[dict[str, Any]] = []
+        for filepath in self._resolve_files(src_dir, source_name, batch_id):
+            lines = filepath.read_text(encoding="utf-8").splitlines()
+            for i, line in enumerate(lines):
+                fields = line.split(delimiter)
+                if col_idx < len(fields):
+                    fields[col_idx] = syn  # replace column value with synonym marker
+                    lines[i] = delimiter.join(fields)
+            filepath.write_text("\n".join(lines) + "\n" if lines else "", encoding="utf-8")
+            mutations.append({
+                "mutation_type": "rename_to_synonym",
+                "source": source_name,
+                "original_field": original,
+                "synonym": syn,
+                "expected_detection": "field_rename_candidate",
+                "expected_stage": "bronze_validation",
+                "recoverable": True,
+                "recovery_hint": "field_alias_lookup",
+            })
+        return mutations
+
+    def _inject_entity_id_ambiguity(
+        self,
+        src_dir: Path,
+        source_name: str,
+        batch_id: str,
+        **_: Any,
+    ) -> list[dict[str, Any]]:
+        """Duplicate an entity record with a slightly different technical ID.
+
+        Copies a random record and changes its entity ID, simulating the case
+        where two different technical IDs refer to the same real-world entity
+        but the system cannot resolve them.
+        """
+        meta = get_semantic_meta(source_name)
+        id_fields = meta.get("entity_id_fields", [])
+        cfg = get_source_config(source_name)
+        delimiter = cfg.get("delimiter", "|")
+        columns = cfg.get("columns", [])
+
+        if not id_fields:
+            id_fields = [c for c in columns[:3] if "id" in c.lower() or "sym" in c.lower()]
+        if not id_fields:
+            return [{"mutation_type": "entity_id_ambiguity", "skipped": "no_id_fields"}]
+
+        id_idx = columns.index(id_fields[0]) if id_fields[0] in columns else 0
+
+        mutations: list[dict[str, Any]] = []
+        for filepath in self._resolve_files(src_dir, source_name, batch_id):
+            lines = filepath.read_text(encoding="utf-8").splitlines()
+            if len(lines) < 2:
+                continue
+            # Pick a random non-empty line to duplicate
+            candidates = [i for i, l in enumerate(lines) if l.strip()]
+            if not candidates:
+                continue
+            dup_idx = self.rng.choice(candidates)
+            original_line = lines[dup_idx].rstrip("\n\r")
+            fields = original_line.split(delimiter)
+
+            # Modify the ID field slightly
+            if id_idx < len(fields):
+                orig_id = fields[id_idx]
+                # Append a suffix to create ambiguity
+                fields[id_idx] = orig_id + "_AMBIGUOUS"
+            mutated_line = delimiter.join(fields)
+
+            # Insert the mutated duplicate after the original
+            lines.insert(dup_idx + 1, mutated_line)
+            filepath.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            mutations.append({
+                "mutation_type": "entity_id_ambiguity",
+                "source": source_name,
+                "id_field": id_fields[0],
+                "original_id": orig_id if id_idx < len(fields) else "",
+                "ambiguous_id": fields[id_idx] if id_idx < len(fields) else "",
+                "dup_line_number": dup_idx + 1,
+                "expected_detection": "entity_resolution_problem",
+                "expected_stage": "silver_validation",
+                "recoverable": False,
+                "recovery_hint": "entity_resolution_engine",
+            })
+        return mutations
+
+    def _inject_same_name_different_meaning(
+        self,
+        src_dir: Path,
+        source_name: str,
+        batch_id: str,
+        **_: Any,
+    ) -> list[dict[str, Any]]:
+        """Swap numeric values between two fields that share a common keyword
+        in their names but have different business meanings.
+
+        Example: swap ``trade_price`` ↔ ``cash_amount`` — both are amounts
+        but represent different concepts (unit price vs total cash).
+        """
+        cfg = get_source_config(source_name)
+        columns = cfg.get("columns", [])
+        delimiter = cfg.get("delimiter", "|")
+
+        # Find pairs of columns sharing a keyword but with different roles
+        keyword_groups: dict[str, list[int]] = {}
+        keywords = ["price", "amount", "value", "fee", "commission", "tax", "rate", "quantity", "volume"]
+        for kw in keywords:
+            matching = [i for i, c in enumerate(columns) if kw in c.lower()]
+            if len(matching) >= 2:
+                keyword_groups[kw] = matching
+
+        if not keyword_groups:
+            # Fallback: pick any two numeric-ish columns
+            all_idx = list(range(min(len(columns), 6)))
+            if len(all_idx) >= 2:
+                a, b = self.rng.sample(all_idx, 2)
+                keyword_groups["generic"] = [a, b]
+            else:
+                return [{"mutation_type": "same_name_different_meaning", "skipped": "no_col_pair"}]
+
+        kw = self.rng.choice(list(keyword_groups.keys()))
+        idx_pair = keyword_groups[kw]
+        a_idx, b_idx = idx_pair[0], idx_pair[1]
+
+        mutations: list[dict[str, Any]] = []
+        for filepath in self._resolve_files(src_dir, source_name, batch_id):
+            lines = filepath.read_text(encoding="utf-8").splitlines()
+            for i, line in enumerate(lines):
+                fields = line.split(delimiter)
+                if a_idx < len(fields) and b_idx < len(fields):
+                    fields[a_idx], fields[b_idx] = fields[b_idx], fields[a_idx]
+                lines[i] = delimiter.join(fields)
+            filepath.write_text("\n".join(lines) + "\n" if lines else "", encoding="utf-8")
+            mutations.append({
+                "mutation_type": "same_name_different_meaning",
+                "source": source_name,
+                "swapped_fields": [columns[a_idx], columns[b_idx]],
+                "keyword": kw,
+                "expected_detection": "semantic_anomaly",
+                "expected_stage": "semantic_validation",
+                "recoverable": False,
+                "recovery_hint": "field_semantic_validation",
+            })
+        return mutations
+
+    def _inject_different_business_definitions(
+        self,
+        src_dir: Path,
+        source_name: str,
+        batch_id: str,
+        *,
+        formula: str = "net_to_gross",
+        tax_rate: float = 0.10,
+        **_: Any,
+    ) -> list[dict[str, Any]]:
+        """Apply a formula shift to numeric fields simulating different
+        business definition (e.g. net_price → gross_price by adding tax).
+
+        Supported formulas:
+          net_to_gross — Multiply amount fields by (1 + tax_rate)
+          gross_to_net — Divide amount fields by (1 + tax_rate)
+          add_markup   — Multiply by 1.5
+        """
+        meta = get_semantic_meta(source_name)
+        amount_fields = meta.get("amount_fields", [])
+        if not amount_fields:
+            return [{"mutation_type": "different_business_definitions", "skipped": "no_amount_fields"}]
+
+        cfg = get_source_config(source_name)
+        delimiter = cfg.get("delimiter", "|")
+        col_indices = self._get_col_indices(source_name, amount_fields)
+
+        if formula == "net_to_gross":
+            factor = 1 + tax_rate
+        elif formula == "gross_to_net":
+            factor = 1 / (1 + tax_rate)
+        elif formula == "add_markup":
+            factor = 1.5
+        else:
+            factor = 1 + tax_rate
+
+        mutations: list[dict[str, Any]] = []
+        for filepath in self._resolve_files(src_dir, source_name, batch_id):
+            lines = filepath.read_text(encoding="utf-8").splitlines()
+            new_lines = []
+            for line in lines:
+                stripped = line.rstrip("\n\r")
+                fields = stripped.split(delimiter)
+                for idx in col_indices:
+                    if idx < len(fields):
+                        s = fields[idx].strip()
+                        if s.lstrip("-").replace(".", "").isdigit():
+                            try:
+                                orig = float(s)
+                                if "." in s:
+                                    fields[idx] = str(orig * factor)
+                                else:
+                                    fields[idx] = str(int(orig * factor))
+                            except ValueError:
+                                pass
+                new_lines.append(delimiter.join(fields))
+            filepath.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+            mutations.append({
+                "mutation_type": "different_business_definitions",
+                "source": source_name,
+                "formula": formula,
+                "factor": factor,
+                "affected_fields": amount_fields,
+                "expected_detection": "semantic_anomaly",
+                "expected_stage": "semantic_validation",
+                "recoverable": False,
+                "recovery_hint": "reapply_business_rules",
+            })
+        return mutations
+
+    def _inject_different_spatial_ref(
+        self,
+        src_dir: Path,
+        source_name: str,
+        batch_id: str,
+        **_: Any,
+    ) -> list[dict[str, Any]]:
+        """Inject a spatial Coordinate Reference System (CRS) field or modify
+        coordinate values to simulate spatial reference system mismatch.
+
+        Since TPC-DI has no spatial data, this injector adds a synthetic
+        ``_crs`` field and/or modifies mock coordinate fields.
+        """
+        cfg = get_source_config(source_name)
+        delimiter = cfg.get("delimiter", "|")
+
+        crs_values = ["EPSG:4326", "EPSG:3857", "EPSG:27700", "EPSG:32633"]
+        selected_crs = self.rng.choice(crs_values)
+
+        mutations: list[dict[str, Any]] = []
+        for filepath in self._resolve_files(src_dir, source_name, batch_id):
+            lines = filepath.read_text(encoding="utf-8").splitlines()
+            new_lines = []
+            for line in lines:
+                stripped = line.rstrip("\n\r")
+                if not stripped:
+                    new_lines.append(line)
+                    continue
+                # Append CRS field to each record
+                new_lines.append(stripped + delimiter + selected_crs)
+            filepath.write_text("\n".join(new_lines) + "\n" if new_lines else "", encoding="utf-8")
+            mutations.append({
+                "mutation_type": "different_spatial_ref",
+                "source": source_name,
+                "injected_crs": selected_crs,
+                "expected_detection": "semantic_anomaly",
+                "expected_stage": "semantic_validation",
+                "recoverable": False,
+                "recovery_hint": "reproject_coordinates",
+            })
+        return mutations
+
+    def _inject_cross_source_inconsistency(
+        self,
+        src_dir: Path,
+        source_name: str,
+        batch_id: str,
+        *,
+        conflict_source: str | None = None,
+        **_: Any,
+    ) -> list[dict[str, Any]]:
+        """Modify values in the current source to create inconsistency with
+        another source that shares a common identifier.
+
+        Picks a second source (e.g. ``trade`` vs ``cash_transaction``) that
+        shares entity IDs and negates or scales amount values in the current
+        source so the two sources no longer agree on the same entity.
+        """
+        cfg = get_source_config(source_name)
+        columns = cfg.get("columns", [])
+        delimiter = cfg.get("delimiter", "|")
+
+        # Pick a conflict source
+        conflict_candidates = []
+        for sn, meta in _SEMANTIC_META.items():
+            if sn != source_name:
+                conflict_candidates.append(sn)
+        conflict = conflict_source or (self.rng.choice(conflict_candidates) if conflict_candidates else None)
+
+        # Find shared ID fields
+        meta = get_semantic_meta(source_name)
+        id_fields = meta.get("entity_id_fields", [])
+        amount_fields = meta.get("amount_fields", []) or meta.get("volume_fields", [])
+
+        if not amount_fields:
+            return [{"mutation_type": "cross_source_inconsistency", "skipped": "no_amount_fields"}]
+
+        amt_indices = self._get_col_indices(source_name, amount_fields)
+
+        mutations: list[dict[str, Any]] = []
+        for filepath in self._resolve_files(src_dir, source_name, batch_id):
+            lines = filepath.read_text(encoding="utf-8").splitlines()
+            new_lines = []
+            for line in lines:
+                stripped = line.rstrip("\n\r")
+                fields = stripped.split(delimiter)
+                for idx in amt_indices:
+                    if idx < len(fields):
+                        s = fields[idx].strip()
+                        if s.lstrip("-").replace(".", "").isdigit():
+                            try:
+                                orig = float(s)
+                                # Negate or zero out to create inconsistency
+                                if orig > 0:
+                                    if "." in s:
+                                        fields[idx] = str(-orig)
+                                    else:
+                                        fields[idx] = str(-abs(int(orig)))
+                            except ValueError:
+                                pass
+                new_lines.append(delimiter.join(fields))
+            filepath.write_text("\n".join(new_lines) + "\n" if new_lines else "", encoding="utf-8")
+            mutations.append({
+                "mutation_type": "cross_source_inconsistency",
+                "source": source_name,
+                "conflict_source": conflict,
+                "affected_fields": amount_fields,
+                "expected_detection": "cross_source_inconsistency",
+                "expected_stage": "gold_audit",
+                "recoverable": False,
+                "recovery_hint": "reconciliation_engine",
             })
         return mutations
 

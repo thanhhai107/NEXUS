@@ -15,7 +15,7 @@ def chat(
 
     client = OpenAI(
         api_key=os.getenv("OPENAI_API_KEY"),
-        base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+        base_url=os.getenv("OPENAI_BASE_URL"),
     )
     stream = client.responses.create(
         model=model,
@@ -38,14 +38,15 @@ def check_health() -> dict[str, Any]:
 
         client = OpenAI(
             api_key=os.getenv("OPENAI_API_KEY"),
-            base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+            base_url=os.getenv("OPENAI_BASE_URL"),
         )
         resp = client.models.list()
         model_ids = [m.id for m in resp]
+        configured_model = os.getenv("NEXUS_AGENT_MODEL") or ""
         return {
             "available": True,
             "models": model_ids[:20],
-            "model_available": os.getenv("NEXUS_AGENT_MODEL", "gpt-4o-mini") in model_ids,
+            "model_available": configured_model in model_ids,
         }
     except Exception as e:
         return {"available": False, "error": str(e)}

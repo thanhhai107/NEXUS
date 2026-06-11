@@ -29,9 +29,9 @@ class TestStorageConfig:
         """Test local storage config."""
         monkeypatch.setenv("NEXUS_RUNTIME_MODE", "local")
         reset_storage()
-        
+
         config = get_storage_config()
-        
+
         assert config.mode == "local"
         assert config.base_path is not None
 
@@ -42,9 +42,9 @@ class TestStorageConfig:
         monkeypatch.setenv("MINIO_ROOT_USER", "testuser")
         monkeypatch.setenv("MINIO_ROOT_PASSWORD", "testpass")
         reset_storage()
-        
+
         config = get_storage_config()
-        
+
         assert config.mode == "vm"
         assert config.endpoint == "http://minio:9000"
         assert config.access_key == "testuser"
@@ -61,12 +61,12 @@ class TestLocalStorageBackend:
     def test_write_and_read_json(self):
         """Test writing and reading JSON."""
         data = {"key": "value", "number": 42}
-        
+
         path = self.storage.write("test/data.json", data)
-        
+
         assert Path(path).exists()
         assert self.storage.exists("test/data.json")
-        
+
         read_data = self.storage.read("test/data.json")
         assert read_data == data
 
@@ -76,9 +76,9 @@ class TestLocalStorageBackend:
             {"id": 1, "name": "Alice"},
             {"id": 2, "name": "Bob"},
         ]
-        
+
         self.storage.write_jsonl("test/records.jsonl", records)
-        
+
         read_records = list(self.storage.read_jsonl("test/records.jsonl"))
         assert len(read_records) == 2
         assert read_records[0]["id"] == 1
@@ -88,18 +88,18 @@ class TestLocalStorageBackend:
         """Test appending to JSONL."""
         records = [{"id": 1}]
         self.storage.write_jsonl("test/append.jsonl", records)
-        
+
         self.storage.append_jsonl("test/append.jsonl", {"id": 2})
-        
+
         read_records = list(self.storage.read_jsonl("test/append.jsonl"))
         assert len(read_records) == 2
 
     def test_exists(self):
         """Test exists check."""
         assert not self.storage.exists("nonexistent.json")
-        
+
         self.storage.write("exists.json", {"test": True})
-        
+
         assert self.storage.exists("exists.json")
 
     def test_list(self):
@@ -107,9 +107,9 @@ class TestLocalStorageBackend:
         self.storage.write("dir1/file1.json", {"test": 1})
         self.storage.write("dir1/file2.json", {"test": 2})
         self.storage.write("dir2/file3.json", {"test": 3})
-        
+
         files = self.storage.list("dir1")
-        
+
         assert len(files) == 2
         assert any("file1.json" in f for f in files)
         assert any("file2.json" in f for f in files)
@@ -118,16 +118,16 @@ class TestLocalStorageBackend:
         """Test deleting files."""
         self.storage.write("delete_me.json", {"test": True})
         assert self.storage.exists("delete_me.json")
-        
+
         result = self.storage.delete("delete_me.json")
-        
+
         assert result is True
         assert not self.storage.exists("delete_me.json")
 
     def test_nested_directories(self):
         """Test nested directory creation."""
         path = self.storage.write("a/b/c/d/deep.json", {"deep": True})
-        
+
         assert Path(path).exists()
         read_data = self.storage.read("a/b/c/d/deep.json")
         assert read_data["deep"] is True
@@ -144,9 +144,9 @@ class TestStorageFactory:
         """Test getting local storage."""
         monkeypatch.setenv("NEXUS_RUNTIME_MODE", "local")
         reset_storage()
-        
+
         storage = get_storage()
-        
+
         assert isinstance(storage, LocalStorageBackend)
 
     def test_convenience_functions(self, tmp_path, monkeypatch):
@@ -154,10 +154,10 @@ class TestStorageFactory:
         monkeypatch.setenv("NEXUS_RUNTIME_MODE", "local")
         monkeypatch.setenv("NEXUS_RUNTIME_DIR", str(tmp_path))
         reset_storage()
-        
+
         data = {"test": "value"}
         write_json("test.json", data)
-        
+
         assert exists("test.json")
         read_data = read_json("test.json")
         assert read_data == data
@@ -175,11 +175,11 @@ class TestStorageContext:
         with storage_context("test") as ctx:
             ctx.storage = LocalStorageBackend(Path(self.temp_dir))
             ctx.write("data.json", {"value": 123})
-        
+
         # Verify file was written
         path = Path(self.temp_dir) / "test" / "data.json"
         assert path.exists()
-        
+
         data = json.loads(path.read_text())
         assert data["value"] == 123
 
@@ -192,19 +192,19 @@ class TestStorageIntegration:
         # Test local mode
         monkeypatch.setenv("NEXUS_RUNTIME_MODE", "local")
         reset_storage()
-        
+
         assert is_vm_mode() is False
-        
+
         # Test VM mode
         monkeypatch.setenv("NEXUS_RUNTIME_MODE", "vm")
         reset_storage()
-        
+
         # Note: is_vm_mode() checks NEXUS_RUNTIME_MODE, not just environment
         # But actual S3 usage requires MINIO_ENDPOINT to be set
         monkeypatch.setenv("MINIO_ENDPOINT", "http://localhost:9000")
-        
+
         # Reset again to pick up new env
         reset_storage()
-        
+
         config = get_storage_config()
         assert config.mode == "vm"

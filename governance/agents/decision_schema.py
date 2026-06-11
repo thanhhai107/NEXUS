@@ -22,7 +22,9 @@ class AgentDecision:
     recommended_fixes: list[str] = field(default_factory=list)
     reprocess_required: bool = False
     evidence: dict[str, Any] = field(default_factory=dict)
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
 
     def __post_init__(self) -> None:
         if self.decision not in VALID_DECISIONS:
@@ -49,7 +51,9 @@ class AgentDecision:
             recommended_fixes=list(payload.get("recommended_fixes") or []),
             reprocess_required=bool(payload.get("reprocess_required", False)),
             evidence=dict(payload.get("evidence") or {}),
-            created_at=str(payload.get("created_at") or datetime.now(timezone.utc).isoformat()),
+            created_at=str(
+                payload.get("created_at") or datetime.now(timezone.utc).isoformat()
+            ),
         )
 
     @classmethod

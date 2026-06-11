@@ -87,7 +87,7 @@ def record_lineage(
     input_names = list(inputs)
     output_names = list(outputs)
     event_time = utc_now_iso()
-    
+
     # Build transform facets if any metadata provided
     transform_facets = _build_transform_facets(
         input_version=input_version,
@@ -98,7 +98,7 @@ def record_lineage(
         column_mapping=column_mapping,
         transform_rules=transform_rules,
     )
-    
+
     # Build run facets
     run_facets = {
         "nexus_batch": {
@@ -109,11 +109,11 @@ def record_lineage(
             "source_path": context.source_path,
         }
     }
-    
+
     # Add transform facets if available
     if transform_facets:
         run_facets["transform"] = transform_facets
-    
+
     openlineage_event = {
         "eventType": event_type,
         "eventTime": event_time,
@@ -130,7 +130,7 @@ def record_lineage(
         "producer": OPENLINEAGE_PRODUCER,
         "schemaURL": OPENLINEAGE_SCHEMA_URL,
     }
-    
+
     event = {
         **openlineage_event,
         "job_name": job_name,
@@ -166,7 +166,7 @@ def _build_transform_facets(
     Returns None if no transform metadata is provided.
     """
     facets = {}
-    
+
     if input_version is not None:
         facets["input_version"] = input_version
     if output_version is not None:
@@ -181,7 +181,7 @@ def _build_transform_facets(
         facets["column_mapping"] = column_mapping
     if transform_rules is not None:
         facets["transform_rules"] = transform_rules
-    
+
     return facets if facets else None
 
 

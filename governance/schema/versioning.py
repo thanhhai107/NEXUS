@@ -48,7 +48,7 @@ class SchemaRegistry:
         """Load the registry index."""
         if not self.index_path.exists():
             return {"schemas": {}, "latest": {}}
-        
+
         try:
             return json.loads(self.index_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
@@ -82,16 +82,16 @@ class SchemaRegistry:
         schema_hash = hashlib.sha256(
             json.dumps(schema_data, sort_keys=True).encode()
         ).hexdigest()[:12]
-        
+
         # Create version directory
         version = f"v{len(self.list_versions(source_id)) + 1}_{schema_hash}"
         version_dir = self.registry_dir / source_id / version
         version_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Copy schema to version directory
         import shutil
         shutil.copy2(schema_path, version_dir / "schema.json")
-        
+
         # Create version entry
         version_entry = SchemaVersion(
             version=version,
@@ -102,13 +102,13 @@ class SchemaRegistry:
             record_count=record_count,
             path=str(version_dir / "schema.json"),
         )
-        
+
         # Update index
         index = self._load_index()
-        
+
         if source_id not in index["schemas"]:
             index["schemas"][source_id] = {}
-        
+
         index["schemas"][source_id][version] = {
             "schema_hash": schema_hash,
             "created_at": version_entry.created_at,
@@ -116,21 +116,21 @@ class SchemaRegistry:
             "record_count": version_entry.record_count,
             "path": version_entry.path,
         }
-        
+
         index["latest"][source_id] = version
-        
+
         self._save_index(index)
-        
+
         return version_entry
 
     def get_version(self, source_id: str, version: str) -> SchemaVersion | None:
         """Get a specific schema version."""
         index = self._load_index()
-        
+
         schemas = index.get("schemas", {}).get(source_id, {})
         if version not in schemas:
             return None
-        
+
         entry = schemas[version]
         return SchemaVersion(
             version=version,
@@ -145,11 +145,11 @@ class SchemaRegistry:
     def get_latest(self, source_id: str) -> SchemaVersion | None:
         """Get the latest schema version for a source."""
         index = self._load_index()
-        
+
         latest_version = index.get("latest", {}).get(source_id)
         if not latest_version:
             return None
-        
+
         return self.get_version(source_id, latest_version)
 
     def list_versions(self, source_id: str) -> list[str]:
@@ -166,10 +166,10 @@ class SchemaRegistry:
     def approve_version(self, source_id: str, version: str) -> bool:
         """Mark a schema version as approved."""
         index = self._load_index()
-        
+
         if source_id not in index["schemas"] or version not in index["schemas"][source_id]:
             return False
-        
+
         # Create approval marker
         source_dir = self.registry_dir / source_id / version
         approval_file = source_dir / "approved.json"
@@ -177,10 +177,10 @@ class SchemaRegistry:
             "approved": True,
             "approved_at": datetime.now(timezone.utc).isoformat(),
         }, indent=2))
-        
+
         index["schemas"][source_id][version]["approved"] = True
         self._save_index(index)
-        
+
         return True
 
 
@@ -212,20 +212,20 @@ def compare_schemas(source_id: str, version_a: str, version_b: str) -> dict[str,
         Dict with added, removed, and changed fields
     """
     registry = SchemaRegistry()
-    
+
     schema_a = registry.get_version(source_id, version_a)
     schema_b = registry.get_version(source_id, version_b)
-    
+
     if not schema_a or not schema_b:
         return {"error": "One or both versions not found"}
-    
+
     # Load schema data
     data_a = json.loads(Path(schema_a.path).read_text(encoding="utf-8"))
     data_b = json.loads(Path(schema_b.path).read_text(encoding="utf-8"))
-    
+
     fields_a = set(data_a.get("properties", {}).keys())
     fields_b = set(data_b.get("properties", {}).keys())
-    
+
     return {
         "version_a": version_a,
         "version_b": version_b,

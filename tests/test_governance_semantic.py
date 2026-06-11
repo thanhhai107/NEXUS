@@ -25,16 +25,16 @@ class TestSemanticCache:
             "id": {"role": "identifier", "description": "Unique ID", "confidence": 1.0},
             "name": {"role": "name", "description": "Person name", "confidence": 0.9},
         }
-        
+
         version = self.cache.set(
             source_id="trade",
             annotations=annotations,
             schema_hash="abc123",
             annotated_by="llm",
         )
-        
+
         assert version.startswith("v")
-        
+
         cached = self.cache.get("trade")
         assert cached is not None
         assert cached.annotations["id"]["role"] == "identifier"
@@ -47,10 +47,10 @@ class TestSemanticCache:
     def test_list_sources(self):
         """Test listing all sources with cached annotations."""
         annotations = {"field1": {"role": "test"}}
-        
+
         self.cache.set("source1", annotations, "hash1")
         self.cache.set("source2", annotations, "hash2")
-        
+
         sources = self.cache.list_sources()
         assert "source1" in sources
         assert "source2" in sources
@@ -58,20 +58,20 @@ class TestSemanticCache:
     def test_approve_annotations(self):
         """Test approving annotations."""
         annotations = {"field1": {"role": "test"}}
-        
+
         self.cache.set("trade", annotations, "hash1")
         assert not self.cache.is_approved("trade")
-        
+
         self.cache.approve("trade", approved_by="human")
         assert self.cache.is_approved("trade")
 
     def test_get_status(self):
         """Test getting cache status."""
         annotations = {"field1": {"role": "test"}}
-        
+
         self.cache.set("source1", annotations, "hash1")
         self.cache.approve("source1")
-        
+
         status = self.cache.get_status()
         assert "source1" in status
         assert status["source1"]["approved"]
@@ -87,7 +87,7 @@ class TestTemplateAnnotator:
     def test_annotate_id_field(self):
         """Test annotating ID field."""
         result = self.annotator.annotate("id")
-        
+
         assert result is not None
         assert result["role"] == "identifier"
         assert result["confidence"] == 1.0
@@ -95,7 +95,7 @@ class TestTemplateAnnotator:
     def test_annotate_timestamp_field(self):
         """Test annotating timestamp field."""
         result = self.annotator.annotate("created_at")
-        
+
         assert result is not None
         assert result["role"] == "timestamp"
         assert result["confidence"] == 1.0
@@ -126,9 +126,9 @@ class TestTemplateAnnotator:
             "name": {"type": "string"},
             "unknown_field": {"type": "string"},
         }
-        
+
         annotations = self.annotator.annotate_batch(fields)
-        
+
         assert "id" in annotations
         assert "name" in annotations
         assert "unknown_field" not in annotations

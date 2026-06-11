@@ -30,13 +30,13 @@ class TestSchemaInference:
             {"id": 2, "name": "Bob", "age": 25},
             {"id": 3, "name": "Charlie", "age": 35},
         ]
-        
+
         schema = self.inference.infer_from_records(
             records,
             source_id="trade",
             source_key="test_key",
         )
-        
+
         assert schema.source_id == "trade"
         assert schema.record_count == 3
         assert "id" in schema.fields
@@ -52,13 +52,13 @@ class TestSchemaInference:
             {"id": 1, "name": None, "age": 30},
             {"id": 2, "name": "Bob", "age": None},
         ]
-        
+
         schema = self.inference.infer_from_records(
             records,
             source_id="trade",
             source_key="test_key",
         )
-        
+
         assert schema.fields["name"].nullable
         assert schema.fields["age"].nullable
 
@@ -68,13 +68,13 @@ class TestSchemaInference:
             {"id": 1, "address": {"city": "London", "zip": "SW1A"}},
             {"id": 2, "address": {"city": "Paris", "zip": "75001"}},
         ]
-        
+
         schema = self.inference.infer_from_records(
             records,
             source_id="trade",
             source_key="test_key",
         )
-        
+
         # Nested fields should be flattened
         assert "address_city" in schema.fields
         assert "address_zip" in schema.fields
@@ -84,15 +84,15 @@ class TestSchemaInference:
         records = [
             {"id": 1, "name": "Alice"},
         ]
-        
+
         schema = self.inference.infer_from_records(
             records,
             source_id="trade",
             source_key="test_key",
         )
-        
+
         schema_dict = schema.to_dict()
-        
+
         assert "$schema" in schema_dict
         assert "properties" in schema_dict
         assert "id" in schema_dict["properties"]
@@ -103,15 +103,15 @@ class TestSchemaInference:
         records = [
             {"id": 1, "name": "Alice"},
         ]
-        
+
         schema = self.inference.infer_from_records(
             records,
             source_id="trade",
             source_key="test_key",
         )
-        
+
         summary = schema.to_summary()
-        
+
         assert summary["source_id"] == "trade"
         assert summary["field_count"] == 2
         assert "fields" in summary
@@ -121,18 +121,18 @@ class TestSchemaInference:
         records = [
             {"id": 1, "name": "Alice"},
         ]
-        
+
         schema = self.inference.infer_from_records(
             records,
             source_id="trade",
             source_key="test_key",
         )
-        
+
         schema_path = Path(self.temp_dir) / "test.schema.json"
         schema.save(schema_path)
-        
+
         assert schema_path.exists()
-        
+
         # Load and verify
         loaded_data = schema_path.read_text()
         loaded = json.loads(loaded_data)
@@ -150,7 +150,7 @@ class TestFieldSchema:
             total_count=100,
             null_count=25,
         )
-        
+
         assert field.null_ratio == 0.25
 
     def test_to_dict_output(self):
@@ -163,9 +163,9 @@ class TestFieldSchema:
             null_count=10,
             sample_values=[1, 2, 3],
         )
-        
+
         field_dict = field.to_dict()
-        
+
         assert field_dict["name"] == "test_field"
         assert field_dict["type"] == "integer"
         assert field_dict["nullable"]

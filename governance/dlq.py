@@ -39,7 +39,7 @@ class RetryPolicy:
     backoff_base_seconds: float = 1.0
     backoff_max_seconds: float = 60.0
     jitter_seconds: float = 0.5
-    
+
     def get_delay(self, attempt: int) -> float:
         """Calculate backoff delay for an attempt."""
         import random
@@ -68,7 +68,7 @@ class DLQEntry:
     run_id: str | None = None
     status: str = "pending"  # pending, retrying, succeeded, failed, skipped
     context: dict[str, Any] | None = None
-    
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "category": self.category,
@@ -87,7 +87,7 @@ class DLQEntry:
             "context": self.context,
             "payload": self.payload,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "DLQEntry":
         return cls(
@@ -113,7 +113,7 @@ class DLQEntry:
 
 class EnhancedDLQ:
     """Enhanced Dead Letter Queue with retry backoff and scheduling."""
-    
+
     def __init__(
         self,
         dlq_dir: Path | None = None,
@@ -125,7 +125,7 @@ class EnhancedDLQ:
         self.dlq_dir.mkdir(parents=True, exist_ok=True)
         self.index_dir.mkdir(parents=True, exist_ok=True)
         self.retry_policy = retry_policy or RetryPolicy()
-    
+
     def record(
         self,
         category: str,
@@ -145,96 +145,96 @@ class EnhancedDLQ:
             **kwargs,
         )
         return self._write_entry(entry)
-    
+
     def _write_entry(self, entry: DLQEntry) -> Path | str:
         """Write a DLQ entry to disk or S3."""
         timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-        
+
         if is_vm_mode():
             # Use S3 storage
             storage = get_governance_storage()
             storage_path = f"dlq/{entry.category}_{timestamp}.jsonl"
             line = json.dumps(entry.to_dict(), ensure_ascii=False) + "\n"
-            
+
             # Read existing content or create new
             existing_content = b""
             if storage.exists(storage_path):
                 existing_content = storage.read_bytes(storage_path)
-            
+
             content = existing_content + line.encode("utf-8")
             storage.write_bytes(storage_path, content)
-            
+
             # Update index in S3
             self._update_index_s3(entry, timestamp)
-            
+
             return f"s3://{storage._bucket if hasattr(storage, '_bucket') else 'nexus-lakehouse'}/{storage_path}"
         else:
             # Use local filesystem
             entry_path = self.dlq_dir / f"{entry.category}_{timestamp}.jsonl"
-            
+
             with entry_path.open("a", encoding="utf-8", newline="\n") as f:
                 f.write(json.dumps(entry.to_dict(), ensure_ascii=False) + "\n")
-            
+
             self._update_index(entry)
             return entry_path
-    
+
     def _update_index(self, entry: DLQEntry) -> None:
         """Update the DLQ index (local)."""
         index_file = self.index_dir / f"{entry.category}.index.json"
-        
+
         index = {}
         if index_file.exists():
             try:
                 index = json.loads(index_file.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 index = {}
-        
+
         key = f"{entry.source}:{entry.captured_at}"
         index[key] = entry.to_dict()
-        
+
         if len(index) > 1000:
             sorted_items = sorted(index.items(), key=lambda x: x[1]["captured_at"])
             index = dict(sorted_items[-1000:])
-        
+
         index_file.write_text(json.dumps(index, indent=2), encoding="utf-8")
-    
+
     def _update_index_s3(self, entry: DLQEntry, timestamp: str) -> None:
         """Update the DLQ index in S3."""
         storage = get_governance_storage()
         index_path = f"dlq/.index/{entry.category}.index.json"
-        
+
         index = {}
         if storage.exists(index_path):
             try:
                 index = storage.read(index_path)
             except Exception:
                 index = {}
-        
+
         key = f"{entry.source}:{entry.captured_at}"
         index[key] = entry.to_dict()
-        
+
         if len(index) > 1000:
             sorted_items = sorted(index.items(), key=lambda x: x[1]["captured_at"])
             index = dict(sorted_items[-1000:])
-        
+
         storage.write(index_path, index, is_json=True)
-    
+
     def list_pending(self, category: str | None = None) -> list[DLQEntry]:
         """List pending DLQ entries."""
         entries = []
         now = datetime.now(timezone.utc)
-        
+
         if is_vm_mode():
             # Use S3 storage
             storage = get_governance_storage()
             prefix = "dlq/"
             if category:
                 prefix = f"dlq/{category}_"
-            
+
             for key in storage.list(prefix):
                 if not key.endswith(".jsonl"):
                     continue
-                
+
                 try:
                     # Read each DLQ file
                     content = storage.read_bytes(key).decode("utf-8")
@@ -242,18 +242,18 @@ class EnhancedDLQ:
                         line = line.strip()
                         if not line:
                             continue
-                        
+
                         data = json.loads(line)
                         entry = DLQEntry.from_dict(data)
-                        
+
                         if entry.status != "pending":
                             continue
-                        
+
                         if entry.next_retry:
                             next_retry = datetime.fromisoformat(entry.next_retry)
                             if next_retry > now:
                                 continue
-                        
+
                         entries.append(entry)
                 except Exception:
                     continue
@@ -262,31 +262,31 @@ class EnhancedDLQ:
             for path in self.dlq_dir.glob("*.jsonl"):
                 if category and not path.name.startswith(category):
                     continue
-                
+
                 with path.open("r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
                         if not line:
                             continue
-                        
+
                         try:
                             data = json.loads(line)
                             entry = DLQEntry.from_dict(data)
-                            
+
                             if entry.status != "pending":
                                 continue
-                            
+
                             if entry.next_retry:
                                 next_retry = datetime.fromisoformat(entry.next_retry)
                                 if next_retry > now:
                                     continue
-                            
+
                             entries.append(entry)
                         except (json.JSONDecodeError, KeyError):
                             continue
-        
+
         return sorted(entries, key=lambda e: e.captured_at)
-    
+
     def retry_entry(
         self,
         entry: DLQEntry,
@@ -295,14 +295,14 @@ class EnhancedDLQ:
     ) -> DLQEntry:
         """Retry a DLQ entry with backoff."""
         policy = retry_policy or self.retry_policy
-        
+
         entry.attempts += 1
         entry.last_attempt = datetime.now(timezone.utc).isoformat()
         entry.status = "retrying"
-        
+
         try:
             success = handler(entry)
-            
+
             if success:
                 entry.status = "succeeded"
                 logger.info(f"DLQ entry succeeded after {entry.attempts} attempts")
@@ -311,10 +311,10 @@ class EnhancedDLQ:
         except Exception as e:
             entry.error = f"{type(e).__name__}: {str(e)}"
             self._handle_failure(entry, policy)
-        
+
         self._update_entry(entry)
         return entry
-    
+
     def _handle_failure(self, entry: DLQEntry, policy: RetryPolicy) -> None:
         """Handle a failed retry attempt."""
         if entry.attempts >= policy.max_attempts:
@@ -324,13 +324,13 @@ class EnhancedDLQ:
             entry.status = "pending"
             delay = policy.get_delay(entry.attempts)
             entry.next_retry = (datetime.now(timezone.utc) + timedelta(seconds=delay)).isoformat()
-    
+
     def _update_entry(self, entry: DLQEntry) -> None:
         """Update an entry in the DLQ file."""
         for path in self.dlq_dir.glob(f"{entry.category}_*.jsonl"):
             lines = []
             updated = False
-            
+
             with path.open("r", encoding="utf-8") as f:
                 for line in f:
                     data = json.loads(line.strip())
@@ -343,13 +343,13 @@ class EnhancedDLQ:
                         updated = True
                     else:
                         lines.append(line.rstrip())
-            
+
             if updated:
                 with path.open("w", encoding="utf-8", newline="\n") as f:
                     for line in lines:
                         f.write(line + "\n")
                 break
-    
+
     def replay_with_backoff(
         self,
         handler: Callable[[DLQEntry], bool],
@@ -360,12 +360,12 @@ class EnhancedDLQ:
         """Replay DLQ entries with exponential backoff."""
         policy = retry_policy or self.retry_policy
         pending = self.list_pending(category)[:batch_size]
-        
+
         results = {"total": 0, "succeeded": 0, "failed": 0, "pending": 0, "retried": 0}
-        
+
         for entry in pending:
             updated = self.retry_entry(entry, handler, policy)
-            
+
             if updated.status == "succeeded":
                 results["succeeded"] += 1
             elif updated.status == "failed":
@@ -374,30 +374,30 @@ class EnhancedDLQ:
                 results["pending"] += 1
                 results["retried"] += 1
             results["total"] += 1
-        
+
         return results
-    
+
     def get_stats(self, category: str | None = None) -> dict[str, Any]:
         """Get DLQ statistics."""
         stats = {"total": 0, "pending": 0, "retrying": 0, "succeeded": 0, "failed": 0, "by_source": {}}
-        
+
         for path in self.dlq_dir.glob("*.jsonl"):
             if category and not path.name.startswith(category):
                 continue
-            
+
             with path.open("r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:
                         continue
-                    
+
                     try:
                         data = json.loads(line)
                         entry = DLQEntry.from_dict(data)
-                        
+
                         stats["total"] += 1
                         stats[entry.status] = stats.get(entry.status, 0) + 1
-                        
+
                         source = entry.source
                         if source not in stats["by_source"]:
                             stats["by_source"][source] = {"total": 0, "pending": 0, "failed": 0}
@@ -405,36 +405,36 @@ class EnhancedDLQ:
                         stats["by_source"][source][entry.status] = stats["by_source"][source].get(entry.status, 0) + 1
                     except (json.JSONDecodeError, KeyError):
                         continue
-        
+
         return stats
-    
+
     def archive_completed(self, older_than_days: int = 7) -> int:
         """Archive completed DLQ entries older than specified days."""
         cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
         archived = 0
-        
+
         for path in self.dlq_dir.glob("*.jsonl"):
             lines = []
             removed = 0
-            
+
             with path.open("r", encoding="utf-8") as f:
                 for line in f:
                     data = json.loads(line.strip())
                     entry = DLQEntry.from_dict(data)
-                    
+
                     captured = datetime.fromisoformat(entry.captured_at)
-                    
+
                     if entry.status in ("succeeded", "skipped") and captured < cutoff:
                         removed += 1
                     else:
                         lines.append(line.rstrip())
-            
+
             if removed > 0:
                 with path.open("w", encoding="utf-8", newline="\n") as f:
                     for line in lines:
                         f.write(line + "\n")
                 archived += removed
-        
+
         return archived
 
 
@@ -485,7 +485,7 @@ def record_dlq_event(
     try:
         from governance.storage import append_governance_event, using_postgres_storage
         from governance.context import GovernanceContext, utc_now_iso
-        
+
         if using_postgres_storage():
             context = GovernanceContext.from_values(batch_id, run_id, source_path, actor)
             envelope = {
@@ -504,10 +504,10 @@ def record_dlq_event(
             return dlq_dir or DEFAULT_DLQ_DIR
     except ImportError:
         pass
-    
+
     # Fall back to file-based
     dlq_dir = dlq_dir or DEFAULT_DLQ_DIR
-    
+
     # Build context manually if imports failed
     context = {
         "batch_id": batch_id,
@@ -515,7 +515,7 @@ def record_dlq_event(
         "source_path": str(source_path) if source_path else None,
         "actor": actor,
     }
-    
+
     envelope = {
         "category": category,
         "source": source,
@@ -528,7 +528,7 @@ def record_dlq_event(
         "captured_at": datetime.now(timezone.utc).isoformat(),
         "payload": dict(payload),
     }
-    
+
     output_path = _dlq_file(category, dlq_dir)
     with output_path.open("a", encoding="utf-8", newline="\n") as file:
         file.write(json.dumps(envelope, ensure_ascii=False) + "\n")
@@ -540,7 +540,7 @@ def list_dlq_events(dlq_dir: Path | None = None) -> list[dict[str, Any]]:
     dlq_dir = dlq_dir or DEFAULT_DLQ_DIR
     if not dlq_dir.exists():
         return []
-    
+
     events: list[dict[str, Any]] = []
     for path in sorted(dlq_dir.glob("*.jsonl")):
         with path.open("r", encoding="utf-8") as file:
@@ -581,21 +581,21 @@ def replay_dlq_events(
     """
     if with_backoff:
         dlq = EnhancedDLQ(dlq_dir=dlq_dir, retry_policy=retry_policy)
-        
+
         def entry_handler(entry: DLQEntry) -> bool:
             # Convert DLQEntry to dict for handler compatibility
             event = entry.to_dict()
             return bool(handler(event))
-        
+
         return dlq.replay_with_backoff(entry_handler, category=category, retry_policy=retry_policy)
-    
+
     # Original replay logic
     dlq_dir = dlq_dir or DEFAULT_DLQ_DIR
     events = list_dlq_events(dlq_dir)
     matched = 0
     succeeded = 0
     failed: list[dict[str, Any]] = []
-    
+
     for event in events:
         if category and event.get("category") != category:
             continue
@@ -603,19 +603,19 @@ def replay_dlq_events(
             continue
         if dataset and event.get("dataset") != dataset:
             continue
-        
+
         matched += 1
         try:
             ok = bool(handler(event))
         except Exception as exc:
             ok = False
             failed.append({"event": event, "error": f"{type(exc).__name__}: {exc}"})
-        
+
         if ok:
             succeeded += 1
         elif not failed or failed[-1]["event"] is not event:
             failed.append({"event": event, "error": "handler_returned_false"})
-    
+
     return {"matched": matched, "succeeded": succeeded, "failed": failed}
 
 

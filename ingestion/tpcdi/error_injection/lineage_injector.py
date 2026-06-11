@@ -10,6 +10,9 @@ Supported mutation_types:
   remove_source_mapping        — Delete source_mapping entries from manifest.
   corrupt_quarantine_metadata  — Corrupt quarantine record metadata fields.
   split_emission_targets       — Duplicate lineage records across two "targets".
+  suppress_transform_lineage   — Remove transform-level lineage metadata
+                                  (Bronze→Silver→Gold steps).
+  break_downstream_impact      — Remove or corrupt downstream dependency mappings.
 
 These mutations are structural/metadata-level, so detection depends on
 lineage reconciliation (Gold or audit layer), not bronze validation.
@@ -362,6 +365,104 @@ class LineageInjector:
             "expected_stage": "audit",
             "recoverable": True,
             "recovery_hint": "deduplicate_lineage_records",
+        })
+        return mutations
+
+    def _inject_suppress_transform_lineage(
+        self,
+        scenario_root_dir: Path,
+        src_dir: Path,
+        **_: Any,
+    ) -> list[dict[str, Any]]:
+        """Remove transform-level lineage metadata (Bronze→Silver→Gold).
+
+        Creates synthetic transform lineage records then strips key identifiers
+        to simulate missing transform provenance.
+        """
+        mutations: list[dict[str, Any]] = []
+        xform_dir = scenario_root_dir / "transform_lineage"
+        xform_dir.mkdir(exist_ok=True)
+
+        # Create synthetic transform lineage
+        transforms = [
+            {"transform_id": "tx-001", "source_layer": "bronze", "target_layer": "silver",
+             "dataset": "trade", "transform_type": "type_serialization", "applied_at": "2024-01-01T00:00:00"},
+            {"transform_id": "tx-002", "source_layer": "silver", "target_layer": "gold",
+             "dataset": "trade", "transform_type": "business_aggregation", "applied_at": "2024-01-01T01:00:00"},
+        ]
+
+        # Write then corrupt: remove transform_id and target_layer
+        xform_file = xform_dir / "transform_lineage.jsonl"
+        corrupted = []
+        for t in transforms:
+            rec = dict(t)
+            del rec["transform_id"]
+            del rec["target_layer"]
+            corrupted.append(rec)
+        xform_file.write_text("\n".join(json.dumps(r) for r in corrupted), encoding="utf-8")
+
+        mutations.append({
+            "mutation_type": "suppress_transform_lineage",
+            "removed_fields": ["transform_id", "target_layer"],
+            "expected_detection": "lineage_gap",
+            "expected_stage": "audit",
+            "recoverable": False,
+        })
+        return mutations
+
+    def _inject_break_downstream_impact(
+        self,
+        scenario_root_dir: Path,
+        src_dir: Path,
+        *,
+        target_dataset: str = "dim_trade",
+        **_: Any,
+    ) -> list[dict[str, Any]]:
+        """Remove or corrupt downstream dependency mappings.
+
+        Creates a dependency graph file then removes entries for a target
+        dataset, simulating unknown downstream impact of upstream changes.
+        """
+        mutations: list[dict[str, Any]] = []
+        dep_dir = scenario_root_dir / "dependencies"
+        dep_dir.mkdir(exist_ok=True)
+
+        # Build a synthetic dependency graph
+        dep_graph = {
+            "dataset_dependencies": {
+                "dim_trade": {
+                    "upstream": ["bronze_trade", "bronze_cash_transaction"],
+                    "downstream": ["gold_daily_returns", "dashboard_trade_monitor", "ml_trade_features"],
+                    "consumers": ["superset_dashboard", "trino_query_engine", "airflow_daily_job"],
+                },
+                "dim_customer": {
+                    "upstream": ["bronze_customer", "bronze_account"],
+                    "downstream": ["gold_customer_segments", "dashboard_customer_360"],
+                    "consumers": ["superset_dashboard"],
+                },
+            },
+        }
+
+        # Corrupt: remove downstream entries for the target
+        target_deps = dep_graph["dataset_dependencies"]
+        if target_dataset in target_deps:
+            removed = target_deps[target_dataset].pop("downstream", [])
+            removed_consumers = target_deps[target_dataset].pop("consumers", [])
+        else:
+            removed = []
+            removed_consumers = []
+
+        dep_file = dep_dir / "dependency_graph.json"
+        dep_file.write_text(json.dumps(dep_graph, indent=2), encoding="utf-8")
+
+        mutations.append({
+            "mutation_type": "break_downstream_impact",
+            "target_dataset": target_dataset,
+            "removed_dependencies": removed,
+            "removed_consumers": removed_consumers,
+            "expected_detection": "lineage_gap",
+            "expected_stage": "audit",
+            "recoverable": False,
         })
         return mutations
 

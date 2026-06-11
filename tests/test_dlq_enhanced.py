@@ -25,13 +25,13 @@ class TestRetryPolicy:
             backoff_max_seconds=60.0,
             jitter_seconds=0.0,
         )
-        
+
         # Attempt 1: 1 * 2^0 = 1s
         assert policy.get_delay(1) == 1.0
-        
+
         # Attempt 2: 1 * 2^1 = 2s
         assert policy.get_delay(2) == 2.0
-        
+
         # Attempt 3: 1 * 2^2 = 4s
         assert policy.get_delay(3) == 4.0
 
@@ -42,7 +42,7 @@ class TestRetryPolicy:
             backoff_max_seconds=30.0,
             jitter_seconds=0.0,
         )
-        
+
         # Attempt 4: 10 * 2^3 = 80, but capped at 30
         assert policy.get_delay(4) == 30.0
 
@@ -52,9 +52,9 @@ class TestRetryPolicy:
             backoff_base_seconds=1.0,
             jitter_seconds=0.5,
         )
-        
+
         delays = [policy.get_delay(1) for _ in range(10)]
-        
+
         # All should be around 1.0-1.5
         assert all(1.0 <= d <= 1.5 for d in delays)
 
@@ -72,9 +72,9 @@ class TestDLQEntry:
             captured_at="2026-05-30T10:00:00Z",
             attempts=2,
         )
-        
+
         data = entry.to_dict()
-        
+
         assert data["category"] == "test"
         assert data["source"] == "tpcdi_trade"
         assert data["error"] == "Connection timeout"
@@ -92,9 +92,9 @@ class TestDLQEntry:
             "attempts": 3,
             "status": "failed",
         }
-        
+
         entry = DLQEntry.from_dict(data)
-        
+
         assert entry.category == "test"
         assert entry.source == "tpcdi_status_type"
         assert entry.attempts == 3
@@ -117,7 +117,7 @@ class TestEnhancedDLQ:
             error="Connection failed",
             payload={"url": "http://api.tpcdi_trade.org"},
         )
-        
+
         assert path.exists()
 
     def test_list_pending(self):
@@ -134,9 +134,9 @@ class TestEnhancedDLQ:
             error="Error 2",
             payload={"id": 2},
         )
-        
+
         pending = self.dlq.list_pending("test")
-        
+
         assert len(pending) == 2
         sources = [e.source for e in pending]
         assert "tpcdi_trade" in sources
@@ -156,9 +156,9 @@ class TestEnhancedDLQ:
             error="Error",
             payload={},
         )
-        
+
         pending = self.dlq.list_pending("api_error")
-        
+
         assert len(pending) == 1
         assert pending[0].source == "tpcdi_trade"
 
@@ -170,15 +170,15 @@ class TestEnhancedDLQ:
             error="Temporary error",
             payload={"id": 1},
         )
-        
+
         pending = self.dlq.list_pending("test")
         assert len(pending) == 1
-        
+
         def success_handler(e):
             return True
-        
+
         updated = self.dlq.retry_entry(pending[0], success_handler)
-        
+
         assert updated.status == "succeeded"
         assert updated.attempts == 1
 
@@ -190,14 +190,14 @@ class TestEnhancedDLQ:
             error="Temporary error",
             payload={"id": 1},
         )
-        
+
         pending = self.dlq.list_pending("test")
-        
+
         def failure_handler(e):
             return False
-        
+
         updated = self.dlq.retry_entry(pending[0], failure_handler)
-        
+
         assert updated.status == "pending"
         assert updated.attempts == 1
         assert updated.next_retry is not None
@@ -205,24 +205,24 @@ class TestEnhancedDLQ:
     def test_retry_entry_max_attempts_exceeded(self):
         """Test retry stops after max attempts."""
         policy = RetryPolicy(max_attempts=2)
-        
+
         entry = self.dlq.record(
             category="test",
             source="tpcdi_trade",
             error="Persistent error",
             payload={"id": 1},
         )
-        
+
         pending = self.dlq.list_pending("test")
-        
+
         def failure_handler(e):
             return False
-        
+
         # First retry
         updated = self.dlq.retry_entry(pending[0], failure_handler, policy)
         assert updated.status == "pending"
         assert updated.attempts == 1
-        
+
         # Second retry (max)
         updated = self.dlq.retry_entry(updated, failure_handler, policy)
         assert updated.status == "failed"
@@ -242,9 +242,9 @@ class TestEnhancedDLQ:
             error="Error",
             payload={},
         )
-        
+
         stats = self.dlq.get_stats("test")
-        
+
         assert stats["total"] == 2
         assert stats["pending"] == 2
         assert "tpcdi_trade" in stats["by_source"]
@@ -258,15 +258,15 @@ class TestEnhancedDLQ:
             error="Error",
             payload={"id": 1},
         )
-        
+
         success_count = [0]
-        
+
         def handler(entry):
             success_count[0] += 1
             return True
-        
+
         results = self.dlq.replay_with_backoff(handler, "test")
-        
+
         assert results["total"] == 1
         assert results["succeeded"] == 1
 
@@ -286,5 +286,5 @@ class TestConvenienceFunctions:
             error="Test error",
             payload={"id": 1},
         )
-        
+
         assert path.exists()

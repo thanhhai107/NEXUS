@@ -21,7 +21,7 @@ class CachedAnnotations:
     annotations: dict[str, dict]
     annotated_at: str
     field_count: int = 0
-    
+
     def __post_init__(self):
         if self.field_count == 0:
             self.field_count = len(self.annotations)
@@ -29,39 +29,39 @@ class CachedAnnotations:
 
 class SemanticCache:
     """Semantic annotation cache system."""
-    
+
     def __init__(self, cache_dir: Path | str):
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-    
+
     def get(self, source_id: str) -> CachedAnnotations | None:
         """Get cached annotations for a source."""
         source_dir = self.cache_dir / source_id
         if not source_dir.exists():
             return None
-        
+
         versions = sorted(
             [d for d in source_dir.iterdir() if d.is_dir() and d.name.startswith("v")],
             reverse=True
         )
-        
+
         if not versions:
             return None
-        
+
         latest = versions[0]
         cache_file = latest / "annotations.json"
-        
+
         if not cache_file.exists():
             return None
-        
+
         try:
             data = json.loads(cache_file.read_text(encoding="utf-8"))
-            
+
             annotations = {
                 k: v for k, v in data.items()
                 if not k.startswith("_")
             }
-            
+
             return CachedAnnotations(
                 source_id=source_id,
                 version=latest.name,
@@ -72,7 +72,7 @@ class SemanticCache:
             )
         except (json.JSONDecodeError, KeyError):
             return None
-    
+
     def set(
         self,
         source_id: str,
@@ -83,11 +83,11 @@ class SemanticCache:
         """Save annotations to cache."""
         source_dir = self.cache_dir / source_id
         source_dir.mkdir(parents=True, exist_ok=True)
-        
+
         version = f"v{schema_hash[:4]}"
         version_dir = source_dir / version
         version_dir.mkdir(exist_ok=True)
-        
+
         now = datetime.now(timezone.utc).isoformat()
         cache_data = {
             **annotations,
@@ -96,14 +96,14 @@ class SemanticCache:
             "_annotated_by": annotated_by,
             "_field_count": len(annotations),
         }
-        
+
         (version_dir / "annotations.json").write_text(
             json.dumps(cache_data, indent=2, ensure_ascii=False),
             encoding="utf-8"
         )
-        
+
         return version
-    
+
     def approve(
         self,
         source_id: str,
@@ -114,7 +114,7 @@ class SemanticCache:
         source_dir = self.cache_dir / source_id
         if not source_dir.exists():
             return False
-        
+
         if version is None:
             versions = sorted(
                 [d for d in source_dir.iterdir() if d.is_dir() and d.name.startswith("v")],
@@ -127,28 +127,28 @@ class SemanticCache:
             version_dir = source_dir / version
             if not version_dir.exists():
                 return False
-        
+
         now = datetime.now(timezone.utc).isoformat()
-        
+
         approved_data = {
             "approved": True,
             "approved_at": now,
             "approved_by": approved_by,
         }
-        
+
         (version_dir / "approved.json").write_text(
             json.dumps(approved_data, indent=2),
             encoding="utf-8"
         )
-        
+
         return True
-    
+
     def is_approved(self, source_id: str, version: str | None = None) -> bool:
         """Check if annotations are approved."""
         source_dir = self.cache_dir / source_id
         if not source_dir.exists():
             return False
-        
+
         if version is None:
             versions = sorted(
                 [d for d in source_dir.iterdir() if d.is_dir() and d.name.startswith("v")],
@@ -161,26 +161,26 @@ class SemanticCache:
             version_dir = source_dir / version
             if not version_dir.exists():
                 return False
-        
+
         approved_file = version_dir / "approved.json"
         if not approved_file.exists():
             return False
-        
+
         try:
             data = json.loads(approved_file.read_text(encoding="utf-8"))
             return data.get("approved", False)
         except json.JSONDecodeError:
             return False
-    
+
     def get_status(self) -> dict[str, dict[str, Any]]:
         """Get status of all cached annotations."""
         status = {}
-        
+
         for source_id in self.list_sources():
             versions = self.list_versions(source_id)
             latest = self.get(source_id)
             approved = self.is_approved(source_id)
-            
+
             status[source_id] = {
                 "version_count": len(versions),
                 "latest_version": versions[0] if versions else None,
@@ -188,20 +188,20 @@ class SemanticCache:
                 "annotated_at": latest.annotated_at if latest else None,
                 "approved": approved,
             }
-        
+
         return status
-    
+
     def list_versions(self, source_id: str) -> list[str]:
         """List all versions for a source."""
         source_dir = self.cache_dir / source_id
         if not source_dir.exists():
             return []
-        
+
         return sorted([
             d.name for d in source_dir.iterdir()
             if d.is_dir() and d.name.startswith("v")
         ], reverse=True)
-    
+
     def list_sources(self) -> list[str]:
         """List all sources with cached annotations."""
         return sorted([

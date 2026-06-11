@@ -14,10 +14,10 @@ class LLMAnnotator:
 
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
+        model: str | None = None,
         timeout: int = 180,
     ):
-        self.model = os.getenv("NEXUS_AGENT_MODEL", model)
+        self.model = os.getenv("NEXUS_AGENT_MODEL") or model
         self.timeout = timeout
 
     def annotate(

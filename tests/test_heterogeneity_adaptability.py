@@ -32,31 +32,31 @@ def test_format_parsing():
     print("\n" + "="*60)
     print("TEST 1: Format Parsing")
     print("="*60)
-    
+
     # Create test data in different formats
     test_dir = Path(__file__).parent.parent / "runtime" / "test_formats"
     test_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # JSON
     json_file = test_dir / "test.json"
     json_file.write_text(json.dumps([
         {"id": "1", "name": "Alice", "value": 100},
         {"id": "2", "name": "Bob", "value": 200},
     ]))
-    
+
     # JSONL
     jsonl_file = test_dir / "test.jsonl"
     jsonl_file.write_text(
         '{"id": "1", "name": "Alice", "value": 100}\n'
         '{"id": "2", "name": "Bob", "value": 200}\n'
     )
-    
+
     # CSV
     csv_file = test_dir / "test.csv"
     csv_file.write_text("id,name,value\n1,Alice,100\n2,Bob,200\n")
-    
+
     formats_tested = []
-    
+
     for file in test_dir.glob("*"):
         try:
             records = list(iter_artifact_records(file))
@@ -64,13 +64,13 @@ def test_format_parsing():
             formats_tested.append(file.suffix)
         except Exception as e:
             print(f"  [FAIL] {file.name}: ERROR - {e}")
-    
+
     # Cleanup
     for f in test_dir.glob("*"):
         f.unlink()
     test_dir.rmdir()
-    
-    return len(formats_tested) >= 3
+
+    assert len(formats_tested) >= 3, f"Expected >=3 formats, got {len(formats_tested)}"
 
 
 def trade_registry():
@@ -78,31 +78,31 @@ def trade_registry():
     print("\n" + "="*60)
     print("TEST 2: Source Registry")
     print("="*60)
-    
+
     sources = list_sources()
     print(f"  Total sources registered: {len(sources)}")
-    
+
     # Group by domain
     domains = {}
     for source in sources:
         domains.setdefault(source.domain, []).append(source.name)
-    
+
     for domain, names in domains.items():
         print(f"  {domain}: {len(names)} sources")
         for source_name in names[:5]:  # Show first 5
             print(f"    - {source_name}")
         if len(names) > 5:
             print(f"    ... and {len(names) - 5} more")
-    
+
     # Test different source types
     source_types = {}
     for source in sources:
         source_types.setdefault(source.source_type, []).append(source.name)
-    
+
     print("\n  Source types:")
     for stype, names in source_types.items():
         print(f"    {stype}: {len(names)} sources")
-    
+
     return len(sources) >= 10
 
 
@@ -111,7 +111,7 @@ def test_bronze_envelope():
     print("\n" + "="*60)
     print("TEST 3: Bronze Envelope")
     print("="*60)
-    
+
     context = EnvelopeContext(
         dataset_id="tpcdi_dim_trade",
         source_id="trade",
@@ -119,13 +119,13 @@ def test_bronze_envelope():
         run_id="20260528T010000Z",
         chunk_id="test_chunk_1",
     )
-    
+
     # Sample record from different "sources"
     records = [
         {"id": "1", "temperature": 25.5, "humidity": 60},
         {"id": "2", "temperature": 26.0, "humidity": 55},
     ]
-    
+
     for record in records:
         envelope = build_raw_envelope(record, context)
         print(f"  [OK] Original keys: {list(record.keys())}")
@@ -135,9 +135,8 @@ def test_bronze_envelope():
         assert "payload" in envelope
         assert envelope["payload"] == record
         print(f"    Envelope sample: _nexus_run_id={envelope['_nexus_run_id']}")
-    
+
     print("  [OK] Bronze envelope metadata wrapping works!")
-    return True
 
 
 def test_quality_checks():
@@ -145,14 +144,14 @@ def test_quality_checks():
     print("\n" + "="*60)
     print("TEST 4: Quality Checks")
     print("="*60)
-    
+
     now = datetime.now(timezone.utc).isoformat()
     records = [
         {"id": "1", "name": "Alice", "updated_at": now},
         {"id": "2", "name": "Bob", "updated_at": now},
         {"id": "3", "name": "", "updated_at": now},  # Missing value
     ]
-    
+
     result = run_quality_checks(
         dataset="tpcdi_dim_trade",
         records=records,
@@ -161,23 +160,23 @@ def test_quality_checks():
         freshness_column="updated_at",
         max_age_hours=24,
     )
-    
+
     print(f"  Record count: {result.record_count}")
     print(f"  Missing ratio: {result.missing_ratio:.2%}")
     print(f"  Duplicate ratio: {result.duplicate_ratio:.2%}")
     print(f"  Freshness score: {result.freshness_score:.2%}")
     print(f"  Readiness score: {result.readiness_score:.2%}")
     print(f"  Schema valid: {result.schema_valid}")
-    
+
     status, violations = evaluate_quality_status(result, {
         "max_missing_ratio": 0.5,
         "max_duplicate_ratio": 0.5,
         "min_freshness_score": 0.5,
     })
-    
+
     print(f"  Overall status: {status}")
-    
-    return result.record_count == 3
+
+    assert result.record_count == 3, f"Expected 3 records, got {result.record_count}"
 
 
 def test_freshness_tracking():
@@ -185,9 +184,9 @@ def test_freshness_tracking():
     print("\n" + "="*60)
     print("TEST 5: Freshness Tracking")
     print("="*60)
-    
+
     from common.source_registry import derive_update_frequency
-    
+
     # Test different freshness configurations
     test_cases = [
         {"poll_seconds": 60, "expected": "every_1m"},
@@ -198,7 +197,7 @@ def test_freshness_tracking():
         {"freshness_hours": 168, "expected": "every_1w"},
         {"freshness_hours": 8760, "expected": "every_1y"},
     ]
-    
+
     all_passed = True
     for tc in test_cases:
         result = derive_update_frequency(tc)
@@ -206,14 +205,14 @@ def test_freshness_tracking():
         if result != tc["expected"]:
             all_passed = False
         print(f"  {status} {tc}: got '{result}', expected '{tc['expected']}'")
-    
+
     # Show actual sources with their frequencies
     sources = list_sources()
     print("\n  Sample source frequencies:")
     for source in sources[:5]:
         print(f"    {source.name}: {source.update_frequency}")
-    
-    return all_passed
+
+    assert all_passed, "Freshness tracking tests failed"
 
 
 def test_checkpoint_resume():
@@ -221,11 +220,11 @@ def test_checkpoint_resume():
     print("\n" + "="*60)
     print("TEST 6: Checkpoint & Resume")
     print("="*60)
-    
+
     from ingestion.base.core import SourceRun, DownloadContext
     from pathlib import Path
     import tempfile
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         config = {
             "spatial_scope": {
@@ -234,7 +233,7 @@ def test_checkpoint_resume():
             }
         }
         mode = {"core_start": "2024-01-01", "core_end": "2024-12-31"}
-        
+
         context = DownloadContext(
             config=config,
             mode_name="test",
@@ -243,36 +242,34 @@ def test_checkpoint_resume():
             run_id="20260528T010000Z",
             resume=True,
         )
-        
+
         run = SourceRun(
             source_id="trade",
             context=context,
             source_key="test_key",
         )
-        
+
         # Simulate first chunk
         run.mark_complete("chunk_1", {"record_count": 100})
-        
+
         # Check checkpoint file exists
         checkpoint_file = run.checkpoint_path
         print(f"  [OK] Checkpoint file created: {checkpoint_file.name}")
-        
+
         # Reload from checkpoint
         run2 = SourceRun(
             source_id="trade",
             context=context,
             source_key="test_key",
         )
-        
+
         # Should skip chunk_1 on resume
         should_skip = run2.should_skip("chunk_1")
         print(f"  [OK] Resume skips completed chunk: {should_skip}")
-        
+
         # New chunk should NOT skip
         should_skip_new = run2.should_skip("chunk_2")
         print(f"  [OK] New chunk executes: {not should_skip_new}")
-    
-    return True
 
 
 def test_ingestion_methods():
@@ -280,9 +277,9 @@ def test_ingestion_methods():
     print("\n" + "="*60)
     print("TEST 7: Ingestion Methods")
     print("="*60)
-    
+
     from common.source_registry import derive_ingestion_method
-    
+
     test_cases = [
         {"source_type": "csv_download", "expected": "batch_csv_download"},
         {"source_type": "rest_api", "expected": "batch_api"},
@@ -290,7 +287,7 @@ def test_ingestion_methods():
         {"source_type": "gtfs_realtime", "expected": "stream_gtfs_realtime"},
         {"ingestion_method": "custom_mode", "expected": "custom_mode"},  # Override
     ]
-    
+
     all_passed = True
     for tc in test_cases:
         result = derive_ingestion_method(tc)
@@ -298,8 +295,8 @@ def test_ingestion_methods():
         if result != tc["expected"]:
             all_passed = False
         print(f"  {status} {tc.get('source_type', 'override')}: {result}")
-    
-    return all_passed
+
+    assert all_passed, "Ingestion methods tests failed"
 
 
 def main():
@@ -307,9 +304,9 @@ def main():
     print("\n" + "#"*60)
     print("NEXUS HETEROGENEITY ADAPTABILITY TEST")
     print("#"*60)
-    
+
     results = []
-    
+
     results.append(("Format Parsing", test_format_parsing()))
     results.append(("Source Registry", trade_registry()))
     results.append(("Bronze Envelope", test_bronze_envelope()))
@@ -317,20 +314,20 @@ def main():
     results.append(("Freshness Tracking", test_freshness_tracking()))
     results.append(("Checkpoint & Resume", test_checkpoint_resume()))
     results.append(("Ingestion Methods", test_ingestion_methods()))
-    
+
     print("\n" + "="*60)
     print("SUMMARY")
     print("="*60)
-    
+
     passed = 0
     for name, result in results:
         status = "PASS" if result else "FAIL"
         print(f"  {status}: {name}")
         if result:
             passed += 1
-    
+
     print(f"\n  Total: {passed}/{len(results)} tests passed")
-    
+
     if passed == len(results):
         print("\n  SUCCESS: NEXUS heterogeneity framework is working correctly!")
         print("  The system can adapt to multiple:")
@@ -341,7 +338,7 @@ def main():
         print("    - Ingestion methods")
     else:
         print("\n  ⚠ Some tests failed. Check implementation.")
-    
+
     return passed == len(results)
 
 

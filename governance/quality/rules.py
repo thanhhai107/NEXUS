@@ -20,7 +20,7 @@ class QualityRule:
     rule_type: str  # "not_null", "unique", "in_range", "regex", "custom"
     params: dict[str, Any] = None
     severity: str = "error"  # "error", "warning", "info"
-    
+
     def __post_init__(self):
         if self.params is None:
             self.params = {}
@@ -41,10 +41,10 @@ def load_rules_from_yaml(path: Path) -> list[QualityRule]:
     """Load quality rules from YAML file."""
     if not path.exists():
         return []
-    
+
     with path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
-    
+
     rules = []
     for rule_data in data.get("rules", []):
         rules.append(QualityRule(
@@ -54,14 +54,14 @@ def load_rules_from_yaml(path: Path) -> list[QualityRule]:
             params=rule_data.get("params", {}),
             severity=rule_data.get("severity", "error"),
         ))
-    
+
     return rules
 
 
 def validate_record(record: dict, rule: QualityRule) -> ValidationResult:
     """Validate a single record against a rule."""
     value = record.get(rule.column)
-    
+
     if rule.rule_type == "not_null":
         passed = value is not None and value != ""
         return ValidationResult(
@@ -71,7 +71,7 @@ def validate_record(record: dict, rule: QualityRule) -> ValidationResult:
             message="Column is required" if not passed else "Column is present",
             severity=rule.severity,
         )
-    
+
     if rule.rule_type == "unique":
         # Note: Unique check requires dataset-level context
         return ValidationResult(
@@ -81,11 +81,11 @@ def validate_record(record: dict, rule: QualityRule) -> ValidationResult:
             message="Unique check deferred to batch validation",
             severity=rule.severity,
         )
-    
+
     if rule.rule_type == "in_range":
         min_val = rule.params.get("min")
         max_val = rule.params.get("max")
-        
+
         if min_val is not None and value < min_val:
             return ValidationResult(
                 rule_name=rule.name,
@@ -94,7 +94,7 @@ def validate_record(record: dict, rule: QualityRule) -> ValidationResult:
                 message=f"Value {value} is below minimum {min_val}",
                 severity=rule.severity,
             )
-        
+
         if max_val is not None and value > max_val:
             return ValidationResult(
                 rule_name=rule.name,
@@ -103,7 +103,7 @@ def validate_record(record: dict, rule: QualityRule) -> ValidationResult:
                 message=f"Value {value} exceeds maximum {max_val}",
                 severity=rule.severity,
             )
-        
+
         return ValidationResult(
             rule_name=rule.name,
             column=rule.column,
@@ -111,7 +111,7 @@ def validate_record(record: dict, rule: QualityRule) -> ValidationResult:
             message="Value is within range",
             severity=rule.severity,
         )
-    
+
     if rule.rule_type == "regex":
         import re
         pattern = rule.params.get("pattern")
@@ -127,7 +127,7 @@ def validate_record(record: dict, rule: QualityRule) -> ValidationResult:
                 )
             except re.error:
                 pass
-    
+
     return ValidationResult(
         rule_name=rule.name,
         column=rule.column,
@@ -148,13 +148,13 @@ def validate_batch(
     """
     results = []
     failed_records = []
-    
+
     for record in records:
         for rule in rules:
             result = validate_record(record, rule)
             results.append(result)
-            
+
             if not result.passed and rule.severity == "error":
                 failed_records.append(record)
-    
+
     return results, failed_records

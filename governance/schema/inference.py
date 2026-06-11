@@ -274,7 +274,7 @@ class SchemaInference:
         """Flatten nested record to dot-separated keys."""
         if sep is None:
             sep = self.flatten_separator
-            
+
         items: dict[str, Any] = {}
 
         if "payload" in record:

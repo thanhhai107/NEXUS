@@ -11,6 +11,7 @@ Supported mutation_types:
   poison_record             — Insert a binary/non-UTF-8 line that breaks parsers.
   missing_batch             — Delete the target batch directory entirely.
   rate_limit_partial_batch  — Keep only the first N% of records (simulate rate limit).
+  atomic_write_failure      — Write only partial content to simulate crashed write.
 
 Usage::
 
@@ -240,6 +241,52 @@ class ReliabilityInjector:
                 "recoverable": False,
                 "recovery_hint": "re_download",
             })
+        return mutations
+
+    def _inject_atomic_write_failure(
+        self,
+        source_dir: Path,
+        source_name: str,
+        batch_id: str,
+        *,
+        completion_pct: float | None = None,
+        **_: Any,
+    ) -> list[dict[str, Any]]:
+        """Simulate an atomic write failure: write only partial file content.
+
+        Writes the first N% of lines, then inserts a ``__WRITE_FAILED__``
+        sentinel and truncates, simulating a crash mid-write.
+        """
+        files = self._resolve_source_files(source_dir, source_name, batch_id)
+        if not files:
+            return [{"mutation_type": "atomic_write_failure", "skipped": "no_files"}]
+
+        pct = completion_pct if completion_pct is not None else self.rng.uniform(0.40, 0.80)
+        mutations: list[dict[str, Any]] = []
+
+        for filepath in files:
+            lines = filepath.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+            original_count = len(lines)
+            cut_point = max(1, int(original_count * pct))
+
+            # Write partial content with sentinel
+            partial = lines[:cut_point]
+            sentinel = "__ATOMIC_WRITE_FAILED__\n"
+            partial.append(sentinel)
+            filepath.write_text("".join(partial), encoding="utf-8")
+
+            mutations.append({
+                "mutation_type": "atomic_write_failure",
+                "relative_file": filepath.name,
+                "original_lines": original_count,
+                "written_lines": cut_point,
+                "completion_pct": round(pct, 3),
+                "expected_detection": "incomplete_batch",
+                "expected_stage": "ingestion",
+                "recoverable": False,
+                "recovery_hint": "rollback_and_retry",
+            })
+
         return mutations
 
 

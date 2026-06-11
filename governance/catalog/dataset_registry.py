@@ -73,17 +73,17 @@ class DatasetRegistry:
             updated_at=datetime.now(timezone.utc).isoformat(),
             **kwargs,
         )
-        
+
         self._save(metadata)
         return metadata
 
     def get(self, dataset_id: str) -> DatasetMetadata | None:
         """Get dataset metadata."""
         path = self.catalog_dir / f"{dataset_id}.json"
-        
+
         if not path.exists():
             return None
-        
+
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             return DatasetMetadata(**data)
@@ -93,23 +93,23 @@ class DatasetRegistry:
     def update(self, dataset_id: str, **updates) -> DatasetMetadata | None:
         """Update dataset metadata."""
         metadata = self.get(dataset_id)
-        
+
         if metadata is None:
             return None
-        
+
         for key, value in updates.items():
             if hasattr(metadata, key):
                 setattr(metadata, key, value)
-        
+
         metadata.updated_at = datetime.now(timezone.utc).isoformat()
         self._save(metadata)
-        
+
         return metadata
 
     def list_by_domain(self, domain: str) -> list[DatasetMetadata]:
         """List all datasets in a domain."""
         datasets = []
-        
+
         for path in self.catalog_dir.glob("*.json"):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
@@ -117,20 +117,20 @@ class DatasetRegistry:
                     datasets.append(DatasetMetadata(**data))
             except (json.JSONDecodeError, TypeError):
                 continue
-        
+
         return sorted(datasets, key=lambda d: d.dataset_id)
 
     def list_all(self) -> list[DatasetMetadata]:
         """List all registered datasets."""
         datasets = []
-        
+
         for path in self.catalog_dir.glob("*.json"):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
                 datasets.append(DatasetMetadata(**data))
             except (json.JSONDecodeError, TypeError):
                 continue
-        
+
         return sorted(datasets, key=lambda d: d.dataset_id)
 
     def _save(self, metadata: DatasetMetadata) -> None:

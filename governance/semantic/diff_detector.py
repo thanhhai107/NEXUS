@@ -27,10 +27,10 @@ class DiffResult:
 
 class SchemaDiffDetector:
     """Detects changes in schema."""
-    
+
     def __init__(self, cache_dir: Path | str):
         self.cache_dir = Path(cache_dir)
-    
+
     def detect_changes(
         self,
         source_id: str,
@@ -38,7 +38,7 @@ class SchemaDiffDetector:
     ) -> DiffResult:
         """Detect changes between current schema and cached version."""
         new_hash = self._compute_hash(schema)
-        
+
         # Check if source exists
         source_dir = self.cache_dir / source_id
         if not source_dir.exists():
@@ -50,13 +50,13 @@ class SchemaDiffDetector:
                 removed_fields=[],
                 changed_fields=[],
             )
-        
+
         # Find latest version
         versions = sorted(
             [d for d in source_dir.iterdir() if d.is_dir() and d.name.startswith("v")],
             reverse=True
         )
-        
+
         if not versions:
             return DiffResult(
                 schema_hash=new_hash,
@@ -66,11 +66,11 @@ class SchemaDiffDetector:
                 removed_fields=[],
                 changed_fields=[],
             )
-        
+
         # Load cached schema
         latest = versions[0]
         cached_file = latest / "annotations.json"
-        
+
         if not cached_file.exists():
             return DiffResult(
                 schema_hash=new_hash,
@@ -80,10 +80,10 @@ class SchemaDiffDetector:
                 removed_fields=[],
                 changed_fields=[],
             )
-        
+
         cached_data = json.loads(cached_file.read_text(encoding="utf-8"))
         cached_hash = cached_data.get("_schema_hash", "")
-        
+
         if cached_hash == new_hash:
             return DiffResult(
                 schema_hash=new_hash,
@@ -93,17 +93,17 @@ class SchemaDiffDetector:
                 removed_fields=[],
                 changed_fields=[],
             )
-        
+
         # Compute diff
         current_fields = set(schema.fields.keys())
         cached_fields = set(k for k in cached_data.keys() if not k.startswith("_"))
-        
+
         new_fields = sorted(current_fields - cached_fields)
         removed_fields = sorted(cached_fields - current_fields)
         changed_fields = []  # Simplified - would need type comparison
-        
+
         should_reannotate = len(new_fields) >= 10
-        
+
         return DiffResult(
             schema_hash=new_hash,
             has_changes=True,
@@ -112,13 +112,13 @@ class SchemaDiffDetector:
             removed_fields=removed_fields,
             changed_fields=changed_fields,
         )
-    
+
     def _compute_hash(self, schema: InferredSchema) -> str:
         """Compute hash of schema."""
         schema_dict = schema.to_dict()
         schema_str = json.dumps(schema_dict, sort_keys=True)
         return hashlib.sha256(schema_str.encode()).hexdigest()[:12]
-    
+
     @property
     def should_reannotate(self) -> bool:
         """Check if should reannotate entire source."""

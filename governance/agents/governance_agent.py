@@ -57,7 +57,9 @@ def _collect_evidence(dataset_name: str, batch_id: str) -> dict[str, Any]:
 
 
 def _llm_decision(evidence: dict[str, Any]) -> AgentDecision | None:
-    model = os.getenv("NEXUS_AGENT_MODEL", "gpt-4o-mini")
+    model = os.getenv("NEXUS_AGENT_MODEL")
+    if not model:
+        return None
     system_prompt = "Return only valid JSON. Do not include markdown."
     user_prompt = build_prompt(evidence)
 
@@ -73,7 +75,8 @@ def _llm_decision(evidence: dict[str, Any]) -> AgentDecision | None:
         parsed["batch_id"] = evidence["batch_id"]
         parsed.setdefault("created_at", datetime.now(timezone.utc).isoformat())
         parsed.setdefault("evidence", _compact_evidence(evidence))
-        remediation = _remediation_plan(evidence, str(parsed.get("decision", "WARNING")))
+        decision = str(parsed.get("decision", "WARNING"))
+        remediation = _remediation_plan(evidence, decision)
         parsed.setdefault("issues", remediation["issues"])
         parsed.setdefault("root_causes", remediation["root_causes"])
         parsed.setdefault("recommended_fixes", remediation["recommended_fixes"])

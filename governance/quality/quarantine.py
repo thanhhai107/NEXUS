@@ -84,17 +84,17 @@ def quarantine_records(
     context = GovernanceContext.from_values(batch_id, run_id, source_path, actor)
     detected_at = utc_now_iso()
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-    
+
     def build_envelope(item: Mapping[str, object]) -> dict[str, object]:
         item_dict = dict(item)
         issue_category = str(item_dict.get("issue_category", "data_quality"))
         issue_code = str(item_dict.get("issue_code", reason))
         severity = str(item_dict.get("severity", "high"))
         record_key = str(item_dict.get("record_key", item_dict.get("id", "unknown")))
-        
+
         # Generate quarantine_id if not provided
         q_id = quarantine_id or str(uuid.uuid4())
-        
+
         # Get field values from item or from function parameters
         item_rule_id = str(item_dict.get("rule_id", rule_id or "unknown_rule"))
         item_failed_field = item_dict.get("column_name") or item_dict.get("failed_field") or failed_field
@@ -102,7 +102,7 @@ def quarantine_records(
         item_actual_value = item_dict.get("actual_value", item_dict.get("failed_value", failed_value))
         item_dq_check_type = item_dict.get("dq_check_type", dq_check_type)
         item_status = str(item_dict.get("status", "open"))
-        
+
         return {
             # Core quarantine metadata
             "quarantine_id": q_id,
@@ -143,38 +143,38 @@ def quarantine_records(
             ),
             "item": item_dict,
         }
-    
+
     # Try PostgreSQL first
     if using_postgres_storage():
         for item in invalid_records:
             envelope = build_envelope(item)
             append_governance_event("quarantine", envelope)
         return str(quarantine_dir / f"{dataset}_{stamp}.jsonl")
-    
+
     # Try S3 if in VM mode
     if is_vm_mode():
         storage = get_raw_storage()
         storage_path = _get_quarantine_storage_path(dataset)
-        
+
         # Read existing content or create new
         existing_content = b""
         if storage.exists(storage_path):
             existing_content = storage.read_bytes(storage_path)
-        
+
         # Build all lines
         lines = []
         for item in invalid_records:
             envelope = build_envelope(item)
             lines.append(json.dumps(envelope, ensure_ascii=False))
-        
+
         content = existing_content + "\n".join(lines).encode("utf-8") + b"\n"
         result = storage.write_bytes(storage_path, content)
         return result
-    
+
     # Fall back to local filesystem
     quarantine_dir.mkdir(parents=True, exist_ok=True)
     output_path = quarantine_dir / f"{dataset}_{stamp}.jsonl"
-    
+
     with output_path.open("a", encoding="utf-8", newline="\n") as file:
         for item in invalid_records:
             envelope = build_envelope(item)
@@ -183,5 +183,5 @@ def quarantine_records(
                 ensure_ascii=False,
                 default=lambda o: o.isoformat() if isinstance(o, (date, datetime)) else str(o),
             ) + "\n")
-    
+
     return output_path

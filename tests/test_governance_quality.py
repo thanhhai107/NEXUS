@@ -22,11 +22,11 @@ class TestQualityRules:
             column="id",
             rule_type="not_null",
         )
-        
+
         # Valid record
         result = validate_record({"id": 1}, rule)
         assert result.passed
-        
+
         # Invalid record
         result = validate_record({"id": None}, rule)
         assert not result.passed
@@ -39,15 +39,15 @@ class TestQualityRules:
             rule_type="in_range",
             params={"min": 0, "max": 120},
         )
-        
+
         # Valid
         result = validate_record({"age": 30}, rule)
         assert result.passed
-        
+
         # Too low
         result = validate_record({"age": -1}, rule)
         assert not result.passed
-        
+
         # Too high
         result = validate_record({"age": 150}, rule)
         assert not result.passed
@@ -60,11 +60,11 @@ class TestQualityRules:
             rule_type="regex",
             params={"pattern": r"^[\w\.-]+@[\w\.-]+\.\w+$"},
         )
-        
+
         # Valid
         result = validate_record({"email": "test@example.com"}, rule)
         assert result.passed
-        
+
         # Invalid
         result = validate_record({"email": "invalid-email"}, rule)
         assert not result.passed
@@ -75,15 +75,15 @@ class TestQualityRules:
             QualityRule(name="id_req", column="id", rule_type="not_null"),
             QualityRule(name="name_req", column="name", rule_type="not_null"),
         ]
-        
+
         records = [
             {"id": 1, "name": "Alice"},
             {"id": 2},  # Missing name
             {"name": "Bob"},  # Missing id
         ]
-        
+
         results, failed_records = validate_batch(records, rules)
-        
+
         assert len(results) == 6  # 3 records x 2 rules
         assert len(failed_records) == 2  # Record 2 and 3
 
@@ -95,7 +95,7 @@ class TestQualityRules:
             rule_type="not_null",
             severity="warning",
         )
-        
+
         result = validate_record({"field": None}, rule)
         assert result.severity == "warning"
 
@@ -112,7 +112,7 @@ class TestValidationResult:
             message="Field is valid",
             severity="error",
         )
-        
+
         assert result.rule_name == "test_rule"
         assert result.column == "test_column"
         assert result.passed
