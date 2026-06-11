@@ -27,7 +27,12 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from common.tpcdi_sources import source_root, resolve_batch_path, get_source_config, list_source_files
+from common.tpcdi_sources import (
+    source_root,
+    resolve_batch_path,
+    get_source_config,
+    list_source_files,
+)
 
 SCENARIO_BASE = Path("runtime/tpcdi/scenarios")
 
@@ -218,6 +223,144 @@ class TpcdiSourceInjector:
                 "recovery_hint": "dedup",
             })
             return line, meta  # line unchanged; duplicate is already inserted in create_scenario()
+
+        elif mutation_type == "null_required_field":
+            # Replace a required numeric field with the "\N" null marker.
+            # "\N" is a common null sentinel in TPC-DI-style pipelines; it fails
+            # _to_int / _to_float coercion (unlike empty string, which returns None
+            # silently) so the bronze validator raises type_coercion_error.
+            numeric_candidates = [
+                i for i, f in enumerate(fields)
+                if f.strip().lstrip("-").replace(".", "").isdigit()
+            ]
+            if not numeric_candidates:
+                return line, {**meta, "skipped": "no_numeric_field"}
+            fi = (
+                field_index
+                if field_index is not None and field_index in numeric_candidates
+                else self.rng.choice(numeric_candidates)
+            )
+            original = fields[fi]
+            fields[fi] = r"\N"
+            meta.update({
+                "target_field": columns[fi] if columns and fi < len(columns) else f"col_{fi}",
+                "original_value": original,
+                "mutated_value": r"\N",
+                "expected_detection": "type_coercion_error",
+                "expected_stage": "bronze_validation",
+                "recoverable": False,
+                "recovery_hint": "quarantine",
+            })
+
+        elif mutation_type == "invalid_format":
+            # Replace a date-formatted field with a bad string.
+            # Targets YYYY-MM-DD date fields first (coerced by parsers), then numeric.
+            date_candidates = [
+                i for i, f in enumerate(fields)
+                if (
+                    len(f.strip()) >= 10
+                    and f.strip()[4:5] == "-"
+                    and f.strip()[7:8] == "-"
+                    and f.strip()[:4].isdigit()
+                )
+            ]
+            numeric_candidates = [
+                i for i, f in enumerate(fields)
+                if f.strip().lstrip("-").replace(".", "").isdigit()
+            ]
+            candidates = date_candidates if date_candidates else numeric_candidates
+            if not candidates:
+                return line, {**meta, "skipped": "no_date_or_numeric_field"}
+            fi = (
+                field_index
+                if field_index is not None and field_index in candidates
+                else self.rng.choice(candidates)
+            )
+            original = fields[fi]
+            bad_val = "NOT_A_DATE" if date_candidates else "##INVALID##"
+            fields[fi] = bad_val
+            meta.update({
+                "target_field": columns[fi] if columns and fi < len(columns) else f"col_{fi}",
+                "original_value": original,
+                "mutated_value": bad_val,
+                "expected_detection": "type_coercion_error",
+                "expected_stage": "bronze_validation",
+                "recoverable": False,
+                "recovery_hint": "quarantine",
+            })
+
+        elif mutation_type == "outlier_value":
+            # Multiply a numeric field by 1,000,000. Preserves int vs float representation
+            # so the parser does not raise a coercion error — detection is deferred to
+            # a range-check rule (silver_validation, Phase 2).
+            numeric_candidates = [
+                i for i, f in enumerate(fields)
+                if f.strip().lstrip("-").replace(".", "").isdigit()
+            ]
+            if not numeric_candidates:
+                return line, {**meta, "skipped": "no_numeric_field"}
+            fi = (
+                field_index
+                if field_index is not None and field_index in numeric_candidates
+                else self.rng.choice(numeric_candidates)
+            )
+            original = fields[fi]
+            try:
+                orig_f = float(original.strip())
+                if "." in original.strip():
+                    fields[fi] = str(orig_f * 1_000_000)
+                else:
+                    fields[fi] = str(int(orig_f) * 1_000_000)
+            except ValueError:
+                return line, {**meta, "skipped": "parse_failed"}
+            meta.update({
+                "target_field": columns[fi] if columns and fi < len(columns) else f"col_{fi}",
+                "original_value": original,
+                "mutated_value": fields[fi],
+                "expected_detection": "outlier_detected",
+                "expected_stage": "silver_validation",
+                "recoverable": False,
+                "recovery_hint": "quarantine",
+            })
+
+        elif mutation_type == "business_rule_violation":
+            # Negate a positive numeric field. Value remains syntactically valid
+            # so parsers pass — detection is deferred to a sign-check rule
+            # (silver_validation, Phase 2).
+            pos_numeric = []
+            for i, f in enumerate(fields):
+                s = f.strip()
+                if s.lstrip("-").replace(".", "").isdigit():
+                    try:
+                        if float(s) > 0:
+                            pos_numeric.append(i)
+                    except ValueError:
+                        pass
+            if not pos_numeric:
+                return line, {**meta, "skipped": "no_positive_numeric"}
+            fi = (
+                field_index
+                if field_index is not None and field_index in pos_numeric
+                else self.rng.choice(pos_numeric)
+            )
+            original = fields[fi]
+            try:
+                orig_f = float(original.strip())
+                if "." in original.strip():
+                    fields[fi] = str(-abs(orig_f))
+                else:
+                    fields[fi] = str(-abs(int(orig_f)))
+            except ValueError:
+                return line, {**meta, "skipped": "parse_failed"}
+            meta.update({
+                "target_field": columns[fi] if columns and fi < len(columns) else f"col_{fi}",
+                "original_value": original,
+                "mutated_value": fields[fi],
+                "expected_detection": "business_rule_fail",
+                "expected_stage": "silver_validation",
+                "recoverable": False,
+                "recovery_hint": "quarantine",
+            })
 
         else:
             raise ValueError(f"Unknown mutation_type: {mutation_type}")

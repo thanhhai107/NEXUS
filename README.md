@@ -396,7 +396,7 @@ python -c "from benchmark.tpcdi.scenario_runner import TpcdiScenarioRunner; r=Tp
 
 | Layer | Module | Function |
 |---|---|---|
-| Error injection | `ingestion/tpcdi/error_injection/source_injector.py` | `TpcdiSourceInjector.create_scenario()` |
+| Error injection | `ingestion/tpcdi/error_injection/` | Row, schema, semantic, format, reliability, lineage, config injectors |
 | Source config | `domains/tpc/tpcdi_sources.yml` | DIGen source file definitions |
 | I/O | `common/tpcdi_io.py` | Streaming iterators (`iter_tpcdi_records`, `iter_tpcdi_chunks`) |
 | Bronze validation | `governance/quality/bronze_validator.py` | `validate_bronze_tpcdi_file()` |
@@ -408,11 +408,37 @@ python -c "from benchmark.tpcdi.scenario_runner import TpcdiScenarioRunner; r=Tp
 
 ### Supported error scenarios
 
-| Scenario | Detection | Recovery rate |
+The injection layer has been extended to cover all 6 error categories (35 issue types). See [`docs/error_injection_improvement.md`](docs/error_injection_improvement.md) for the full taxonomy.
+
+**Phase 1 — Row-level mutations (source_injector.py):**
+
+| Scenario | Detection stage | Bronze detects? |
 |---|---|---|
-| `extra_field` | Bronze validation | 100% |
-| `type_error` | Bronze validation | 100% |
-| `duplicate_pk` | Gold audit | 100% |
+| `missing_field` | Bronze validation | ✅ field_count_mismatch |
+| `extra_field` | Bronze validation | ✅ field_count_mismatch |
+| `type_error` | Bronze validation | ✅ type_coercion_error |
+| `duplicate_pk` | Gold audit | ✅ (audit layer) |
+| `null_required_field` | Bronze validation | ✅ type_coercion_error (`\N` marker) |
+| `invalid_format` | Bronze validation | ✅ type_coercion_error |
+| `outlier_value` | Silver validation | ❌ (deferred, syntactically valid) |
+| `business_rule_violation` | Silver validation | ❌ (deferred, syntactically valid) |
+
+**Phase 2 — Injector classes:**
+
+| Injector | mutation_types |
+|---|---|
+| `SchemaInjector` | `remove_required_field_from_schema`, `change_field_type_in_schema`, `add_unknown_field_to_schema`, `remove_downstream_field` |
+| `ReliabilityInjector` | `partial_file`, `duplicate_batch`, `poison_record`, `missing_batch`, `rate_limit_partial_batch` |
+| `ScenarioBuilder` | Compound scenarios (multiple injectors combined) |
+
+**Phase 3 — Semantic, Format, Lineage, Config:**
+
+| Injector | mutation_types |
+|---|---|
+| `SemanticInjector` | `unit_changed`, `timestamp_format_changed`, `timestamp_granularity_changed`, `pre_aggregate_records` |
+| `FormatInjector` | `csv_to_json`, `flat_to_nested`, `split_batch_to_microfiles` |
+| `LineageInjector` | `suppress_lineage_emission`, `corrupt_audit_run_id`, `remove_source_mapping`, `corrupt_quarantine_metadata`, `split_emission_targets` |
+| `ConfigInjector` | `simulate_api_failure`, `batch_frequency_mismatch`, `mock_rest_adapter` |
 
 ### Artifacts (`runtime/tpcdi/scenarios/{id}/`)
 
@@ -439,7 +465,7 @@ python -m cli.nexus quality gx-suite --dataset tpcdi_dim_customer >/tmp/nexus_gx
 Current expected result:
 
 ```text
-117 passed
+138 passed
 ```
 
 Warnings in `tests/test_heterogeneity_adaptability.py` about tests returning

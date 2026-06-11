@@ -148,6 +148,17 @@ def load_batch_audit(batch_id: str) -> list[dict[str, Any]]:
     return results
 
 
+def get_schema_path(schema_name: str) -> Path:
+    """Return the absolute path to a JSON schema file.
+
+    Args:
+        schema_name: Dataset schema name, e.g. ``tpcdi_dim_trade``.
+            May omit the ``.schema.json`` suffix.
+    """
+    name = schema_name.replace(".schema.json", "")
+    return PROJECT_ROOT / "domains" / "tpc" / "schemas" / f"{name}.schema.json"
+
+
 def load_generator_audit() -> list[dict[str, Any]]:
     cfg = _get_tpcdi_config()
     audit_file = cfg.get("reports", {}).get("generator_audit", {}).get("file", "")

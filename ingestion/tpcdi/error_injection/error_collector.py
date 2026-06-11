@@ -113,18 +113,28 @@ def _parse_bronze_errors(
     scenario_id: str,
     run_id: str,
 ) -> list[dict[str, Any]]:
-    """Extract per-record errors from bronze validation result."""
+    """Extract per-record errors from bronze validation result.
+
+    Maps aggregate counts from ``validate_bronze_tpcdi_file`` output to
+    canonical detected_error records.  Covers Phase 1 and Phase 2 mutation
+    types that produce coercion / field-count failures at bronze.
+
+    Canonical error_type values and the mutations that produce them:
+      field_count_mismatch — missing_field, extra_field, partial_file,
+                             poison_record (after utf-8 replace)
+      type_coercion_error  — type_error, null_required_field (\\N marker),
+                             invalid_format
+    """
     errors: list[dict[str, Any]] = []
     details = result.get("details", {})
     counter = 0
     source_name = details.get("source_name", "unknown")
     batch_id = details.get("batch_id", "batch1")
 
-    # Bronze result chỉ có aggregate counts, không có per-record detail.
-    # Tạo placeholder errors từ aggregate cho scoring.
     fce = details.get("field_count_errors", 0)
     tce = details.get("type_coercion_errors", 0)
-    for i in range(fce):
+
+    for _ in range(fce):
         counter += 1
         errors.append({
             "detected_error_id": f"bronze-{counter:06d}",
@@ -136,7 +146,7 @@ def _parse_bronze_errors(
             "error_type": "field_count_mismatch",
             "detected_stage": "bronze_validation",
         })
-    for i in range(tce):
+    for _ in range(tce):
         counter += 1
         errors.append({
             "detected_error_id": f"bronze-{counter:06d}",

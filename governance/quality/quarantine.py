@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -136,7 +136,11 @@ def quarantine_records(
             "resolved_at": item_dict.get("resolved_at"),
             "resolver_note": item_dict.get("resolver_note"),
             # Full record
-            "raw_payload": json.dumps(item_dict, ensure_ascii=False),
+            "raw_payload": json.dumps(
+                item_dict,
+                ensure_ascii=False,
+                default=lambda o: o.isoformat() if isinstance(o, (date, datetime)) else str(o),
+            ),
             "item": item_dict,
         }
     
@@ -174,6 +178,10 @@ def quarantine_records(
     with output_path.open("a", encoding="utf-8", newline="\n") as file:
         for item in invalid_records:
             envelope = build_envelope(item)
-            file.write(json.dumps(envelope, ensure_ascii=False) + "\n")
+            file.write(json.dumps(
+                envelope,
+                ensure_ascii=False,
+                default=lambda o: o.isoformat() if isinstance(o, (date, datetime)) else str(o),
+            ) + "\n")
     
     return output_path

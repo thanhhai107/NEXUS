@@ -56,7 +56,10 @@ def iter_tpcdi_records(
 
     for filepath in list_source_files(source_name, batch_id):
         record_number = 0
-        with filepath.open("r", encoding="utf-8-sig", newline="") as f:
+        # errors='replace' prevents UnicodeDecodeError on binary/non-UTF-8 content
+        # (e.g. poison_record injection).  Replacement chars cause field-count or
+        # coercion failures which the bronze validator catches as parse errors.
+        with filepath.open("r", encoding="utf-8-sig", errors="replace", newline="") as f:
             if has_header:
                 reader = csv.DictReader(f, delimiter=delimiter)
                 for row in reader:
