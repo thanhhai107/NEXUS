@@ -25,8 +25,13 @@ from governance.recovery.strategies import (
     RepairResult,
     RepairStrategy,
     DropExtraFieldStrategy,
+    InferMissingFieldStrategy,
     SafeCastStrategy,
     DedupStrategy,
+    DefaultValueStrategy,
+    OutlierCorrectionStrategy,
+    BusinessRuleCorrectionStrategy,
+    SchemaRevertStrategy,
 )
 from common.tpcdi_sources import get_source_config
 
@@ -67,8 +72,17 @@ class RecoveryEngine:
         self.run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
         self.strategies: dict[str, RepairStrategy] = {
             "field_count_mismatch_extra": DropExtraFieldStrategy(),
+            "field_count_mismatch_missing": InferMissingFieldStrategy(),
             "type_coercion_error": SafeCastStrategy(),
             "duplicate_primary_key": DedupStrategy(),
+            "missing_field": InferMissingFieldStrategy(),
+            "null_required_field": DefaultValueStrategy(),
+            "missing_required_field": DefaultValueStrategy(),
+            "outlier_detected": OutlierCorrectionStrategy(),
+            "business_rule_fail": BusinessRuleCorrectionStrategy(),
+            "field_type_change": SafeCastStrategy(),
+            "dropped_downstream_field": InferMissingFieldStrategy(),
+            "schema_mutation": SchemaRevertStrategy(),
         }
 
     def run(
@@ -334,18 +348,45 @@ class RecoveryEngine:
         Differentiates missing vs extra field_count_mismatch by checking
         actual vs expected field count from the mutation context.
         """
+        # 1. Exact match via strategy dict
+        if error_type in self.strategies:
+            return self.strategies[error_type]
+
+        # 2. field_count_mismatch — determine direction
         if error_type == "field_count_mismatch":
-            # Determine missing vs extra
-            if mutation:
-                raw_line = "dummy"  # We don't have the line yet, check mutation type
-                mt = mutation.get("mutation_type", "")
-                if mt == "missing_field":
-                    return None  # InferMissingFieldStrategy not implemented yet
+            mt = mutation.get("mutation_type", "") if mutation else ""
+            if mt == "missing_field":
+                return InferMissingFieldStrategy()
             return DropExtraFieldStrategy()
+
+        # 3. type_coercion_error
         if error_type == "type_coercion_error":
             return SafeCastStrategy()
-        if error_type == "duplicate_primary_key":
+
+        # 4. duplicate_primary_key / row_count_mismatch
+        if error_type in ("duplicate_primary_key", "duplicate_batch", "retry_duplicate"):
             return DedupStrategy()
+
+        # 5. Schema errors
+        if error_type in ("missing_required_field", "dropped_downstream_field"):
+            return DefaultValueStrategy()
+
+        if error_type in ("field_type_change", "field_rename_candidate"):
+            return SchemaRevertStrategy()
+
+        # 6. Data quality errors
+        if error_type in ("null_required_field", "missing_value", "missing_data"):
+            return DefaultValueStrategy()
+        if error_type == "outlier_detected":
+            return OutlierCorrectionStrategy()
+        if error_type == "business_rule_fail":
+            return BusinessRuleCorrectionStrategy()
+
+        # 7. Reliability — dedup for retry issues
+        if error_type == "row_count_mismatch":
+            return None  # Cannot auto-fix; needs re-download
+
+        # 8. Semantic/format/lineage — not recoverable at file level
         return None
 
     def _retry_pipeline(self, recovered_source_root: Path, report: RecoveryReport) -> None:
@@ -362,3 +403,201 @@ class RecoveryEngine:
                 os.environ["TPCDI_SOURCE_ROOT"] = original
             else:
                 del os.environ["TPCDI_SOURCE_ROOT"]
+
+    # ═════════════════════════════════════════════════════════════════════
+    # Quarantine-based recovery (production mode — no manifest dependency)
+    # ═════════════════════════════════════════════════════════════════════
+
+    def recover_from_quarantine(
+        self,
+        quarantine_dir: str | Path,
+        *,
+        target_source: str | None = None,
+        delimiter: str = "|",
+    ) -> RecoveryReport:
+        """Recover records directly from quarantine without an injection manifest.
+
+        Scans quarantine JSONL files, applies repair strategies to each
+        failed record, and writes recovered records back to a replay-ready
+        file in ``runtime/lake/recovered/``.
+
+        This is the production recovery path — no manifest needed.
+        """
+        qpath = Path(quarantine_dir)
+        if not qpath.exists():
+            return RecoveryReport(scenario_id="quarantine_recovery", total_quarantined=0)
+
+        report = RecoveryReport(
+            scenario_id="quarantine_recovery",
+            run_id=self.run_id,
+        )
+
+        recovered_dir = qpath.parent.parent / "recovered"
+        recovered_dir.mkdir(parents=True, exist_ok=True)
+
+        # Collect all quarantine records
+        quarantined: list[dict[str, Any]] = []
+        for jf in sorted(qpath.rglob("*.jsonl")):
+            for line in jf.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                    if target_source and rec.get("source_name") != target_source:
+                        continue
+                    quarantined.append(rec)
+                except json.JSONDecodeError:
+                    continue
+
+        report.total_quarantined = len(quarantined)
+        if not quarantined:
+            return report
+
+        # Group by source for batch processing
+        by_source: dict[str, list[dict[str, Any]]] = {}
+        for rec in quarantined:
+            src = rec.get("source_name", "unknown")
+            by_source.setdefault(src, []).append(rec)
+
+        for source_name, records in by_source.items():
+            try:
+                src_cfg = get_source_config(source_name)
+            except KeyError:
+                src_cfg = {}
+            expected_columns = src_cfg.get("columns", [])
+            delim = src_cfg.get("delimiter", delimiter)
+
+            replay_file = recovered_dir / f"{source_name}_recovered.jsonl"
+            repaired_this_source = 0
+
+            for rec in records:
+                raw_line = rec.get("raw_record", "")
+                if not raw_line:
+                    report.unrecoverable += 1
+                    continue
+
+                # Select strategy from error_type
+                error_type = rec.get("error_type", "")
+                strategy = self.strategies.get(error_type) or self._select_strategy(error_type, rec)
+
+                if strategy is None:
+                    report.unrecoverable += 1
+                    report.records.append({
+                        "source_name": source_name,
+                        "error_type": error_type,
+                        "action": "unrecoverable",
+                        "reason": f"No strategy for {error_type}",
+                        "applied": False,
+                    })
+                    continue
+
+                # Build repair context from quarantine record
+                context = RepairContext(
+                    source_name=source_name,
+                    batch_id=rec.get("batch_id", "batch1"),
+                    relative_file=rec.get("source_file", ""),
+                    expected_columns=expected_columns,
+                    delimiter=delim,
+                    line_number=rec.get("record_number", 1) or 1,
+                    raw_line=raw_line,
+                    mutation_id=None,
+                    field_index=None,
+                    target_field=rec.get("field", ""),
+                    original_value=rec.get("original_value", ""),
+                    mutated_value=rec.get("mutated_value", ""),
+                    mutation_type=None,
+                )
+
+                result = strategy.repair(context)
+
+                if result.success and result.confidence >= 0.5:
+                    report.repaired += 1
+                    repaired_this_source += 1
+                    report.strategy_breakdown.setdefault(strategy.__class__.__name__, 0)
+                    report.strategy_breakdown[strategy.__class__.__name__] += 1
+                    report.records.append({
+                        "source_name": source_name,
+                        "error_type": error_type,
+                        "strategy": strategy.__class__.__name__,
+                        "action": "repaired",
+                        "confidence": result.confidence,
+                        "before": result.before[:100],
+                        "after": result.after[:100],
+                        "applied": True,
+                    })
+                    # Write recovered record
+                    recovered_rec = {**rec, "_recovered_line": result.after, "_repaired_by": strategy.__class__.__name__}
+                    with replay_file.open("a", encoding="utf-8") as fh:
+                        fh.write(json.dumps(recovered_rec, default=str) + "\n")
+                else:
+                    report.unrecoverable += 1
+                    report.records.append({
+                        "source_name": source_name,
+                        "error_type": error_type,
+                        "strategy": strategy.__class__.__name__,
+                        "action": "unrecoverable" if not result.success else "repair_candidate",
+                        "confidence": result.confidence,
+                        "applied": False,
+                    })
+
+            if repaired_this_source > 0:
+                report.repair_candidates += repaired_this_source
+
+        # Write recovery log
+        recovery_log_path = recovered_dir / "quarantine_recovery_log.json"
+        recovery_log_path.write_text(
+            json.dumps(report.to_dict(), indent=2, default=str), encoding="utf-8"
+        )
+
+        return report
+
+    def replay_recovered(
+        self,
+        recovered_dir: str | Path,
+        *,
+        target_source: str | None = None,
+    ) -> dict[str, Any]:
+        """Replay recovered records back through bronze validation.
+
+        Reads recovered JSONL files, feeds the repaired lines through
+        validate_bronze_tpcdi_file, and returns the validation result.
+        """
+        from governance.quality.bronze_validator import validate_bronze_file
+
+        rdir = Path(recovered_dir)
+        results: dict[str, Any] = {}
+
+        for rec_file in sorted(rdir.glob("*_recovered.jsonl")):
+            source_name = rec_file.stem.replace("_recovered", "")
+            if target_source and source_name != target_source:
+                continue
+
+            recovered_lines: list[str] = []
+            for line in rec_file.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                rec = json.loads(line)
+                recovered_line = rec.get("_recovered_line", "")
+                if recovered_line:
+                    recovered_lines.append(recovered_line)
+
+            if not recovered_lines:
+                continue
+
+            # Re-validate
+            try:
+                result = validate_bronze_file(
+                    source_name=source_name,
+                    records=recovered_lines,
+                )
+                results[source_name] = {
+                    "status": result.get("status", "unknown"),
+                    "recovered_count": len(recovered_lines),
+                    "still_invalid": result.get("details", {}).get("field_count_errors", 0)
+                                      + result.get("details", {}).get("type_coercion_errors", 0),
+                }
+            except Exception as e:
+                results[source_name] = {"status": "error", "error": str(e)}
+
+        return results

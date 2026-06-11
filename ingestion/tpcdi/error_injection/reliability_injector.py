@@ -132,6 +132,8 @@ class ReliabilityInjector:
                 fh.truncate(offset)
             mutations.append({
                 "mutation_type": "partial_file",
+                "source_name": source_name,
+                "batch_id": batch_id,
                 "relative_file": filepath.name,
                 "original_size": original_size,
                 "truncate_offset": offset,
@@ -185,6 +187,8 @@ class ReliabilityInjector:
             filepath.write_bytes(b"\n".join(lines))
             mutations.append({
                 "mutation_type": "poison_record",
+                "source_name": source_name,
+                "batch_id": batch_id,
                 "relative_file": filepath.name,
                 "insert_line": insert_at,
                 "expected_detection": "parser_exception",
@@ -232,6 +236,8 @@ class ReliabilityInjector:
             filepath.write_text("".join(lines[:keep]), encoding="utf-8")
             mutations.append({
                 "mutation_type": "rate_limit_partial_batch",
+                "source_name": source_name,
+                "batch_id": batch_id,
                 "relative_file": filepath.name,
                 "original_lines": original_count,
                 "kept_lines": keep,
@@ -259,7 +265,9 @@ class ReliabilityInjector:
         """
         files = self._resolve_source_files(source_dir, source_name, batch_id)
         if not files:
-            return [{"mutation_type": "atomic_write_failure", "skipped": "no_files"}]
+            return [{"mutation_type": "atomic_write_failure",
+                "source_name": source_name,
+                "batch_id": batch_id, "skipped": "no_files"}]
 
         pct = completion_pct if completion_pct is not None else self.rng.uniform(0.40, 0.80)
         mutations: list[dict[str, Any]] = []
@@ -277,6 +285,8 @@ class ReliabilityInjector:
 
             mutations.append({
                 "mutation_type": "atomic_write_failure",
+                "source_name": source_name,
+                "batch_id": batch_id,
                 "relative_file": filepath.name,
                 "original_lines": original_count,
                 "written_lines": cut_point,

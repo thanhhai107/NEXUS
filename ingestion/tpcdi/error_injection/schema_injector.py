@@ -5,6 +5,13 @@ Mutates JSON schema files in ``domains/tpc/schemas/`` to simulate schema drift
 scenarios.  Always backs up the original before mutating; call ``revert()``
 to restore (or use as a context manager).
 
+Two workflows are supported:
+
+1. **In-place** — ``inject()`` / ``revert_all()`` for direct schema mutation.
+2. **Scenario** — ``create_scenario()`` copies both source data and schema files
+   into a scenario directory, mutating the schema copy.  Compatible with
+   the SCENARIO_CATALOG and BenchmarkEvaluator.
+
 Supported mutation_types:
   remove_required_field_from_schema — Remove a field from the ``required`` list.
   change_field_type_in_schema       — Change a field's ``type`` value.
@@ -111,6 +118,114 @@ class SchemaInjector:
         schema_path = get_schema_path(schema_name)
         shutil.copy(Path(backup_path), schema_path)
 
+    def create_scenario(
+        self,
+        scenario_id: str,
+        *,
+        target_source: str = "trade",
+        batch_id: str = "batch1",
+        mutation_type: str,
+        schema_mutation: str | None = None,
+        schema_name: str | None = None,
+        field: str | None = None,
+        new_type: str | None = None,
+        **_: Any,
+    ) -> Path:
+        """Create scenario with both source data copy + mutated schema copy.
+
+        Copies the clean DIGen source tree, copies the relevant schema JSON
+        file, applies the mutation, and writes ``injection_manifest.json``.
+
+        Parameters
+        ----------
+        schema_mutation:
+            The actual schema mutation to apply (e.g. ``remove_downstream_field``).
+            Defaults to ``mutation_type`` if not given.
+        schema_name:
+            Schema file name without extension (e.g. ``tpcdi_dim_trade``).
+            Auto-resolves from ``target_source`` if not provided.
+        """
+        from common.tpcdi_sources import source_root
+
+        scenario_root_dir = PROJECT_ROOT / "runtime" / "tpcdi" / "scenarios" / scenario_id
+        src_dir = scenario_root_dir / "source"
+
+        # Copy clean source tree
+        clean_root = source_root()
+        if src_dir.exists():
+            shutil.rmtree(src_dir)
+        shutil.copytree(clean_root, src_dir)
+
+        # Copy schema file into scenario
+        schema_subdir = scenario_root_dir / "schema"
+        schema_subdir.mkdir(parents=True, exist_ok=True)
+        if schema_name is None:
+            schema_name = f"tpcdi_dim_{target_source}"
+
+        # Try to copy real schema; fall back to synthetic if missing
+        original_schema_path = get_schema_path(schema_name)
+        scenario_schema_path = schema_subdir / (original_schema_path.name if original_schema_path.exists() else f"{schema_name}.schema.json")
+        if original_schema_path.exists():
+            shutil.copy(original_schema_path, scenario_schema_path)
+        else:
+            # Create a minimal synthetic schema for detection
+            fields = ["id", "value", target_source + "_key", "timestamp", "amount"]
+            synthetic = {
+                "title": schema_name,
+                "type": "object",
+                "properties": {f: {"type": "string"} for f in fields},
+                "required": fields[:3],
+            }
+            scenario_schema_path.write_text(json.dumps(synthetic, indent=2), encoding="utf-8")
+
+        # Load and mutate the scenario schema copy
+        schema = json.loads(scenario_schema_path.read_text(encoding="utf-8"))
+        actual_mutation = schema_mutation or mutation_type
+        resolved_field = self._apply_mutation(schema, actual_mutation, field, new_type)
+        scenario_schema_path.write_text(json.dumps(schema, indent=2), encoding="utf-8")
+
+        # Build mutations record
+        mutations = [{
+            "mutation_id": f"mut-schema-{scenario_id}",
+            "mutation_type": actual_mutation,
+            "injector_type": "schema",
+            "schema_name": schema_name,
+            "schema_path": str(scenario_schema_path.relative_to(scenario_root_dir)),
+            "field": resolved_field,
+            "target_source": target_source,
+            "batch_id": batch_id,
+            "expected_detection": self._expected_detection(actual_mutation),
+            "expected_stage": "bronze_validation",
+            "recoverable": True,
+            "recovery_hint": "schema_revert",
+        }]
+
+        manifest = {
+            "scenario_id": scenario_id,
+            "seed": self.seed,
+            "base_source_root": str(clean_root),
+            "scenario_root": str(scenario_root_dir),
+            "scenario_source_root": str(src_dir),
+            "target_source": target_source,
+            "batch": batch_id,
+            "mutation_type": actual_mutation,
+            "mutations": mutations,
+        }
+        (scenario_root_dir / "injection_manifest.json").write_text(
+            json.dumps(manifest, indent=2), encoding="utf-8"
+        )
+        return scenario_root_dir
+
+    @staticmethod
+    def _expected_detection(mutation_type: str) -> str:
+        mapping = {
+            "remove_required_field_from_schema": "missing_required_field",
+            "change_field_type_in_schema": "field_type_change",
+            "add_unknown_field_to_schema": "field_count_mismatch",
+            "remove_downstream_field": "dropped_downstream_field",
+        }
+        return mapping.get(mutation_type, "schema_drift")
+
     # ── Context manager ──────────────────────────────────────────────────────
 
     def __enter__(self) -> "SchemaInjector":
@@ -163,6 +278,7 @@ class SchemaInjector:
             return f
 
         raise ValueError(f"Unknown schema mutation_type: {mutation_type!r}")
+
 
 
 __all__ = ["SchemaInjector"]

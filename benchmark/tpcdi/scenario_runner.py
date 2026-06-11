@@ -19,7 +19,6 @@ Usage::
 
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from typing import Any
@@ -30,6 +29,12 @@ from governance.quality.bronze_validator import validate_bronze_tpcdi_file
 from governance.recovery.engine import RecoveryEngine
 from ingestion.tpcdi.error_injection.error_collector import collect_detected_errors, write_detected_errors
 from ingestion.tpcdi.error_injection.source_injector import TpcdiSourceInjector
+from ingestion.tpcdi.error_injection.semantic_injector import SemanticInjector
+from ingestion.tpcdi.error_injection.format_injector import FormatInjector
+from ingestion.tpcdi.error_injection.lineage_injector import LineageInjector
+from ingestion.tpcdi.error_injection.reliability_injector import ReliabilityInjector
+from ingestion.tpcdi.error_injection.config_injector import ConfigInjector
+from ingestion.tpcdi.error_injection.schema_injector import SchemaInjector
 
 
 class TpcdiScenarioRunner:
@@ -44,20 +49,23 @@ class TpcdiScenarioRunner:
         self,
         scenario_id: str,
         mutation_type: str,
+        *,
         target_source: str = "trade",
         batch_id: str = "batch1",
+        injector_type: str = "source",
         line_numbers: list[int] | None = None,
         seed: int = 42,
         recover: bool = True,
+        extra_kwargs: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Run one scenario end-to-end.
+        """Run one scenario end-to-end with automatic injector dispatch.
 
-        Returns dict with paths, before/after status, and scoring report.
-
-        Notes
-        -----
-        - TPCDI_SOURCE_ROOT is saved/restored around the run.
-        - A fresh injector is created per call (seed applied at construction).
+        Parameters
+        ----------
+        injector_type:
+            One of: source, semantic, format, lineage, reliability, config, schema.
+        extra_kwargs:
+            Additional keyword arguments forwarded to the injector create_scenario().
         """
         original_source_root = os.environ.get("TPCDI_SOURCE_ROOT")
         os.environ.pop("TPCDI_SOURCE_ROOT", None)
@@ -70,20 +78,24 @@ class TpcdiScenarioRunner:
         after_status = "unknown"
 
         try:
-            # 1. Inject (fresh injector per call)
-            injector = TpcdiSourceInjector(seed=seed)
-            scenario_root = injector.create_scenario(
-                scenario_id,
+            # 1. Inject via dispatch to appropriate injector
+            scenario_root = self._create_scenario(
+                scenario_id=scenario_id,
+                injector_type=injector_type,
+                mutation_type=mutation_type,
                 target_source=target_source,
                 batch_id=batch_id,
-                mutation_type=mutation_type,
-                line_numbers=line_numbers or [100, 200, 300],
+                seed=seed,
+                line_numbers=line_numbers,
+                extra_kwargs=extra_kwargs or {},
             )
             source_dir = scenario_root / "source"
             scenario_root = Path(scenario_root)
 
-            # 2. Detect
+            # 2. Detect (bronze validation only for source injector)
             os.environ["TPCDI_SOURCE_ROOT"] = str(source_dir)
+            bronze: dict[str, Any] | None = None
+            before_result: Any = None
             if is_dup:
                 before_result = TpcdiRunner(scale_factor=self.scale_factor).run_milestone4(clean_outputs=True)
                 before_status = "valid" if before_result.is_valid else "invalid"
@@ -92,7 +104,7 @@ class TpcdiScenarioRunner:
                     run_id=self.scorer.run_id,
                     audit_results=before_result.correctness_details,
                 )
-            else:
+            elif injector_type == "source":
                 bronze = validate_bronze_tpcdi_file(
                     source_name=target_source,
                     batch_id=batch_id,
@@ -103,6 +115,13 @@ class TpcdiScenarioRunner:
                     scenario_id=scenario_id,
                     run_id=self.scorer.run_id,
                     bronze_validation=bronze,
+                )
+            else:
+                # Non-source injectors: detection via scenario inspection only
+                before_status = "scenario_inspected"
+                detected = collect_detected_errors(
+                    scenario_id=scenario_id,
+                    run_id=self.scorer.run_id,
                 )
 
             # 3. Write detected_errors.json (always, before recovery)
@@ -135,7 +154,7 @@ class TpcdiScenarioRunner:
                             run_id=self.scorer.run_id,
                             audit_results=rerun.correctness_details,
                         )
-                    else:
+                    elif injector_type == "source":
                         after_bronze = validate_bronze_tpcdi_file(
                             source_name=target_source,
                             batch_id=batch_id,
@@ -146,6 +165,12 @@ class TpcdiScenarioRunner:
                             scenario_id=scenario_id,
                             run_id=self.scorer.run_id,
                             bronze_validation=after_bronze,
+                        )
+                    else:
+                        after_status = "scenario_inspected"
+                        after_detected = collect_detected_errors(
+                            scenario_id=scenario_id,
+                            run_id=self.scorer.run_id,
                         )
                     write_detected_errors(
                         after_detected, scenario_root / "detected_errors_after_recovery.json"
@@ -186,3 +211,57 @@ class TpcdiScenarioRunner:
                 os.environ["TPCDI_SOURCE_ROOT"] = original_source_root
             elif "TPCDI_SOURCE_ROOT" in os.environ:
                 os.environ.pop("TPCDI_SOURCE_ROOT", None)
+
+    def _create_scenario(
+        self,
+        scenario_id: str,
+        injector_type: str,
+        mutation_type: str,
+        target_source: str,
+        batch_id: str,
+        seed: int,
+        line_numbers: list[int] | None,
+        extra_kwargs: dict[str, Any],
+    ) -> Path:
+        """Dispatch to the correct injector class and call create_scenario()."""
+        injector = self._get_injector(injector_type, seed)
+        kwargs: dict[str, Any] = dict(extra_kwargs)
+
+        if injector_type == "source":
+            kwargs.setdefault("line_numbers", line_numbers or [100, 200, 300])
+        if injector_type == "schema":
+            kwargs.setdefault("schema_mutation", kwargs.get("schema_mutation", mutation_type))
+
+        if injector_type in ("lineage", "config"):
+            return injector.create_scenario(
+                scenario_id,
+                mutation_type=mutation_type,
+                target_source=target_source,
+                batch_id=batch_id,
+                **kwargs,
+            )
+
+        return injector.create_scenario(
+            scenario_id,
+            target_source=target_source,
+            batch_id=batch_id,
+            mutation_type=mutation_type,
+            **kwargs,
+        )
+
+    @staticmethod
+    def _get_injector(injector_type: str, seed: int) -> Any:
+        """Return an injector instance for the given type."""
+        injectors = {
+            "source": TpcdiSourceInjector,
+            "semantic": SemanticInjector,
+            "format": FormatInjector,
+            "lineage": LineageInjector,
+            "reliability": ReliabilityInjector,
+            "config": ConfigInjector,
+            "schema": SchemaInjector,
+        }
+        cls = injectors.get(injector_type)
+        if cls is None:
+            raise ValueError(f"Unknown injector_type: {injector_type!r}")
+        return cls(seed=seed)

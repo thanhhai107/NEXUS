@@ -234,7 +234,6 @@ class SemanticInjector:
 
         meta = get_semantic_meta(source_name)
         ts_fields = meta.get("timestamp_fields", [])
-        orig_fmt = meta.get("timestamp_format", "%Y-%m-%d")
         if not ts_fields:
             return [{"mutation_type": "timestamp_format_changed", "skipped": "no_timestamp_fields"}]
 
@@ -264,6 +263,7 @@ class SemanticInjector:
             mutations.append({
                 "mutation_type": "timestamp_format_changed",
                 "source": source_name,
+                "batch_id": batch_id,
                 "affected_fields": ts_fields,
                 "new_format": new_format,
                 "expected_detection": "timestamp_parse_error",
@@ -306,6 +306,7 @@ class SemanticInjector:
             mutations.append({
                 "mutation_type": "timestamp_granularity_changed",
                 "source": source_name,
+                "batch_id": batch_id,
                 "affected_fields": ts_fields,
                 "expected_detection": "semantic_anomaly",
                 "expected_stage": "semantic_validation",
@@ -368,6 +369,7 @@ class SemanticInjector:
             mutations.append({
                 "mutation_type": "pre_aggregate_records",
                 "source": source_name,
+                "batch_id": batch_id,
                 "group_by": key_fields,
                 "summed_fields": amount_fields,
                 "original_records": len(lines),
@@ -431,6 +433,7 @@ class SemanticInjector:
             mutations.append({
                 "mutation_type": "rename_to_synonym",
                 "source": source_name,
+                "batch_id": batch_id,
                 "original_field": original,
                 "synonym": syn,
                 "expected_detection": "field_rename_candidate",
@@ -472,7 +475,7 @@ class SemanticInjector:
             if len(lines) < 2:
                 continue
             # Pick a random non-empty line to duplicate
-            candidates = [i for i, l in enumerate(lines) if l.strip()]
+            candidates = [i for i, line in enumerate(lines) if line.strip()]
             if not candidates:
                 continue
             dup_idx = self.rng.choice(candidates)
@@ -492,6 +495,7 @@ class SemanticInjector:
             mutations.append({
                 "mutation_type": "entity_id_ambiguity",
                 "source": source_name,
+                "batch_id": batch_id,
                 "id_field": id_fields[0],
                 "original_id": orig_id if id_idx < len(fields) else "",
                 "ambiguous_id": fields[id_idx] if id_idx < len(fields) else "",
@@ -553,6 +557,7 @@ class SemanticInjector:
             mutations.append({
                 "mutation_type": "same_name_different_meaning",
                 "source": source_name,
+                "batch_id": batch_id,
                 "swapped_fields": [columns[a_idx], columns[b_idx]],
                 "keyword": kw,
                 "expected_detection": "semantic_anomaly",
@@ -622,6 +627,7 @@ class SemanticInjector:
             mutations.append({
                 "mutation_type": "different_business_definitions",
                 "source": source_name,
+                "batch_id": batch_id,
                 "formula": formula,
                 "factor": factor,
                 "affected_fields": amount_fields,
@@ -666,6 +672,7 @@ class SemanticInjector:
             mutations.append({
                 "mutation_type": "different_spatial_ref",
                 "source": source_name,
+                "batch_id": batch_id,
                 "injected_crs": selected_crs,
                 "expected_detection": "semantic_anomaly",
                 "expected_stage": "semantic_validation",
@@ -691,7 +698,6 @@ class SemanticInjector:
         source so the two sources no longer agree on the same entity.
         """
         cfg = get_source_config(source_name)
-        columns = cfg.get("columns", [])
         delimiter = cfg.get("delimiter", "|")
 
         # Pick a conflict source
@@ -703,7 +709,6 @@ class SemanticInjector:
 
         # Find shared ID fields
         meta = get_semantic_meta(source_name)
-        id_fields = meta.get("entity_id_fields", [])
         amount_fields = meta.get("amount_fields", []) or meta.get("volume_fields", [])
 
         if not amount_fields:
@@ -737,6 +742,7 @@ class SemanticInjector:
             mutations.append({
                 "mutation_type": "cross_source_inconsistency",
                 "source": source_name,
+                "batch_id": batch_id,
                 "conflict_source": conflict,
                 "affected_fields": amount_fields,
                 "expected_detection": "cross_source_inconsistency",

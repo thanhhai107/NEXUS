@@ -283,7 +283,7 @@ def generate_tpcdi(
         output_dir=DEFAULT_OUTPUT_DIR / "tpcdi",
         mode="batch",
         run_id=run_id,
-        spark_master="spark://spark:7077",
+        spark_master="local[*]",
     )
     return run_plan(config, dry_run=dry_run, timeout_seconds=7200)
 

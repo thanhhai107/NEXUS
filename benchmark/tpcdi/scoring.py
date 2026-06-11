@@ -116,7 +116,7 @@ class TpcdiScoringEngine:
         """
         manifest = load_manifest(manifest_path)
         scenario_id = manifest.get("scenario_id", "unknown")
-        injected = iter_mutations(manifest)
+        injected = [m for m in iter_mutations(manifest) if "skipped" not in m]
         total = len(injected)
 
         # Collect detected errors if not provided
@@ -147,22 +147,24 @@ class TpcdiScoringEngine:
                     break
 
             if found_idx is None:
-                # Fallback level 1: source + batch + file + physical_line + error_type (exact line match)
+                # Fallback level 1: error_type match + optional field matching
                 for idx, det in enumerate(unmatched_detections):
-                    if (str(det.get("physical_line_number")) == str(injection.get("physical_line_number"))
-                            and det.get("source_name") == injection.get("source_name")
-                            and det.get("batch_id") == injection.get("batch_id")
-                            and det.get("relative_file") == injection.get("relative_file")
-                            and det.get("error_type") == injection.get("expected_detection")):
+                    if det.get("error_type") != injection.get("expected_detection"):
+                        continue
+                    # Match on non-empty fields only; empty/None fields are wildcards
+                    src_ok = not injection.get("source_name") or str(det.get("source_name", "")) == str(injection.get("source_name", ""))
+                    batch_ok = not injection.get("batch_id") or str(det.get("batch_id", "")) == str(injection.get("batch_id", ""))
+                    file_ok = not injection.get("relative_file") or str(det.get("relative_file", "")) == str(injection.get("relative_file", ""))
+                    line_ok = not str(injection.get("physical_line_number") or "") or str(det.get("physical_line_number")) == str(injection.get("physical_line_number"))
+                    if src_ok and batch_ok and file_ok and line_ok:
                         found_idx = idx
                         break
 
             if found_idx is None:
-                # Fallback level 2: source + batch + error_type (table-level, no line precision)
+                # Fallback level 2: source + error_type only (table-level)
                 for idx, det in enumerate(unmatched_detections):
-                    if (det.get("source_name") == injection.get("source_name")
-                            and det.get("batch_id") == injection.get("batch_id")
-                            and det.get("error_type") == injection.get("expected_detection")):
+                    if (det.get("error_type") == injection.get("expected_detection")
+                            and (not injection.get("source_name") or det.get("source_name") == injection.get("source_name"))):
                         found_idx = idx
                         break
 

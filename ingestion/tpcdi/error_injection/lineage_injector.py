@@ -99,7 +99,24 @@ class LineageInjector:
         (scenario_root_dir / "injection_manifest.json").write_text(
             json.dumps(manifest, indent=2), encoding="utf-8"
         )
+
+        # Post-processing: some mutations need to patch the manifest after it's written
+        if mutation_type == "corrupt_audit_run_id":
+            self._postprocess_corrupt_run_id(scenario_root_dir)
+
         return scenario_root_dir
+
+    def _postprocess_corrupt_run_id(self, scenario_root_dir: Path) -> None:
+        """Re-read the just-written manifest and corrupt its run_id."""
+        import json
+        mpath = scenario_root_dir / "injection_manifest.json"
+        if mpath.exists():
+            try:
+                manifest = json.loads(mpath.read_text(encoding="utf-8"))
+                manifest["run_id"] = _FAKE_RUN_ID
+                mpath.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            except Exception:
+                pass
 
     # ── Mutation implementations ─────────────────────────────────────────────
 
@@ -158,6 +175,8 @@ class LineageInjector:
 
         mutations.append({
             "mutation_type": "suppress_lineage_emission",
+            "source_name": "trade",
+            "batch_id": "batch1",
             "suppressed_fields": list(set(suppressed_fields)),
             "affected_files": [str(jf.relative_to(scenario_root_dir)) for jf in jsonl_files],
             "expected_detection": "lineage_gap",
@@ -212,6 +231,8 @@ class LineageInjector:
 
         mutations.append({
             "mutation_type": "corrupt_audit_run_id",
+            "batch_id": "batch1",
+            "source_name": "trade",
             "original_run_id": original_run_id,
             "injected_run_id": fake_run_id,
             "affected_files": affected_files,
@@ -252,6 +273,8 @@ class LineageInjector:
 
         mutations.append({
             "mutation_type": "remove_source_mapping",
+            "batch_id": "batch1",
+            "source_name": source_name,
             "target_source": source_name,
             "removed_mapping": removed_entry,
             "expected_detection": "lineage_gap",
@@ -313,6 +336,7 @@ class LineageInjector:
 
         mutations.append({
             "mutation_type": "corrupt_quarantine_metadata",
+            "batch_id": "batch1",
             "corrupted_records": corrupted_count,
             "removed_fields": ["source_name", "mutation_id"],
             "corrupted_fields": ["record_number"],
@@ -357,6 +381,7 @@ class LineageInjector:
 
         mutations.append({
             "mutation_type": "split_emission_targets",
+            "batch_id": "batch1",
             "n_targets": n_targets,
             "records_per_target": len(source_records),
             "total_emitted": len(source_records) * n_targets,
@@ -403,6 +428,7 @@ class LineageInjector:
 
         mutations.append({
             "mutation_type": "suppress_transform_lineage",
+            "batch_id": "batch1",
             "removed_fields": ["transform_id", "target_layer"],
             "expected_detection": "lineage_gap",
             "expected_stage": "audit",
@@ -457,6 +483,7 @@ class LineageInjector:
 
         mutations.append({
             "mutation_type": "break_downstream_impact",
+            "batch_id": "batch1",
             "target_dataset": target_dataset,
             "removed_dependencies": removed,
             "removed_consumers": removed_consumers,

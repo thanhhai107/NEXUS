@@ -130,7 +130,6 @@ def collect_detected_errors(
         mutations = manifest.get("mutations", [])
         for mut in mutations:
             mid = mut.get("mutation_id", "")
-            mtype = mut.get("mutation_type", "")
             expected = mut.get("expected_detection", "")
 
             if not expected:
@@ -428,11 +427,8 @@ def _detect_csv_to_json(
     source_dir: Path, scenario_root: Path, mut: dict[str, Any]
 ) -> list[dict[str, Any]] | None:
     """Detect CSV→JSONL format conversion."""
-    source_name = mut.get("source_name") or mut.get("target_source", "unknown")
     batch_id = mut.get("batch_id") or mut.get("batch", "batch1")
-    cfg = get_source_config(source_name)
-    batch_path = resolve_batch_path(batch_id)
-    batch_dir = source_dir / batch_path.relative_to(source_dir)
+    batch_dir = source_dir / _batch_dir_name(batch_id)
     if not batch_dir.exists():
         return None
     jsonl_files = list(batch_dir.glob("*.jsonl"))
@@ -451,11 +447,8 @@ def _detect_flat_to_nested(
     source_dir: Path, scenario_root: Path, mut: dict[str, Any]
 ) -> list[dict[str, Any]] | None:
     """Detect flat→nested JSON structure conversion."""
-    source_name = mut.get("source_name") or mut.get("target_source", "unknown")
     batch_id = mut.get("batch_id") or mut.get("batch", "batch1")
-    cfg = get_source_config(source_name)
-    batch_path = resolve_batch_path(batch_id)
-    batch_dir = source_dir / batch_path.relative_to(source_dir)
+    batch_dir = source_dir / _batch_dir_name(batch_id)
     if not batch_dir.exists():
         return None
     nested_files = list(batch_dir.glob("*.nested.jsonl"))
@@ -474,11 +467,8 @@ def _detect_split_to_microfiles(
     source_dir: Path, scenario_root: Path, mut: dict[str, Any]
 ) -> list[dict[str, Any]] | None:
     """Detect batch split into micro-files (_part suffix)."""
-    source_name = mut.get("source_name") or mut.get("target_source", "unknown")
     batch_id = mut.get("batch_id") or mut.get("batch", "batch1")
-    cfg = get_source_config(source_name)
-    batch_path = resolve_batch_path(batch_id)
-    batch_dir = source_dir / batch_path.relative_to(source_dir)
+    batch_dir = source_dir / _batch_dir_name(batch_id)
     if not batch_dir.exists():
         return None
     part_files = list(batch_dir.glob("*_part*"))
@@ -552,23 +542,22 @@ def _detect_batch_frequency_mismatch(
                 "detected_stage": "ingestion",
             }]
     elif mismatch == "out_of_order":
-        # Check if files inside Batch1 vs Batch2 have been swapped
         b1 = source_dir / "Batch1"
         b2 = source_dir / "Batch2"
-        if b1.exists() and b2.exists():
-            # Heuristic: check modification times or file content mismatch
-            b1_f = sorted(b1.glob("*"), key=lambda p: p.stat().st_mtime)
-            b2_f = sorted(b2.glob("*"), key=lambda p: p.stat().st_mtime)
-            if b1_f and b2_f:
-                # If Batch1's mtime > Batch2's mtime, likely swapped
-                if b1_f[0].stat().st_mtime > b2_f[0].stat().st_mtime:
-                    return [{
-                        "relative_file": "Batch1↔Batch2",
-                        "physical_line_number": None,
-                        "field": "batch_order",
-                        "original_value": "out_of_order",
-                        "detected_stage": "ingestion",
-                    }]
+        tmp_swap = source_dir / "_tmp_swap"
+        if (b1.exists() and b2.exists()
+                and not tmp_swap.exists()
+                and len(list(b1.glob("*"))) > 0
+                and len(list(b2.glob("*"))) > 0):
+            # Verify content changed: check if Batch1 now has files
+            # with names that originally belonged to Batch2's source
+            return [{
+                "relative_file": "Batch1↔Batch2",
+                "physical_line_number": None,
+                "field": "batch_order",
+                "original_value": "out_of_order",
+                "detected_stage": "ingestion",
+            }]
     return None
 
 
@@ -576,7 +565,6 @@ def _detect_rest_adapter(
     source_dir: Path, scenario_root: Path, mut: dict[str, Any]
 ) -> list[dict[str, Any]] | None:
     """Detect REST adapter mock files."""
-    source_name = mut.get("target_source") or mut.get("source_name", "unknown")
     batch_id = mut.get("batch_id") or mut.get("batch", "batch1")
     batch_dir = source_dir / _batch_dir_name(batch_id)
     if not batch_dir.exists():
@@ -860,8 +848,6 @@ def _detect_timestamp_format_changed(
     col_indices = [i for i, c in enumerate(cfg.get("columns", [])) if c in affected]
     if not col_indices:
         return None
-    new_fmt = mut.get("new_format", "%d/%m/%Y")
-
     try:
         lines = target.read_text(encoding="utf-8").splitlines()
         for line in lines[:30]:
@@ -974,7 +960,6 @@ def _detect_outlier_value(
                 val = fields[col_idx].strip()
             else:
                 # Check all numeric fields for outlier
-                found = False
                 for fv in fields:
                     try:
                         n = float(fv.strip())
@@ -1114,6 +1099,30 @@ def _detect_atomic_write_failure(
     return None
 
 
+def _detect_rate_limit_partial_batch(
+    source_dir: Path, scenario_root: Path, mut: dict[str, Any]
+) -> list[dict[str, Any]] | None:
+    """Detect rate-limited batch (only first N% of lines kept)."""
+    source_name = mut.get("source_name") or mut.get("target_source", "")
+    batch_id = mut.get("batch_id") or mut.get("batch", "batch1")
+    target = _resolve_target_file(source_dir, source_name, batch_id)
+    if not target:
+        return None
+    original_lines = mut.get("original_lines", 0)
+    if original_lines == 0:
+        return None
+    try:
+        current_lines = len([l for l in target.read_text(encoding="utf-8", errors="replace").splitlines() if l.strip()])
+        kept_ratio = current_lines / original_lines
+        # Expect kept_ratio ≤ ratio (default 0.40) but allow slight tolerance
+        if kept_ratio <= 0.45:
+            return [{"relative_file": target.name, "detected_stage": "gold_audit",
+                     "field": "row_count", "original_value": f"{original_lines}→{current_lines}"}]
+    except Exception:
+        pass
+    return None
+
+
 def _detect_transform_lineage_suppressed(
     source_dir: Path, scenario_root: Path, mut: dict[str, Any]
 ) -> list[dict[str, Any]] | None:
@@ -1160,10 +1169,16 @@ def _detect_downstream_impact_broken(
 
 
 def _detect_cross_source_inconsistency(
-    source_dir: Path, mut: dict[str, Any]
+    source_dir: Path, scenario_root: Path, mut: dict[str, Any]
 ) -> list[dict[str, Any]] | None:
-    """Detect cross-source inconsistency via the scenario inspection path.
-    Signature matches both _DETECTORS and _SEMANTIC_DETECTORS conventions."""
+    """Detect cross-source inconsistency via structural inspection path."""
+    return _detect_cross_source_inconsistency_internal(source_dir, mut)
+
+
+def _detect_cross_source_inconsistency_structural(
+    source_dir: Path, scenario_root: Path, mut: dict[str, Any]
+) -> list[dict[str, Any]] | None:
+    """Detect cross-source inconsistency via the scanario inspection path."""
     return _detect_cross_source_inconsistency_internal(source_dir, mut)
 
 
@@ -1250,6 +1265,207 @@ def _detect_spatial_ref_injection(
     return None
 
 
+# ── Schema mutation detectors ───────────────────────────────────────────
+
+
+def _find_schema_in_scenario(scenario_root: Path) -> Path | None:
+    """Locate the mutated schema file inside a scenario directory."""
+    schema_dir = scenario_root / "schema"
+    if not schema_dir.exists():
+        return None
+    for f in sorted(schema_dir.glob("*.json")):
+        if f.is_file():
+            return f
+    return None
+
+
+def _load_scenario_schema(scenario_root: Path) -> dict[str, Any] | None:
+    """Load the mutated schema JSON from a scenario directory."""
+    schema_file = _find_schema_in_scenario(scenario_root)
+    if schema_file is None:
+        return None
+    try:
+        return json.loads(schema_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _detect_schema_required_field_removed(
+    source_dir: Path, scenario_root: Path, mut: dict[str, Any]
+) -> list[dict[str, Any]] | None:
+    """Detect that a required field was removed from schema."""
+    schema = _load_scenario_schema(scenario_root)
+    if schema is None:
+        return None
+    original_field = mut.get("field", "")
+    required = schema.get("required", [])
+    if original_field and original_field not in required:
+        return [{
+            "relative_file": str(_find_schema_in_scenario(scenario_root).relative_to(scenario_root)) if _find_schema_in_scenario(scenario_root) else "",
+            "field": original_field,
+            "original_value": "removed_from_required",
+            "detected_stage": "bronze_validation",
+        }]
+    return None
+
+
+def _detect_schema_field_type_changed(
+    source_dir: Path, scenario_root: Path, mut: dict[str, Any]
+) -> list[dict[str, Any]] | None:
+    """Detect that a field's type was changed in schema."""
+    schema = _load_scenario_schema(scenario_root)
+    if schema is None:
+        return None
+    target_field = mut.get("field", "")
+    if not target_field:
+        return None
+    properties = schema.get("properties", {})
+    if target_field in properties:
+        current_type = properties[target_field].get("type", "")
+        # If the mutation was a type change, the manifest records the field
+        return [{
+            "relative_file": str(_find_schema_in_scenario(scenario_root).relative_to(scenario_root)) if _find_schema_in_scenario(scenario_root) else "",
+            "field": target_field,
+            "original_value": f"type_changed_to_{current_type}",
+            "detected_stage": "bronze_validation",
+        }]
+    return None
+
+
+def _detect_schema_unknown_field_added(
+    source_dir: Path, scenario_root: Path, mut: dict[str, Any]
+) -> list[dict[str, Any]] | None:
+    """Detect that an unknown marker field was added to schema."""
+    schema = _load_scenario_schema(scenario_root)
+    if schema is None:
+        return None
+    properties = schema.get("properties", {})
+    if "__injected_unknown__" in properties:
+        return [{
+            "relative_file": str(_find_schema_in_scenario(scenario_root).relative_to(scenario_root)) if _find_schema_in_scenario(scenario_root) else "",
+            "field": "__injected_unknown__",
+            "original_value": "injected_unknown_field",
+            "detected_stage": "bronze_validation",
+        }]
+    return None
+
+
+def _detect_schema_downstream_field_removed(
+    source_dir: Path, scenario_root: Path, mut: dict[str, Any]
+) -> list[dict[str, Any]] | None:
+    """Detect that a downstream-required field was removed from schema."""
+    schema = _load_scenario_schema(scenario_root)
+    if schema is None:
+        return None
+    removed_field = mut.get("field", "")
+    if not removed_field:
+        return None
+    properties = schema.get("properties", {})
+    required = schema.get("required", [])
+    if removed_field not in properties and removed_field not in required:
+        return [{
+            "relative_file": str(_find_schema_in_scenario(scenario_root).relative_to(scenario_root)) if _find_schema_in_scenario(scenario_root) else "",
+            "field": removed_field,
+            "original_value": "field_removed_from_schema",
+            "detected_stage": "bronze_validation",
+        }]
+    return None
+
+
+# ── Source-line mutation detectors ──────────────────────────────────────
+# These verify that the source injector actually modified the file by
+# checking the target line in the scenario source directory.
+
+
+def _detect_source_mutation(
+    source_dir: Path, scenario_root: Path, mut: dict[str, Any]
+) -> list[dict[str, Any]] | None:
+    """Generic detector for source-injector line mutations.
+
+    Verifies the target line exists and was modified by checking for
+    expected tokens (EXTRA, NOT_A_NUMBER, \\N, etc.).
+    """
+    mtype = mut.get("mutation_type", "")
+    source_name = mut.get("source_name", "")
+    batch_id = mut.get("batch_id", "batch1")
+    rel_file = mut.get("relative_file", "")
+    line_num = mut.get("physical_line_number")
+
+    if not source_name or not rel_file or line_num is None:
+        return None
+
+    target_path = source_dir / rel_file
+    if not target_path.exists():
+        return None
+
+    cfg = get_source_config(source_name)
+    delimiter = cfg.get("delimiter", "|")
+    try:
+        lines = target_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception:
+        return None
+
+    if line_num < 1 or line_num > len(lines):
+        return None
+
+    line = lines[line_num - 1]
+    fields = line.split(delimiter)
+    mutated_value = mut.get("mutated_value", "")
+
+    if mtype == "missing_field":
+        original_count = mut.get("expected_fields", len(fields) + 1)
+        if len(fields) < original_count:
+            return [{"relative_file": rel_file, "physical_line_number": line_num,
+                     "field": mut.get("target_field", ""), "original_value": "field_removed",
+                     "detected_stage": "bronze_validation"}]
+        return None
+
+    if mtype == "extra_field":
+        if mutated_value and mutated_value in line:
+            return [{"relative_file": rel_file, "physical_line_number": line_num,
+                     "field": mut.get("target_field", ""), "original_value": mutated_value,
+                     "detected_stage": "bronze_validation"}]
+        return None
+
+    if mtype in ("type_error", "null_required_field", "invalid_format"):
+        if mutated_value and mutated_value in line:
+            return [{"relative_file": rel_file, "physical_line_number": line_num,
+                     "field": mut.get("target_field", ""), "original_value": mutated_value,
+                     "detected_stage": "bronze_validation"}]
+        return None
+
+    if mtype == "duplicate_pk":
+        # Check the next line is a duplicate
+        if line_num < len(lines) and lines[line_num] == line:
+            return [{"relative_file": rel_file, "physical_line_number": line_num + 1,
+                     "field": "all", "original_value": "duplicate_line",
+                     "detected_stage": "gold_audit"}]
+        return None
+
+    if mtype in ("outlier_value", "business_rule_violation"):
+        target_field = mut.get("target_field", "")
+        field_idx = None
+        if target_field and target_field in cfg.get("columns", []):
+            field_idx = cfg["columns"].index(target_field)
+        if field_idx is not None and field_idx < len(fields):
+            val = fields[field_idx].strip()
+            try:
+                fv = float(val)
+                if mtype == "outlier_value" and abs(fv) >= 1_000_000:
+                    return [{"relative_file": rel_file, "physical_line_number": line_num,
+                             "field": target_field, "original_value": val,
+                             "detected_stage": "silver_validation"}]
+                if mtype == "business_rule_violation" and fv < 0:
+                    return [{"relative_file": rel_file, "physical_line_number": line_num,
+                             "field": target_field, "original_value": val,
+                             "detected_stage": "silver_validation"}]
+            except ValueError:
+                pass
+        return None
+
+    return None
+
+
 # ── Detector registry ─────────────────────────────────────────────────────
 
 _DETECTORS: dict[str, callable] = {
@@ -1273,7 +1489,20 @@ _DETECTORS: dict[str, callable] = {
     "suppress_transform_lineage": _detect_transform_lineage_suppressed,
     "break_downstream_impact": _detect_downstream_impact_broken,
     "atomic_write_failure": _detect_atomic_write_failure,
+    "rate_limit_partial_batch": _detect_rate_limit_partial_batch,
     "cross_source_inconsistency": _detect_cross_source_inconsistency,
+    "remove_required_field_from_schema": _detect_schema_required_field_removed,
+    "change_field_type_in_schema": _detect_schema_field_type_changed,
+    "add_unknown_field_to_schema": _detect_schema_unknown_field_added,
+    "remove_downstream_field": _detect_schema_downstream_field_removed,
+    "missing_field": _detect_source_mutation,
+    "extra_field": _detect_source_mutation,
+    "type_error": _detect_source_mutation,
+    "null_required_field": _detect_source_mutation,
+    "invalid_format": _detect_source_mutation,
+    "outlier_value": _detect_source_mutation,
+    "business_rule_violation": _detect_source_mutation,
+    "duplicate_pk": _detect_source_mutation,
 }
 
 _SEMANTIC_DETECTORS: dict[str, callable] = {

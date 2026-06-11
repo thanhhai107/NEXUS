@@ -1,0 +1,163 @@
+# NEXUS TPC-DI Failure Injection Configuration
+# ====================================================
+# Centralized parameters for all 34 mutation types across 6 categories.
+# This file drives the SCENARIO_CATALOG and all 7 injector classes.
+#
+# ── Global defaults ────────────────────────────────────────────────────────
+
+global:
+  seed: 42
+  default_batch_id: "batch1"
+  default_target_source: "trade"
+  scenario_base: "runtime/tpcdi/scenarios"
+  pass_threshold_detection_rate: 0.50
+
+# ── Per-mutation-type configurations ────────────────────────────────────────
+
+mutation_defaults:
+
+  # ═══════════════ source_injector (8 types) ═══════════════
+  source:
+    default_n_records: 3
+    default_line_numbers: [100, 200, 300]
+    extra_field:
+      field_prefix: "EXTRA"
+    type_error:
+      invalid_token: "NOT_A_NUMBER"
+    null_required_field:
+      null_sentinel: "\\N"
+    invalid_format:
+      date_token: "NOT_A_DATE"
+      numeric_token: "##INVALID##"
+    outlier_value:
+      multiplier: 1000000
+    business_rule_violation:
+      operation: "negate"
+
+  # ═══════════════ semantic_injector (10 types) ═══════════════
+  semantic:
+    unit_changed:
+      factor: 100.0
+    timestamp_format_changed:
+      new_format: "%d/%m/%Y"
+    timestamp_granularity_changed:
+      truncation_length: 10
+    entity_id_ambiguity:
+      suffix: "_AMBIGUOUS"
+    rename_to_synonym:
+      synonyms:
+        price: "cost"
+        quantity: "volume"
+        amount: "sum"
+        date: "day"
+        time: "moment"
+        id: "uid"
+        name: "label"
+        type: "category"
+        status: "state"
+        value: "score"
+        rate: "ratio"
+        fee: "charge"
+    pre_aggregate_records:
+      aggregation_fn: "sum"
+    different_business_definitions:
+      formula: "net_to_gross"
+      tax_rate: 0.10
+      supported_formulas:
+        - net_to_gross
+        - gross_to_net
+        - add_markup
+    different_spatial_ref:
+      crs_values:
+        - "EPSG:4326"
+        - "EPSG:3857"
+        - "EPSG:27700"
+        - "EPSG:32633"
+
+  # ═══════════════ reliability_injector (6 types) ═══════════════
+  reliability:
+    partial_file:
+      offset_range: [0.30, 0.70]
+    poison_record:
+      insert_position: 0.50
+      poison_bytes: "\\xff\\xfeBAD_BINARY_INJECTION\\xff\\xfe"
+    rate_limit_partial_batch:
+      ratio: 0.40
+    atomic_write_failure:
+      completion_range: [0.40, 0.80]
+      sentinel: "__ATOMIC_WRITE_FAILED__"
+
+  # ═══════════════ format_injector (3 types) ═══════════════
+  format:
+    split_batch_to_microfiles:
+      n_chunks: 5
+
+  # ═══════════════ lineage_injector (7 types) ═══════════════
+  lineage:
+    corrupt_audit_run_id:
+      fake_run_id: "00000000-dead-beef-dead-000000000000"
+    split_emission_targets:
+      n_targets: 2
+    suppress_lineage_emission:
+      synthetic_records: 10
+    break_downstream_impact:
+      target_dataset: "dim_trade"
+
+  # ═══════════════ config_injector (3 types) ═══════════════
+  config:
+    simulate_api_failure:
+      http_status: 503
+      error_message: "Service Unavailable"
+    mock_rest_adapter:
+      n_records: 50
+    batch_frequency_mismatch:
+      double_delivery_suffix: "_duplicate"
+
+  # ═══════════════ schema_injector (4 types) ═══════════════
+  schema:
+    change_field_type_in_schema:
+      fallback_type: "string"
+
+# ── Category scoring weights ─────────────────────────────────────────────────
+
+categories:
+  schema:
+    label: "Schema Issues"
+    weight: 0.20
+  semantic:
+    label: "Semantic Issues"
+    weight: 0.15
+  quality:
+    label: "Data Quality"
+    weight: 0.20
+  heterogeneity:
+    label: "Source Heterogeneity"
+    weight: 0.10
+  lineage:
+    label: "Lineage Issues"
+    weight: 0.15
+  reliability:
+    label: "Reliability & Failure Handling"
+    weight: 0.20
+
+# ── Severity profiles (pre-configured injection intensity) ──────────────────
+
+severity_profiles:
+  minimal:
+    source_n_records: 1
+    semantic_factor: 10.0
+    format_n_chunks: 3
+    lineage_n_targets: 1
+    reliability_ratio: 0.60
+  standard:
+    source_n_records: 3
+    semantic_factor: 100.0
+    format_n_chunks: 5
+    lineage_n_targets: 2
+    reliability_ratio: 0.40
+  aggressive:
+    source_n_records: 10
+    semantic_factor: 1000.0
+    format_n_chunks: 20
+    lineage_n_targets: 5
+    reliability_ratio: 0.10

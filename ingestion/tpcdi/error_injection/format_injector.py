@@ -150,6 +150,8 @@ class FormatInjector:
 
             mutations.append({
                 "mutation_type": "csv_to_json",
+                "source_name": source_name,
+                "batch_id": batch_id,
                 "original_file": filepath.name,
                 "converted_file": jsonl_path.name,
                 "record_count": len(json_lines),
@@ -209,6 +211,8 @@ class FormatInjector:
 
             mutations.append({
                 "mutation_type": "flat_to_nested",
+                "source_name": source_name,
+                "batch_id": batch_id,
                 "original_file": filepath.name,
                 "converted_file": jsonl_path.name,
                 "nested_groups": list(groups.keys()),
@@ -248,6 +252,8 @@ class FormatInjector:
 
             mutations.append({
                 "mutation_type": "split_batch_to_microfiles",
+                "source_name": source_name,
+                "batch_id": batch_id,
                 "original_file": filepath.name,
                 "micro_files": created,
                 "n_chunks": n_chunks,

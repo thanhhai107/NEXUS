@@ -127,6 +127,7 @@ class ConfigInjector:
 
         return [{
             "mutation_type": "simulate_api_failure",
+            "source_name": target_source,
             "target_source": target_source,
             "http_status": http_status,
             "error_message": error_message,
@@ -158,7 +159,8 @@ class ConfigInjector:
         batch_dir = src_dir / batch_name
 
         if not batch_dir.exists():
-            return [{"mutation_type": "batch_frequency_mismatch", "skipped": f"{batch_name}_not_found"}]
+            return [{"mutation_type": "batch_frequency_mismatch",
+                "source_name": target_source, "skipped": f"{batch_name}_not_found"}]
 
         mutations: list[dict[str, Any]] = []
 
@@ -167,6 +169,7 @@ class ConfigInjector:
             shutil.copytree(batch_dir, dup_dir)
             mutations.append({
                 "mutation_type": "batch_frequency_mismatch",
+                "source_name": target_source,
                 "mismatch_type": "double_delivery",
                 "original_batch": batch_name,
                 "duplicate_batch": f"{batch_name}_duplicate",
@@ -184,6 +187,7 @@ class ConfigInjector:
             shutil.move(str(batch_dir), str(skip_target))
             mutations.append({
                 "mutation_type": "batch_frequency_mismatch",
+                "source_name": target_source,
                 "mismatch_type": "skip_batch",
                 "original_path": batch_name,
                 "new_path": "Batch3",
@@ -204,6 +208,7 @@ class ConfigInjector:
                 shutil.rmtree(tmp)
                 mutations.append({
                     "mutation_type": "batch_frequency_mismatch",
+                "source_name": target_source,
                     "mismatch_type": "out_of_order",
                     "swapped": ["Batch1", "Batch2"],
                     "expected_detection": "batch_sequence_gap",
@@ -214,6 +219,7 @@ class ConfigInjector:
             else:
                 mutations.append({
                     "mutation_type": "batch_frequency_mismatch",
+                "source_name": target_source,
                     "mismatch_type": "out_of_order",
                     "skipped": "batch2_not_found",
                 })
@@ -277,6 +283,7 @@ class ConfigInjector:
 
         return [{
             "mutation_type": "mock_rest_adapter",
+            "source_name": target_source,
             "target_source": target_source,
             "rest_response_file": str(rest_file.relative_to(scenario_root_dir)),
             "adapter_config_file": str(adapter_cfg_file.relative_to(scenario_root_dir)),

@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import random
 import shutil
 from pathlib import Path
@@ -63,8 +62,6 @@ class TpcdiSourceInjector:
         clean_root = source_root()
         scenario_root = PROJECT_ROOT / SCENARIO_BASE / scenario_id
         source_dir = scenario_root / "source"
-        batch_dir = source_dir / resolve_batch_path(batch_id).relative_to(clean_root)
-
         # Copy full clean source root (all batches + reports)
         if source_dir.exists():
             shutil.rmtree(source_dir)
